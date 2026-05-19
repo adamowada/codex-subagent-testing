@@ -13,6 +13,16 @@ import sys
 import threading
 from typing import Any, Iterable, Mapping
 
+from harness.artifacts import (
+    CODEX_IMPLEMENTATION_ARTIFACTS,
+    CODEX_JUDGE_ARTIFACTS,
+    phase_artifact_paths,
+    validate_artifact,
+    validate_experiment_outputs,
+    validate_hidden_artifact_privacy,
+    validate_phase_artifacts,
+    validate_run_metadata,
+)
 from harness.codex_runner import (
     build_implementation_command,
     build_judge_command,
@@ -62,18 +72,6 @@ COPY_IGNORE_PATTERNS = [
     ".ruff_cache",
     "*.pyc",
     "*.tsbuildinfo",
-]
-CODEX_IMPLEMENTATION_ARTIFACTS = [
-    "events.jsonl",
-    "stderr.log",
-    "wall_time.json",
-    "final_response.json",
-]
-CODEX_JUDGE_ARTIFACTS = [
-    "judge.events.jsonl",
-    "judge.stderr.log",
-    "judge.wall_time.json",
-    "judge.json",
 ]
 LOG_LOCK = threading.Lock()
 
@@ -223,11 +221,21 @@ def run(args: argparse.Namespace) -> int:
     )
 
     for run_record in selected_runs:
-        parse_usage_and_score(experiment_dir, run_record, status, log_path)
+        parse_usage_and_score(
+            experiment_dir,
+            run_record,
+            status,
+            log_path,
+            rerun_failed=args.rerun_failed,
+        )
 
     outputs = {}
     if not args.no_report:
         outputs = write_results_outputs(experiment_dir, selected_runs)
+        output_errors = validate_experiment_outputs(experiment_dir)
+        if output_errors:
+            status.update(status="failed", failure="experiment output validation failed")
+            raise OrchestrationError(_format_artifact_errors("experiment output validation failed", output_errors))
         status.update(report_outputs=outputs)
 
     status.update(
@@ -355,7 +363,9 @@ def write_experiment_metadata(
         "config_sha256": _json_sha256(config),
     }
     _write_json(experiment_dir / "experiment-metadata.json", payload)
+    _write_json(experiment_dir / "experiment_metadata.json", payload)
     _write_json(experiment_dir / "config.resolved.json", config)
+    _write_json(experiment_dir / "resolved_config.json", config)
     _write_json(experiment_dir / "matrix.json", selected_runs)
     _write_json(experiment_dir / "matrix-summary.json", summarize_matrix(selected_runs))
 
@@ -365,7 +375,7 @@ def validate_resume_target(
     config: Mapping[str, Any],
     selected_runs: list[dict[str, Any]],
 ) -> None:
-    existing_config = _read_json(experiment_dir / "config.resolved.json")
+    existing_config = _read_json_first(experiment_dir, ["resolved_config.json", "config.resolved.json"])
     if existing_config:
         existing_hash = _json_sha256(existing_config)
         current_hash = _json_sha256(config)
@@ -383,6 +393,13 @@ def validate_resume_target(
                 "resume matrix drift detected; selected run IDs do not match existing experiment"
             )
 
+    for run in selected_runs:
+        run_dir = run_directory(experiment_dir, run)
+        if (run_dir / "metadata.json").exists():
+            errors = validate_run_metadata(run_dir, run)
+            if errors:
+                raise OrchestrationError(_format_artifact_errors("resume metadata drift detected", errors))
+
 
 def prepare_run(
     *,
@@ -399,7 +416,7 @@ def prepare_run(
     run_dir.mkdir(parents=True, exist_ok=True)
     status.update_run(str(run["run_id"]), phase="preparing")
 
-    if not phase_completed(state, "prepared", [worktree]):
+    if not phase_completed(state, "prepared", phase_artifact_paths(run_dir, "prepared")):
         if worktree.exists():
             if rerun_failed:
                 _archive_path(worktree)
@@ -410,15 +427,20 @@ def prepare_run(
         _append_log(log_path, f"{run['run_id']} prepared worktree")
 
     metadata_path = run_dir / "metadata.json"
-    if not phase_completed(load_state(run_dir), "baseline_committed", [metadata_path]):
+    if phase_completed(load_state(run_dir), "baseline_committed", phase_artifact_paths(run_dir, "baseline_committed")):
+        errors = validate_run_metadata(run_dir, run)
+        if errors:
+            raise OrchestrationError(_format_artifact_errors("run metadata validation failed", errors))
+    else:
         baseline_sha = initialize_git_baseline(worktree)
         metadata = run_metadata(run, run_dir, worktree, baseline_sha)
         _write_json(metadata_path, metadata)
         mark_phase(run_dir, "baseline_committed", "completed", {"baseline_sha": baseline_sha})
         _append_log(log_path, f"{run['run_id']} baseline {baseline_sha}")
 
-    render_artifacts(repo_root, run_dir, run)
-    mark_phase(run_dir, "rendered", "completed", {"rendered_at": iso_now()})
+    if not phase_completed(load_state(run_dir), "rendered", phase_artifact_paths(run_dir, "rendered")):
+        render_artifacts(repo_root, run_dir, run)
+        mark_phase(run_dir, "rendered", "completed", {"rendered_at": iso_now()})
     status.update_run(str(run["run_id"]), phase="prepared")
 
 
@@ -491,11 +513,7 @@ def run_implementation_and_tests(
         mark_phase(run_dir, "diff_captured", "completed", {"captured_at": iso_now()})
 
     state = load_state(run_dir)
-    public_artifacts_exist = all(
-        (run_dir / name).exists()
-        for name in ["typecheck.meta.json", "public_ts.meta.json", "public_py.meta.json"]
-    )
-    if should_run_phase(state, "public_tested", run_dir / "typecheck.meta.json", rerun_failed) or not public_artifacts_exist:
+    if should_run_phase(state, "public_tested", run_dir / "typecheck.meta.json", rerun_failed):
         run_public_tests(worktree, run_dir, run)
         mark_phase(run_dir, "public_tested", "completed", {"tested_at": iso_now()})
 
@@ -503,11 +521,23 @@ def run_implementation_and_tests(
     if should_run_phase(state, "hidden_tested", run_dir / "hidden-results.json", rerun_failed):
         run_hidden_tests(repo_root, worktree, run_dir, run)
         hidden_meta = _read_json(run_dir / "hidden-runner.meta.json")
+        privacy_errors = validate_hidden_artifact_privacy(run_dir)
+        hidden_completed = hidden_meta.get("returncode") == 0 and not privacy_errors
+        phase_data = {
+            "tested_at": iso_now(),
+            "returncode": hidden_meta.get("returncode"),
+        }
+        if privacy_errors:
+            phase_data["privacy_errors"] = privacy_errors
+            _append_log(
+                log_path,
+                _format_artifact_errors(f"{run['run_id']} hidden artifact privacy validation failed", privacy_errors),
+            )
         mark_phase(
             run_dir,
             "hidden_tested",
-            "completed" if hidden_meta.get("returncode") == 0 else "failed",
-            {"tested_at": iso_now(), "returncode": hidden_meta.get("returncode")},
+            "completed" if hidden_completed else "failed",
+            phase_data,
         )
     status.update_run(str(run["run_id"]), phase="implementation_complete")
 
@@ -583,21 +613,27 @@ def parse_usage_and_score(
     run: Mapping[str, Any],
     status: StatusWriter,
     log_path: Path,
+    *,
+    rerun_failed: bool = False,
 ) -> None:
     run_dir = run_directory(experiment_dir, run)
-    usage = summarize_usage(
-        implementation_events_path=run_dir / "events.jsonl",
-        judge_events_path=run_dir / "judge.events.jsonl",
-        run=run,
-    )
-    write_usage_summary(run_dir / "usage.json", usage)
-    mark_phase(run_dir, "usage_parsed", "completed", {"parsed_at": iso_now()})
+    state = load_state(run_dir)
+    if should_run_phase(state, "usage_parsed", run_dir / "usage.json", rerun_failed):
+        usage = summarize_usage(
+            implementation_events_path=run_dir / "events.jsonl",
+            judge_events_path=run_dir / "judge.events.jsonl",
+            run=run,
+        )
+        write_usage_summary(run_dir / "usage.json", usage)
+        mark_phase(run_dir, "usage_parsed", "completed", {"parsed_at": iso_now()})
 
-    score = compute_run_score(run_dir, run)
-    write_run_score(run_dir / "score.json", score)
-    mark_phase(run_dir, "scored", "completed", {"quality_score": score.get("quality_score")})
-    _append_log(log_path, f"{run['run_id']} scored quality={score.get('quality_score')}")
-    status.update_run(str(run["run_id"]), phase="scored", quality_score=score.get("quality_score"))
+    state = load_state(run_dir)
+    if should_run_phase(state, "scored", run_dir / "score.json", rerun_failed):
+        score = compute_run_score(run_dir, run)
+        write_run_score(run_dir / "score.json", score)
+        mark_phase(run_dir, "scored", "completed", {"quality_score": score.get("quality_score")})
+        _append_log(log_path, f"{run['run_id']} scored quality={score.get('quality_score')}")
+        status.update_run(str(run["run_id"]), phase="scored", quality_score=score.get("quality_score"))
 
 
 def run_parallel(
@@ -650,6 +686,7 @@ def initialize_git_baseline(worktree: Path) -> str:
 
 
 def render_artifacts(repo_root: Path, run_dir: Path, run: Mapping[str, Any]) -> None:
+    run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "rendered_prompt.md").write_text(render_implementation_prompt(run, repo_root), encoding="utf-8")
     (run_dir / "judge_prompt.md").write_text(render_judge_prompt(run, repo_root), encoding="utf-8")
     config_files = render_codex_config(run, repo_root)
@@ -752,8 +789,11 @@ def should_run_phase(state: Mapping[str, Any], phase: str, required_artifact: Pa
     phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
     phase_state = phases.get(phase, {}) if isinstance(phases, Mapping) else {}
     if isinstance(phase_state, Mapping):
-        if phase_state.get("status") == "completed" and required_artifact.exists():
-            return False
+        if phase_state.get("status") == "completed":
+            errors = validate_phase_artifacts(required_artifact.parent, phase)
+            if not errors and required_artifact.exists():
+                return False
+            raise OrchestrationError(_format_artifact_errors(f"completed phase has invalid artifacts: {phase}", errors))
         if phase_state.get("status") == "failed" and required_artifact.exists() and not rerun_failed:
             return False
     return True
@@ -789,10 +829,11 @@ def archive_failed_phase_artifacts(
 def phase_completed(state: Mapping[str, Any], phase: str, artifacts: Iterable[Path]) -> bool:
     phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
     phase_state = phases.get(phase, {}) if isinstance(phases, Mapping) else {}
+    paths = list(artifacts)
     return (
         isinstance(phase_state, Mapping)
         and phase_state.get("status") == "completed"
-        and all(path.exists() for path in artifacts)
+        and all(not validate_artifact(path) for path in paths)
     )
 
 
@@ -869,6 +910,14 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _read_json_first(root: Path, names: Iterable[str]) -> dict[str, Any]:
+    for name in names:
+        value = _read_json(root / name)
+        if value:
+            return value
+    return {}
+
+
 def _read_json_any(path: Path) -> Any:
     if not path.exists():
         return None
@@ -895,6 +944,13 @@ def _safe_name(value: str) -> str:
 def _json_sha256(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _format_artifact_errors(title: str, errors: Iterable[str]) -> str:
+    details = list(errors)
+    if not details:
+        return title
+    return title + ": " + "; ".join(details)
 
 
 if __name__ == "__main__":
