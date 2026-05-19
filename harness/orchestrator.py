@@ -46,6 +46,7 @@ from harness.preflight import run_preflight, write_preflight
 from harness.prompt_rendering import render_codex_config, render_implementation_prompt, render_judge_prompt
 from harness.report_data import write_results_outputs
 from harness.scoring import compute_run_score, write_run_score
+from harness.validation import validate_stage11, write_validation_report
 
 
 RUNS_DIR_NAME = "runs"
@@ -237,6 +238,26 @@ def run(args: argparse.Namespace) -> int:
             status.update(status="failed", failure="experiment output validation failed")
             raise OrchestrationError(_format_artifact_errors("experiment output validation failed", output_errors))
         status.update(report_outputs=outputs)
+
+    validation = validate_stage11(
+        config_path=config_path,
+        repo_root=repo_root,
+        experiment_dir=experiment_dir,
+        selected_runs=selected_runs,
+        require_codex=not args.dry_run,
+        require_report_outputs=not args.no_report,
+        preflight_result=preflight,
+    )
+    write_validation_report(experiment_dir / "validation.json", validation)
+    if validation["status"] == "failed":
+        status.update(status="failed", failure="stage 11 validation failed")
+        validation_errors = [
+            f"{check['name']}: {check.get('details', '')}"
+            for check in validation.get("checks", [])
+            if check.get("status") == "failed"
+        ]
+        raise OrchestrationError(_format_artifact_errors("stage 11 validation failed", validation_errors))
+    status.update(stage11_validation=validation["status"])
 
     status.update(
         status="completed",
