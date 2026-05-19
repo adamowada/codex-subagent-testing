@@ -63,6 +63,19 @@ COPY_IGNORE_PATTERNS = [
     "*.pyc",
     "*.tsbuildinfo",
 ]
+CODEX_IMPLEMENTATION_ARTIFACTS = [
+    "events.jsonl",
+    "stderr.log",
+    "wall_time.json",
+    "final_response.json",
+]
+CODEX_JUDGE_ARTIFACTS = [
+    "judge.events.jsonl",
+    "judge.stderr.log",
+    "judge.wall_time.json",
+    "judge.json",
+]
+LOG_LOCK = threading.Lock()
 
 
 class OrchestrationError(RuntimeError):
@@ -425,26 +438,52 @@ def run_implementation_and_tests(
     status.update_run(str(run["run_id"]), phase="implementation")
 
     if should_run_phase(state, "implemented", run_dir / "events.jsonl", rerun_failed):
+        archived_to = archive_failed_phase_artifacts(
+            run_dir,
+            "implemented",
+            CODEX_IMPLEMENTATION_ARTIFACTS,
+            state,
+            rerun_failed,
+        )
         prompt = (run_dir / "rendered_prompt.md").read_text(encoding="utf-8")
         command = materialize_worktree_command(build_implementation_command(codex_bin, run, prompt), worktree)
+        display_command = command_for_display(command)
+        _append_log(log_path, f"{run['run_id']} implementation command={json.dumps(display_command)}")
         result = run_process_to_files(
             command,
             cwd=worktree,
             stdout_path=run_dir / "events.jsonl",
             stderr_path=run_dir / "stderr.log",
             timeout_seconds=int(run["timeouts"]["implementation_seconds"]),
-            command_display=command_for_display(command),
+            command_display=display_command,
         )
         write_process_result(run_dir / "wall_time.json", result)
         final_response = extract_final_response(run_dir / "events.jsonl")
         _write_json(run_dir / "final_response.json", final_response)
+        phase_data = {
+            "returncode": result.returncode,
+            "timed_out": result.timed_out,
+            "elapsed_seconds": result.elapsed_seconds,
+            "stdout_path": result.stdout_path,
+            "stderr_path": result.stderr_path,
+            "final_response_parsed": final_response.get("parsed"),
+        }
+        if archived_to is not None:
+            phase_data["previous_artifacts_archived_to"] = archived_to
         mark_phase(
             run_dir,
             "implemented",
             "completed" if result.returncode == 0 and not result.timed_out else "failed",
-            {"returncode": result.returncode, "timed_out": result.timed_out},
+            phase_data,
         )
-        _append_log(log_path, f"{run['run_id']} implementation returncode={result.returncode} timeout={result.timed_out}")
+        _append_log(
+            log_path,
+            (
+                f"{run['run_id']} implementation returncode={result.returncode} "
+                f"timeout={result.timed_out} elapsed={result.elapsed_seconds} "
+                f"stdout={result.stdout_path} stderr={result.stderr_path}"
+            ),
+        )
 
     state = load_state(run_dir)
     if should_run_phase(state, "diff_captured", run_dir / "diff.patch", rerun_failed):
@@ -490,26 +529,52 @@ def run_judge(
     if not should_run_phase(state, "judged", run_dir / "judge.events.jsonl", rerun_failed):
         return
 
+    archived_to = archive_failed_phase_artifacts(
+        run_dir,
+        "judged",
+        CODEX_JUDGE_ARTIFACTS,
+        state,
+        rerun_failed,
+    )
     prompt = (run_dir / "judge_prompt.md").read_text(encoding="utf-8")
     command = materialize_worktree_command(build_judge_command(codex_bin, run, prompt), worktree)
+    display_command = command_for_display(command)
+    _append_log(log_path, f"{run['run_id']} judge command={json.dumps(display_command)}")
     result = run_process_to_files(
         command,
         cwd=worktree,
         stdout_path=run_dir / "judge.events.jsonl",
         stderr_path=run_dir / "judge.stderr.log",
         timeout_seconds=int(run["timeouts"]["judge_seconds"]),
-        command_display=command_for_display(command),
+        command_display=display_command,
     )
     write_process_result(run_dir / "judge.wall_time.json", result)
     judge_json = extract_final_response(run_dir / "judge.events.jsonl")
     _write_json(run_dir / "judge.json", judge_json)
+    phase_data = {
+        "returncode": result.returncode,
+        "timed_out": result.timed_out,
+        "elapsed_seconds": result.elapsed_seconds,
+        "stdout_path": result.stdout_path,
+        "stderr_path": result.stderr_path,
+        "parsed": judge_json.get("parsed"),
+    }
+    if archived_to is not None:
+        phase_data["previous_artifacts_archived_to"] = archived_to
     mark_phase(
         run_dir,
         "judged",
         "completed" if result.returncode == 0 and not result.timed_out and judge_json.get("parsed") else "failed",
-        {"returncode": result.returncode, "timed_out": result.timed_out, "parsed": judge_json.get("parsed")},
+        phase_data,
     )
-    _append_log(log_path, f"{run['run_id']} judge returncode={result.returncode} timeout={result.timed_out}")
+    _append_log(
+        log_path,
+        (
+            f"{run['run_id']} judge returncode={result.returncode} "
+            f"timeout={result.timed_out} elapsed={result.elapsed_seconds} "
+            f"stdout={result.stdout_path} stderr={result.stderr_path}"
+        ),
+    )
     status.update_run(str(run["run_id"]), phase="judged")
 
 
@@ -694,6 +759,33 @@ def should_run_phase(state: Mapping[str, Any], phase: str, required_artifact: Pa
     return True
 
 
+def archive_failed_phase_artifacts(
+    run_dir: Path,
+    phase: str,
+    artifact_names: Iterable[str],
+    state: Mapping[str, Any],
+    rerun_failed: bool,
+) -> str | None:
+    if not rerun_failed:
+        return None
+
+    phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
+    phase_state = phases.get(phase, {}) if isinstance(phases, Mapping) else {}
+    if not isinstance(phase_state, Mapping) or phase_state.get("status") != "failed":
+        return None
+
+    existing = [run_dir / name for name in artifact_names if (run_dir / name).exists()]
+    if not existing:
+        return None
+
+    archive_dir = _unique_archive_dir(run_dir / "reruns", phase)
+    for source in existing:
+        target = archive_dir / source.relative_to(run_dir)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source.rename(target)
+    return str(archive_dir)
+
+
 def phase_completed(state: Mapping[str, Any], phase: str, artifacts: Iterable[Path]) -> bool:
     phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
     phase_state = phases.get(phase, {}) if isinstance(phases, Mapping) else {}
@@ -744,10 +836,22 @@ def _archive_path(path: Path) -> Path:
     return archive
 
 
+def _unique_archive_dir(parent: Path, phase: str) -> Path:
+    timestamp = iso_now().replace(":", "").replace("-", "")
+    candidate = parent / f"{phase}-{timestamp}"
+    suffix = 1
+    while candidate.exists():
+        suffix += 1
+        candidate = parent / f"{phase}-{timestamp}-{suffix:02d}"
+    candidate.mkdir(parents=True)
+    return candidate
+
+
 def _append_log(path: Path, line: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
+    with LOG_LOCK:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
 
 
 def _write_json(path: Path, payload: Any) -> None:

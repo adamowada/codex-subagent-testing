@@ -196,14 +196,24 @@ def _check_codex_version(codex_bin: str) -> PreflightCheck:
             "codex",
             "failed",
             details or f"{codex_bin!r} exited with {completed.returncode}",
-            {"codex_bin": codex_bin, "returncode": completed.returncode},
+            {
+                "codex_bin": codex_bin,
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            },
         )
 
     return PreflightCheck(
         "codex",
         "passed",
         completed.stdout.strip() or codex_bin,
-        {"codex_bin": codex_bin},
+        {
+            "codex_bin": codex_bin,
+            "returncode": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        },
     )
 
 

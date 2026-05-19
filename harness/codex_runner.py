@@ -13,6 +13,7 @@ from typing import Any, Mapping
 
 
 FINAL_JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
+KILL_WAIT_SECONDS = 15
 
 
 @dataclass(frozen=True)
@@ -37,14 +38,15 @@ def resolve_codex_bin(env: Mapping[str, str] | None = None) -> str | None:
     """Return the Codex executable selected by CODEX_BIN or PATH."""
 
     environment = env if env is not None else os.environ
+    path = environment.get("PATH")
     configured = environment.get("CODEX_BIN")
     if configured:
         candidate = Path(configured)
         if candidate.is_absolute() and candidate.exists():
             return str(candidate)
-        resolved = shutil.which(configured)
+        resolved = shutil.which(configured, path=path)
         return resolved or configured
-    return shutil.which("codex")
+    return shutil.which("codex", path=path)
 
 
 def build_implementation_command(codex_bin: str, run: Mapping[str, Any], prompt: str) -> list[str]:
@@ -140,7 +142,14 @@ def run_process_to_files(
                 except subprocess.TimeoutExpired:
                     timed_out = True
                     process.kill()
-                    returncode = process.wait(timeout=15)
+                    stderr_file.write("\nTIMEOUT\n")
+                    try:
+                        returncode = process.wait(timeout=KILL_WAIT_SECONDS)
+                    except subprocess.TimeoutExpired:
+                        returncode = None
+                        stderr_file.write(
+                            f"process_error:TimeoutExpired: process did not exit within {KILL_WAIT_SECONDS}s after kill\n"
+                        )
             except OSError as exc:
                 stderr_file.write(f"process_error:{exc.__class__.__name__}: {exc}\n")
                 returncode = None
@@ -191,8 +200,14 @@ def run_logged_command(
             except subprocess.TimeoutExpired:
                 timed_out = True
                 process.kill()
-                returncode = process.wait(timeout=15)
                 log_file.write("\nTIMEOUT\n")
+                try:
+                    returncode = process.wait(timeout=KILL_WAIT_SECONDS)
+                except subprocess.TimeoutExpired:
+                    returncode = None
+                    log_file.write(
+                        f"process_error:TimeoutExpired: process did not exit within {KILL_WAIT_SECONDS}s after kill\n"
+                    )
         except OSError as exc:
             log_file.write(f"process_error:{exc.__class__.__name__}: {exc}\n")
             returncode = None
@@ -280,13 +295,54 @@ def _parse_json_object_from_text(text: str) -> dict[str, Any]:
     try:
         value = json.loads(stripped)
     except json.JSONDecodeError:
-        match = FINAL_JSON_PATTERN.search(stripped)
-        if not match:
+        candidates = list(_json_object_candidates(stripped))
+        if not candidates:
             return {"parsed": False, "raw": text, "error": "no_json_object"}
-        candidate = match.group(0)
-        try:
-            value = json.loads(candidate)
-        except json.JSONDecodeError as exc:
-            return {"parsed": False, "raw": text, "error": f"json_decode_error:{exc.msg}"}
-        return {"parsed": True, "raw": candidate, "value": value}
+        last_error = "no_json_object"
+        for candidate in reversed(candidates):
+            try:
+                value = json.loads(candidate)
+            except json.JSONDecodeError as exc:
+                last_error = f"json_decode_error:{exc.msg}"
+                continue
+            return {"parsed": True, "raw": candidate, "value": value}
+        return {"parsed": False, "raw": text, "error": last_error}
     return {"parsed": True, "raw": stripped, "value": value}
+
+
+def _json_object_candidates(text: str) -> list[str]:
+    candidates: list[str] = []
+    stack = 0
+    start: int | None = None
+    in_string = False
+    escaped = False
+
+    for index, character in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+
+        if character == '"':
+            in_string = True
+            continue
+        if character == "{":
+            if stack == 0:
+                start = index
+            stack += 1
+            continue
+        if character == "}" and stack:
+            stack -= 1
+            if stack == 0 and start is not None:
+                candidates.append(text[start : index + 1])
+                start = None
+
+    if not candidates:
+        match = FINAL_JSON_PATTERN.search(text)
+        if match:
+            candidates.append(match.group(0))
+    return candidates
