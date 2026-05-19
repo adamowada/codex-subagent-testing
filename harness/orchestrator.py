@@ -1,0 +1,797 @@
+from __future__ import annotations
+
+import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import fnmatch
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import threading
+from typing import Any, Iterable, Mapping
+
+from harness.codex_runner import (
+    build_implementation_command,
+    build_judge_command,
+    command_for_display,
+    extract_final_response,
+    iso_now,
+    materialize_worktree_command,
+    resolve_codex_bin,
+    run_logged_command,
+    run_process_to_files,
+    write_process_result,
+)
+from harness.jsonl_usage import summarize_usage, write_usage_summary
+from harness.matrix import (
+    REPO_ROOT,
+    expand_experiment_matrix,
+    load_experiment_config,
+    summarize_matrix,
+)
+from harness.preflight import run_preflight, write_preflight
+from harness.prompt_rendering import render_codex_config, render_implementation_prompt, render_judge_prompt
+from harness.report_data import write_results_outputs
+from harness.scoring import compute_run_score, write_run_score
+
+
+RUNS_DIR_NAME = "runs"
+STATE_PHASES = [
+    "prepared",
+    "baseline_committed",
+    "rendered",
+    "implemented",
+    "diff_captured",
+    "public_tested",
+    "hidden_tested",
+    "judged",
+    "usage_parsed",
+    "scored",
+]
+COPY_IGNORE_PATTERNS = [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "*.pyc",
+    "*.tsbuildinfo",
+]
+
+
+class OrchestrationError(RuntimeError):
+    """Raised when shared infrastructure prevents orchestration."""
+
+
+class StatusWriter:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.lock = threading.Lock()
+        self.payload: dict[str, Any] = {
+            "schema_version": 1,
+            "status": "running",
+            "started_at": iso_now(),
+            "updated_at": iso_now(),
+            "runs": {},
+        }
+
+    def update_run(self, run_id: str, **values: Any) -> None:
+        with self.lock:
+            run_payload = self.payload["runs"].setdefault(run_id, {})
+            run_payload.update(values)
+            self.payload["updated_at"] = iso_now()
+            self.write_locked()
+
+    def update(self, **values: Any) -> None:
+        with self.lock:
+            self.payload.update(values)
+            self.payload["updated_at"] = iso_now()
+            self.write_locked()
+
+    def write_locked(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.path.write_text(json.dumps(self.payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    try:
+        return run(args)
+    except OrchestrationError as exc:
+        print(f"orchestration failed: {exc}", file=sys.stderr)
+        return 2
+
+
+def run(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    config_path = _resolve_path(args.config, repo_root)
+    runs_root = _resolve_path(args.runs_root, repo_root)
+    config = load_experiment_config(config_path)
+    all_runs = expand_experiment_matrix(config)
+    selected_runs = select_runs(all_runs, pilot=args.pilot, run_ids=args.run_id)
+    if not selected_runs:
+        raise OrchestrationError("no runs selected")
+
+    experiment_dir = resolve_experiment_dir(
+        runs_root=runs_root,
+        config=config,
+        pilot=args.pilot,
+        experiment_name=args.experiment_name,
+        resume=args.resume,
+    )
+    experiment_dir.mkdir(parents=True, exist_ok=True)
+    if args.resume:
+        validate_resume_target(experiment_dir, config, selected_runs)
+    status = StatusWriter(experiment_dir / "status.json")
+    log_path = experiment_dir / "orchestrator.log"
+    _append_log(log_path, f"started {iso_now()}")
+    _append_log(log_path, f"experiment_dir={experiment_dir}")
+
+    preflight = run_preflight(
+        config_path=config_path,
+        repo_root=repo_root,
+        require_codex=not args.dry_run,
+    )
+    write_preflight(experiment_dir / "preflight.json", preflight)
+    if preflight["status"] == "failed":
+        status.update(status="failed", failure="preflight failed")
+        raise OrchestrationError("preflight failed; see preflight.json")
+
+    write_experiment_metadata(
+        experiment_dir=experiment_dir,
+        config_path=config_path,
+        config=config,
+        all_runs=all_runs,
+        selected_runs=selected_runs,
+        args=args,
+    )
+    status.update(
+        status="dry_run" if args.dry_run else "running",
+        experiment_dir=str(experiment_dir),
+        selected_runs=len(selected_runs),
+    )
+
+    print(f"Experiment directory: {experiment_dir}")
+    print(f"Selected runs: {len(selected_runs)}")
+    print(json.dumps(summarize_matrix(selected_runs), indent=2, sort_keys=True))
+
+    if args.dry_run:
+        status.update(status="completed", finished_at=iso_now(), dry_run=True)
+        print("Dry run complete; no Codex jobs were launched.")
+        return 0
+
+    codex_bin = resolve_codex_bin()
+    if codex_bin is None:
+        raise OrchestrationError('Codex executable not found. Set $env:CODEX_BIN = "path\\to\\working\\codex".')
+
+    for run_record in selected_runs:
+        prepare_run(
+            repo_root=repo_root,
+            experiment_dir=experiment_dir,
+            run=run_record,
+            rerun_failed=args.rerun_failed,
+            status=status,
+            log_path=log_path,
+        )
+
+    implementation_failures = run_parallel(
+        selected_runs,
+        max_workers=args.jobs,
+        label="implementation",
+        worker=lambda run_record: run_implementation_and_tests(
+            repo_root=repo_root,
+            experiment_dir=experiment_dir,
+            run=run_record,
+            codex_bin=codex_bin,
+            rerun_failed=args.rerun_failed,
+            status=status,
+            log_path=log_path,
+        ),
+    )
+
+    judge_failures = run_parallel(
+        selected_runs,
+        max_workers=args.judge_jobs,
+        label="judge",
+        worker=lambda run_record: run_judge(
+            experiment_dir=experiment_dir,
+            run=run_record,
+            codex_bin=codex_bin,
+            rerun_failed=args.rerun_failed,
+            status=status,
+            log_path=log_path,
+        ),
+    )
+
+    for run_record in selected_runs:
+        parse_usage_and_score(experiment_dir, run_record, status, log_path)
+
+    outputs = {}
+    if not args.no_report:
+        outputs = write_results_outputs(experiment_dir, selected_runs)
+        status.update(report_outputs=outputs)
+
+    status.update(
+        status="completed",
+        finished_at=iso_now(),
+        implementation_failures=implementation_failures,
+        judge_failures=judge_failures,
+    )
+    _append_log(log_path, f"completed {iso_now()}")
+    print(f"Completed experiment artifacts under: {experiment_dir}")
+    if outputs:
+        print(f"Report HTML: {outputs['report_html']}")
+        print(f"Report PDF: {outputs['report_pdf']}")
+    return 0
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run or resume the Codex subagent benchmark experiment.")
+    parser.add_argument("--repo-root", default=str(REPO_ROOT), help="Repository root. Defaults to this checkout.")
+    parser.add_argument("--config", default="configs/initial_experiment.yaml", help="Experiment config path.")
+    parser.add_argument("--runs-root", default="runs", help="Directory for generated experiment outputs.")
+    parser.add_argument("--experiment-name", help="Optional suffix for a new experiment directory.")
+    parser.add_argument("--resume", help="Existing experiment directory to resume.")
+    parser.add_argument("--jobs", type=int, default=None, help="Implementation job parallelism.")
+    parser.add_argument("--judge-jobs", type=int, default=None, help="Judge job parallelism.")
+    parser.add_argument("--run-id", action="append", help="Specific run ID to include. May be repeated.")
+    parser.add_argument("--pilot", action="store_true", help="Run the two-run pilot subset.")
+    parser.add_argument("--rerun-failed", action="store_true", help="Rerun failed Codex phases.")
+    parser.add_argument("--no-report", action="store_true", help="Skip experiment-level report output generation.")
+    parser.add_argument("--dry-run", action="store_true", help="Validate and write plan artifacts without launching Codex.")
+    args = parser.parse_args(argv)
+
+    config = load_experiment_config(_resolve_path(args.config, Path(args.repo_root).resolve()))
+    parallelism = config.get("parallelism", {})
+    if args.jobs is None:
+        args.jobs = int(parallelism.get("implementation_jobs", 1))
+    if args.judge_jobs is None:
+        args.judge_jobs = int(parallelism.get("judge_jobs", 1))
+    if args.jobs <= 0:
+        parser.error("--jobs must be positive")
+    if args.judge_jobs <= 0:
+        parser.error("--judge-jobs must be positive")
+    return args
+
+
+def select_runs(
+    runs: list[dict[str, Any]],
+    *,
+    pilot: bool = False,
+    run_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    if run_ids:
+        wanted = set(run_ids)
+        selected = [run for run in runs if run["run_id"] in wanted]
+        missing = sorted(wanted - {run["run_id"] for run in selected})
+        if missing:
+            raise OrchestrationError(f"unknown run id(s): {', '.join(missing)}")
+        return selected
+
+    if not pilot:
+        return list(runs)
+
+    c0 = next((run for run in runs if run.get("cell_id") == "C0"), None)
+    c1_proposal = next((run for run in runs if run.get("cell_id") == "C1" and run.get("spark_mode") == "proposal"), None)
+    if c0 is None or c1_proposal is None:
+        raise OrchestrationError("pilot selection requires one C0 run and one C1 proposal run")
+    return [c0, c1_proposal]
+
+
+def resolve_experiment_dir(
+    *,
+    runs_root: Path,
+    config: Mapping[str, Any],
+    pilot: bool,
+    experiment_name: str | None,
+    resume: str | None,
+) -> Path:
+    if resume:
+        path = Path(resume)
+        if not path.is_absolute():
+            path = runs_root / path
+        if not path.exists():
+            raise OrchestrationError(f"resume directory does not exist: {path}")
+        return path.resolve()
+
+    experiment = config.get("experiment", {})
+    experiment_id = experiment.get("id", "experiment") if isinstance(experiment, Mapping) else "experiment"
+    name_parts = [iso_now().replace(":", "").replace("-", "")[:15]]
+    if pilot:
+        name_parts.append("pilot")
+    name_parts.append(str(experiment_id))
+    if experiment_name:
+        name_parts.append(experiment_name)
+    base_name = _safe_name("-".join(name_parts))
+    runs_root.mkdir(parents=True, exist_ok=True)
+
+    candidate = runs_root / base_name
+    suffix = 1
+    while candidate.exists():
+        suffix += 1
+        candidate = runs_root / f"{base_name}-{suffix:02d}"
+    return candidate.resolve()
+
+
+def write_experiment_metadata(
+    *,
+    experiment_dir: Path,
+    config_path: Path,
+    config: Mapping[str, Any],
+    all_runs: list[dict[str, Any]],
+    selected_runs: list[dict[str, Any]],
+    args: argparse.Namespace,
+) -> None:
+    payload = {
+        "schema_version": 1,
+        "created_at": iso_now(),
+        "config_path": str(config_path),
+        "pilot": bool(args.pilot),
+        "dry_run": bool(args.dry_run),
+        "jobs": args.jobs,
+        "judge_jobs": args.judge_jobs,
+        "selected_run_count": len(selected_runs),
+        "full_run_count": len(all_runs),
+        "matrix_summary": summarize_matrix(selected_runs),
+        "config_sha256": _json_sha256(config),
+    }
+    _write_json(experiment_dir / "experiment-metadata.json", payload)
+    _write_json(experiment_dir / "config.resolved.json", config)
+    _write_json(experiment_dir / "matrix.json", selected_runs)
+    _write_json(experiment_dir / "matrix-summary.json", summarize_matrix(selected_runs))
+
+
+def validate_resume_target(
+    experiment_dir: Path,
+    config: Mapping[str, Any],
+    selected_runs: list[dict[str, Any]],
+) -> None:
+    existing_config = _read_json(experiment_dir / "config.resolved.json")
+    if existing_config:
+        existing_hash = _json_sha256(existing_config)
+        current_hash = _json_sha256(config)
+        if existing_hash != current_hash:
+            raise OrchestrationError(
+                "resume config drift detected; start a new experiment directory for changed config"
+            )
+
+    existing_matrix = _read_json_any(experiment_dir / "matrix.json")
+    if isinstance(existing_matrix, list):
+        existing_ids = [run.get("run_id") for run in existing_matrix if isinstance(run, Mapping)]
+        selected_ids = [run["run_id"] for run in selected_runs]
+        if existing_ids != selected_ids:
+            raise OrchestrationError(
+                "resume matrix drift detected; selected run IDs do not match existing experiment"
+            )
+
+
+def prepare_run(
+    *,
+    repo_root: Path,
+    experiment_dir: Path,
+    run: Mapping[str, Any],
+    rerun_failed: bool,
+    status: StatusWriter,
+    log_path: Path,
+) -> None:
+    run_dir = run_directory(experiment_dir, run)
+    worktree = run_dir / "worktree"
+    state = load_state(run_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    status.update_run(str(run["run_id"]), phase="preparing")
+
+    if not phase_completed(state, "prepared", [worktree]):
+        if worktree.exists():
+            if rerun_failed:
+                _archive_path(worktree)
+            else:
+                raise OrchestrationError(f"worktree exists but prepared phase is incomplete: {worktree}")
+        copy_benchmark_template(repo_root / "benchmark_template", worktree)
+        mark_phase(run_dir, "prepared", "completed", {"worktree": str(worktree)})
+        _append_log(log_path, f"{run['run_id']} prepared worktree")
+
+    metadata_path = run_dir / "metadata.json"
+    if not phase_completed(load_state(run_dir), "baseline_committed", [metadata_path]):
+        baseline_sha = initialize_git_baseline(worktree)
+        metadata = run_metadata(run, run_dir, worktree, baseline_sha)
+        _write_json(metadata_path, metadata)
+        mark_phase(run_dir, "baseline_committed", "completed", {"baseline_sha": baseline_sha})
+        _append_log(log_path, f"{run['run_id']} baseline {baseline_sha}")
+
+    render_artifacts(repo_root, run_dir, run)
+    mark_phase(run_dir, "rendered", "completed", {"rendered_at": iso_now()})
+    status.update_run(str(run["run_id"]), phase="prepared")
+
+
+def run_implementation_and_tests(
+    *,
+    repo_root: Path,
+    experiment_dir: Path,
+    run: Mapping[str, Any],
+    codex_bin: str,
+    rerun_failed: bool,
+    status: StatusWriter,
+    log_path: Path,
+) -> None:
+    run_dir = run_directory(experiment_dir, run)
+    worktree = run_dir / "worktree"
+    state = load_state(run_dir)
+    status.update_run(str(run["run_id"]), phase="implementation")
+
+    if should_run_phase(state, "implemented", run_dir / "events.jsonl", rerun_failed):
+        prompt = (run_dir / "rendered_prompt.md").read_text(encoding="utf-8")
+        command = materialize_worktree_command(build_implementation_command(codex_bin, run, prompt), worktree)
+        result = run_process_to_files(
+            command,
+            cwd=worktree,
+            stdout_path=run_dir / "events.jsonl",
+            stderr_path=run_dir / "stderr.log",
+            timeout_seconds=int(run["timeouts"]["implementation_seconds"]),
+            command_display=command_for_display(command),
+        )
+        write_process_result(run_dir / "wall_time.json", result)
+        final_response = extract_final_response(run_dir / "events.jsonl")
+        _write_json(run_dir / "final_response.json", final_response)
+        mark_phase(
+            run_dir,
+            "implemented",
+            "completed" if result.returncode == 0 and not result.timed_out else "failed",
+            {"returncode": result.returncode, "timed_out": result.timed_out},
+        )
+        _append_log(log_path, f"{run['run_id']} implementation returncode={result.returncode} timeout={result.timed_out}")
+
+    state = load_state(run_dir)
+    if should_run_phase(state, "diff_captured", run_dir / "diff.patch", rerun_failed):
+        capture_diff(run_dir, worktree)
+        mark_phase(run_dir, "diff_captured", "completed", {"captured_at": iso_now()})
+
+    state = load_state(run_dir)
+    public_artifacts_exist = all(
+        (run_dir / name).exists()
+        for name in ["typecheck.meta.json", "public_ts.meta.json", "public_py.meta.json"]
+    )
+    if should_run_phase(state, "public_tested", run_dir / "typecheck.meta.json", rerun_failed) or not public_artifacts_exist:
+        run_public_tests(worktree, run_dir, run)
+        mark_phase(run_dir, "public_tested", "completed", {"tested_at": iso_now()})
+
+    state = load_state(run_dir)
+    if should_run_phase(state, "hidden_tested", run_dir / "hidden-results.json", rerun_failed):
+        run_hidden_tests(repo_root, worktree, run_dir, run)
+        hidden_meta = _read_json(run_dir / "hidden-runner.meta.json")
+        mark_phase(
+            run_dir,
+            "hidden_tested",
+            "completed" if hidden_meta.get("returncode") == 0 else "failed",
+            {"tested_at": iso_now(), "returncode": hidden_meta.get("returncode")},
+        )
+    status.update_run(str(run["run_id"]), phase="implementation_complete")
+
+
+def run_judge(
+    *,
+    experiment_dir: Path,
+    run: Mapping[str, Any],
+    codex_bin: str,
+    rerun_failed: bool,
+    status: StatusWriter,
+    log_path: Path,
+) -> None:
+    run_dir = run_directory(experiment_dir, run)
+    worktree = run_dir / "worktree"
+    state = load_state(run_dir)
+    status.update_run(str(run["run_id"]), phase="judge")
+
+    if not should_run_phase(state, "judged", run_dir / "judge.events.jsonl", rerun_failed):
+        return
+
+    prompt = (run_dir / "judge_prompt.md").read_text(encoding="utf-8")
+    command = materialize_worktree_command(build_judge_command(codex_bin, run, prompt), worktree)
+    result = run_process_to_files(
+        command,
+        cwd=worktree,
+        stdout_path=run_dir / "judge.events.jsonl",
+        stderr_path=run_dir / "judge.stderr.log",
+        timeout_seconds=int(run["timeouts"]["judge_seconds"]),
+        command_display=command_for_display(command),
+    )
+    write_process_result(run_dir / "judge.wall_time.json", result)
+    judge_json = extract_final_response(run_dir / "judge.events.jsonl")
+    _write_json(run_dir / "judge.json", judge_json)
+    mark_phase(
+        run_dir,
+        "judged",
+        "completed" if result.returncode == 0 and not result.timed_out and judge_json.get("parsed") else "failed",
+        {"returncode": result.returncode, "timed_out": result.timed_out, "parsed": judge_json.get("parsed")},
+    )
+    _append_log(log_path, f"{run['run_id']} judge returncode={result.returncode} timeout={result.timed_out}")
+    status.update_run(str(run["run_id"]), phase="judged")
+
+
+def parse_usage_and_score(
+    experiment_dir: Path,
+    run: Mapping[str, Any],
+    status: StatusWriter,
+    log_path: Path,
+) -> None:
+    run_dir = run_directory(experiment_dir, run)
+    usage = summarize_usage(
+        implementation_events_path=run_dir / "events.jsonl",
+        judge_events_path=run_dir / "judge.events.jsonl",
+        run=run,
+    )
+    write_usage_summary(run_dir / "usage.json", usage)
+    mark_phase(run_dir, "usage_parsed", "completed", {"parsed_at": iso_now()})
+
+    score = compute_run_score(run_dir, run)
+    write_run_score(run_dir / "score.json", score)
+    mark_phase(run_dir, "scored", "completed", {"quality_score": score.get("quality_score")})
+    _append_log(log_path, f"{run['run_id']} scored quality={score.get('quality_score')}")
+    status.update_run(str(run["run_id"]), phase="scored", quality_score=score.get("quality_score"))
+
+
+def run_parallel(
+    runs: list[dict[str, Any]],
+    *,
+    max_workers: int,
+    label: str,
+    worker: Any,
+) -> list[dict[str, str]]:
+    failures: list[dict[str, str]] = []
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_run = {executor.submit(worker, run): run for run in runs}
+        for future in as_completed(future_to_run):
+            run = future_to_run[future]
+            try:
+                future.result()
+            except Exception as exc:
+                failures.append({"run_id": str(run["run_id"]), "phase": label, "error": str(exc)})
+    return failures
+
+
+def copy_benchmark_template(source: Path, destination: Path) -> None:
+    def ignore(directory: str, names: list[str]) -> set[str]:
+        ignored: set[str] = set()
+        for name in names:
+            for pattern in COPY_IGNORE_PATTERNS:
+                if fnmatch.fnmatch(name, pattern):
+                    ignored.add(name)
+        return ignored
+
+    shutil.copytree(source, destination, ignore=ignore)
+
+
+def initialize_git_baseline(worktree: Path) -> str:
+    commands = [
+        ["git", "init"],
+        ["git", "config", "user.email", "codex-harness@example.invalid"],
+        ["git", "config", "user.name", "Codex Harness"],
+        ["git", "add", "."],
+        ["git", "commit", "-m", "baseline"],
+    ]
+    for command in commands:
+        completed = subprocess.run(command, cwd=worktree, text=True, capture_output=True, check=False)
+        if completed.returncode != 0:
+            raise OrchestrationError(f"git command failed in {worktree}: {' '.join(command)}\n{completed.stderr}")
+    completed = subprocess.run(["git", "rev-parse", "HEAD"], cwd=worktree, text=True, capture_output=True, check=False)
+    if completed.returncode != 0:
+        raise OrchestrationError(f"failed to read baseline commit in {worktree}: {completed.stderr}")
+    return completed.stdout.strip()
+
+
+def render_artifacts(repo_root: Path, run_dir: Path, run: Mapping[str, Any]) -> None:
+    (run_dir / "rendered_prompt.md").write_text(render_implementation_prompt(run, repo_root), encoding="utf-8")
+    (run_dir / "judge_prompt.md").write_text(render_judge_prompt(run, repo_root), encoding="utf-8")
+    config_files = render_codex_config(run, repo_root)
+    config_dir = run_dir / "codex_config"
+    for relative_path, contents in config_files.items():
+        path = config_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents, encoding="utf-8")
+
+
+def run_public_tests(worktree: Path, run_dir: Path, run: Mapping[str, Any]) -> None:
+    if (worktree / "package.json").exists() and not _typescript_dependency_present(worktree):
+        npm_ci = run_logged_command(
+            ["npm", "ci"],
+            cwd=worktree,
+            log_path=run_dir / "npm-ci.log",
+            timeout_seconds=180,
+        )
+        write_process_result(run_dir / "npm-ci.meta.json", npm_ci)
+
+    commands = [
+        ("typecheck", ["npm", "run", "typecheck"], "typecheck.log"),
+        ("public_ts", ["npm", "run", "test:public"], "public_ts.log"),
+        ("public_py", [sys.executable, "-m", "unittest", "discover", "-s", "tests_public_py"], "public_py.log"),
+    ]
+    timeout = int(run["timeouts"]["implementation_seconds"])
+    for name, command, log_name in commands:
+        result = run_logged_command(
+            command,
+            cwd=worktree,
+            log_path=run_dir / log_name,
+            timeout_seconds=min(timeout, 600),
+        )
+        write_process_result(run_dir / f"{name}.meta.json", result)
+
+
+def run_hidden_tests(repo_root: Path, worktree: Path, run_dir: Path, run: Mapping[str, Any]) -> None:
+    command = [
+        sys.executable,
+        "-m",
+        "harness.hidden_runner",
+        "--worktree",
+        str(worktree),
+        "--out",
+        str(run_dir / "hidden-results.json"),
+    ]
+    result = run_logged_command(
+        command,
+        cwd=repo_root,
+        log_path=run_dir / "hidden-runner.log",
+        timeout_seconds=min(int(run["timeouts"]["implementation_seconds"]), 900),
+    )
+    write_process_result(run_dir / "hidden-runner.meta.json", result)
+
+
+def capture_diff(run_dir: Path, worktree: Path) -> None:
+    metadata = _read_json(run_dir / "metadata.json")
+    baseline = metadata.get("baseline_commit", "HEAD")
+    diff = subprocess.run(
+        ["git", "diff", "--patch", "--binary", str(baseline), "--"],
+        cwd=worktree,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    (run_dir / "diff.patch").write_text(diff.stdout, encoding="utf-8", errors="replace")
+    numstat = subprocess.run(
+        ["git", "diff", "--numstat", str(baseline), "--"],
+        cwd=worktree,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    (run_dir / "diff-numstat.txt").write_text(numstat.stdout, encoding="utf-8", errors="replace")
+
+
+def run_metadata(run: Mapping[str, Any], run_dir: Path, worktree: Path, baseline_sha: str) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "run": run,
+        "run_id": run["run_id"],
+        "cell_id": run["cell_id"],
+        "cell_name": run["cell_name"],
+        "repeat_index": run["repeat_index"],
+        "topology": run["topology"],
+        "spark_mode": run.get("spark_mode"),
+        "root": run["root"],
+        "subleads": run.get("subleads"),
+        "leaf": run.get("leaf"),
+        "agents": run["agents"],
+        "timeouts": run["timeouts"],
+        "run_dir": str(run_dir),
+        "worktree": str(worktree),
+        "baseline_commit": baseline_sha,
+        "created_at": iso_now(),
+    }
+
+
+def should_run_phase(state: Mapping[str, Any], phase: str, required_artifact: Path, rerun_failed: bool) -> bool:
+    phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
+    phase_state = phases.get(phase, {}) if isinstance(phases, Mapping) else {}
+    if isinstance(phase_state, Mapping):
+        if phase_state.get("status") == "completed" and required_artifact.exists():
+            return False
+        if phase_state.get("status") == "failed" and required_artifact.exists() and not rerun_failed:
+            return False
+    return True
+
+
+def phase_completed(state: Mapping[str, Any], phase: str, artifacts: Iterable[Path]) -> bool:
+    phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
+    phase_state = phases.get(phase, {}) if isinstance(phases, Mapping) else {}
+    return (
+        isinstance(phase_state, Mapping)
+        and phase_state.get("status") == "completed"
+        and all(path.exists() for path in artifacts)
+    )
+
+
+def mark_phase(run_dir: Path, phase: str, status: str, data: Mapping[str, Any] | None = None) -> None:
+    state = load_state(run_dir)
+    phases = state.setdefault("phases", {})
+    phases[phase] = {
+        "status": status,
+        "updated_at": iso_now(),
+        "data": dict(data or {}),
+    }
+    state["updated_at"] = iso_now()
+    _write_json(run_dir / "state.json", state)
+
+
+def load_state(run_dir: Path) -> dict[str, Any]:
+    path = run_dir / "state.json"
+    if not path.exists():
+        return {
+            "schema_version": 1,
+            "created_at": iso_now(),
+            "updated_at": iso_now(),
+            "phases": {phase: {"status": "pending"} for phase in STATE_PHASES},
+        }
+    return _read_json(path)
+
+
+def run_directory(experiment_dir: Path, run: Mapping[str, Any]) -> Path:
+    return experiment_dir / RUNS_DIR_NAME / str(run["run_id"])
+
+
+def _typescript_dependency_present(worktree: Path) -> bool:
+    return (worktree / "node_modules" / ".bin" / "tsc").exists() or (
+        worktree / "node_modules" / ".bin" / "tsc.cmd"
+    ).exists()
+
+
+def _archive_path(path: Path) -> Path:
+    archive = path.with_name(f"{path.name}.archive-{iso_now().replace(':', '').replace('-', '')}")
+    path.rename(archive)
+    return archive
+
+
+def _append_log(path: Path, line: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(line + "\n")
+
+
+def _write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _read_json_any(path: Path) -> Any:
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+
+
+def _resolve_path(path_value: str | os.PathLike[str], repo_root: Path) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        return path
+    return repo_root / path
+
+
+def _safe_name(value: str) -> str:
+    safe = "".join(character if character.isalnum() or character in {"-", "_"} else "-" for character in value)
+    while "--" in safe:
+        safe = safe.replace("--", "-")
+    return safe.strip("-") or "experiment"
+
+
+def _json_sha256(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
