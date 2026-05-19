@@ -117,6 +117,22 @@ def test_unknown_scoring_component_fails_validation(config: dict) -> None:
         validate_experiment_config(candidate)
 
 
+def test_judge_must_remain_gpt55_xhigh_read_only(config: dict) -> None:
+    candidate = copy.deepcopy(config)
+    candidate["judge"]["sandbox"] = "workspace-write"
+
+    with pytest.raises(ExperimentConfigError, match="judge.sandbox"):
+        validate_experiment_config(candidate)
+
+
+def test_prompt_template_must_match_topology(config: dict) -> None:
+    candidate = copy.deepcopy(config)
+    candidate["cells"][1]["prompt_template"] = "solo"
+
+    with pytest.raises(ExperimentConfigError, match="prompt_template"):
+        validate_experiment_config(candidate)
+
+
 def test_minimality_scoring_config_is_propagated_to_runs(config: dict) -> None:
     candidate = copy.deepcopy(config)
     candidate["scoring"]["weights"] = {"hidden_tests": 0.95, "minimality": 0.05}

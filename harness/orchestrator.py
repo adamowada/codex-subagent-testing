@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 from typing import Any, Iterable, Mapping
 
@@ -50,6 +51,7 @@ from harness.validation import validate_stage11, write_validation_report
 
 
 RUNS_DIR_NAME = "runs"
+DEFAULT_WORKSPACE_ROOT_NAME = "codex-subagent-testing-workspaces"
 STATE_PHASES = [
     "prepared",
     "baseline_committed",
@@ -138,12 +140,15 @@ def run(args: argparse.Namespace) -> int:
         resume=args.resume,
     )
     experiment_dir.mkdir(parents=True, exist_ok=True)
+    workspace_root = resolve_workspace_root(args.workspace_root, repo_root)
+    workspace_root.mkdir(parents=True, exist_ok=True)
     if args.resume:
         validate_resume_target(experiment_dir, config, selected_runs)
     status = StatusWriter(experiment_dir / "status.json")
     log_path = experiment_dir / "orchestrator.log"
     _append_log(log_path, f"started {iso_now()}")
     _append_log(log_path, f"experiment_dir={experiment_dir}")
+    _append_log(log_path, f"workspace_root={workspace_root}")
 
     preflight = run_preflight(
         config_path=config_path,
@@ -162,6 +167,7 @@ def run(args: argparse.Namespace) -> int:
         all_runs=all_runs,
         selected_runs=selected_runs,
         args=args,
+        workspace_root=workspace_root,
     )
     status.update(
         status="dry_run" if args.dry_run else "running",
@@ -186,6 +192,7 @@ def run(args: argparse.Namespace) -> int:
         prepare_run(
             repo_root=repo_root,
             experiment_dir=experiment_dir,
+            workspace_root=workspace_root,
             run=run_record,
             rerun_failed=args.rerun_failed,
             status=status,
@@ -278,6 +285,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--repo-root", default=str(REPO_ROOT), help="Repository root. Defaults to this checkout.")
     parser.add_argument("--config", default="configs/initial_experiment.yaml", help="Experiment config path.")
     parser.add_argument("--runs-root", default="runs", help="Directory for generated experiment outputs.")
+    parser.add_argument(
+        "--workspace-root",
+        help=(
+            "Directory for measured implementation worktrees. Defaults to a temp-root outside this repository "
+            "so hidden tests are not reachable through run worktree parent traversal."
+        ),
+    )
     parser.add_argument("--experiment-name", help="Optional suffix for a new experiment directory.")
     parser.add_argument("--resume", help="Existing experiment directory to resume.")
     parser.add_argument("--jobs", type=int, default=None, help="Implementation job parallelism.")
@@ -369,6 +383,7 @@ def write_experiment_metadata(
     all_runs: list[dict[str, Any]],
     selected_runs: list[dict[str, Any]],
     args: argparse.Namespace,
+    workspace_root: Path | None = None,
 ) -> None:
     payload = {
         "schema_version": 1,
@@ -378,6 +393,7 @@ def write_experiment_metadata(
         "dry_run": bool(args.dry_run),
         "jobs": args.jobs,
         "judge_jobs": args.judge_jobs,
+        "workspace_root": str(workspace_root) if workspace_root is not None else None,
         "selected_run_count": len(selected_runs),
         "full_run_count": len(all_runs),
         "matrix_summary": summarize_matrix(selected_runs),
@@ -426,13 +442,14 @@ def prepare_run(
     *,
     repo_root: Path,
     experiment_dir: Path,
+    workspace_root: Path,
     run: Mapping[str, Any],
     rerun_failed: bool,
     status: StatusWriter,
     log_path: Path,
 ) -> None:
     run_dir = run_directory(experiment_dir, run)
-    worktree = run_dir / "worktree"
+    worktree = worktree_directory(experiment_dir, run, workspace_root)
     state = load_state(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
     status.update_run(str(run["run_id"]), phase="preparing")
@@ -444,6 +461,7 @@ def prepare_run(
             else:
                 raise OrchestrationError(f"worktree exists but prepared phase is incomplete: {worktree}")
         copy_benchmark_template(repo_root / "benchmark_template", worktree)
+        write_worktree_pointer(run_dir, worktree, repo_root)
         mark_phase(run_dir, "prepared", "completed", {"worktree": str(worktree)})
         _append_log(log_path, f"{run['run_id']} prepared worktree")
 
@@ -476,7 +494,7 @@ def run_implementation_and_tests(
     log_path: Path,
 ) -> None:
     run_dir = run_directory(experiment_dir, run)
-    worktree = run_dir / "worktree"
+    worktree = worktree_path(run_dir)
     state = load_state(run_dir)
     status.update_run(str(run["run_id"]), phase="implementation")
 
@@ -489,7 +507,10 @@ def run_implementation_and_tests(
             rerun_failed,
         )
         prompt = (run_dir / "rendered_prompt.md").read_text(encoding="utf-8")
-        command = materialize_worktree_command(build_implementation_command(codex_bin, run, prompt), worktree)
+        command = materialize_worktree_command(
+            build_implementation_command(codex_bin, run, prompt, config_dir=run_dir / "codex_config"),
+            worktree,
+        )
         display_command = command_for_display(command)
         _append_log(log_path, f"{run['run_id']} implementation command={json.dumps(display_command)}")
         result = run_process_to_files(
@@ -573,7 +594,7 @@ def run_judge(
     log_path: Path,
 ) -> None:
     run_dir = run_directory(experiment_dir, run)
-    worktree = run_dir / "worktree"
+    worktree = worktree_path(run_dir)
     state = load_state(run_dir)
     status.update_run(str(run["run_id"]), phase="judge")
 
@@ -587,6 +608,7 @@ def run_judge(
         state,
         rerun_failed,
     )
+    prepare_judge_evidence(run_dir, worktree)
     prompt = (run_dir / "judge_prompt.md").read_text(encoding="utf-8")
     command = materialize_worktree_command(build_judge_command(codex_bin, run, prompt), worktree)
     display_command = command_for_display(command)
@@ -758,9 +780,10 @@ def run_hidden_tests(repo_root: Path, worktree: Path, run_dir: Path, run: Mappin
     ]
     result = run_logged_command(
         command,
-        cwd=repo_root,
+        cwd=Path(tempfile.gettempdir()),
         log_path=run_dir / "hidden-runner.log",
         timeout_seconds=min(int(run["timeouts"]["implementation_seconds"]), 900),
+        env=_pythonpath_env(repo_root),
     )
     write_process_result(run_dir / "hidden-runner.meta.json", result)
 
@@ -768,6 +791,13 @@ def run_hidden_tests(repo_root: Path, worktree: Path, run_dir: Path, run: Mappin
 def capture_diff(run_dir: Path, worktree: Path) -> None:
     metadata = _read_json(run_dir / "metadata.json")
     baseline = metadata.get("baseline_commit", "HEAD")
+    subprocess.run(
+        ["git", "add", "--intent-to-add", "."],
+        cwd=worktree,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
     diff = subprocess.run(
         ["git", "diff", "--patch", "--binary", str(baseline), "--"],
         cwd=worktree,
@@ -890,6 +920,88 @@ def run_directory(experiment_dir: Path, run: Mapping[str, Any]) -> Path:
     return experiment_dir / RUNS_DIR_NAME / str(run["run_id"])
 
 
+def resolve_workspace_root(workspace_root: str | os.PathLike[str] | None, repo_root: Path) -> Path:
+    if workspace_root:
+        path = Path(workspace_root)
+        if not path.is_absolute():
+            path = repo_root / path
+    else:
+        path = Path(tempfile.gettempdir()) / DEFAULT_WORKSPACE_ROOT_NAME
+    resolved = path.resolve()
+    if _is_relative_to(resolved, repo_root):
+        raise OrchestrationError(
+            f"workspace root must be outside the repository so hidden tests are not parent-reachable: {resolved}"
+        )
+    return resolved
+
+
+def worktree_directory(experiment_dir: Path, run: Mapping[str, Any], workspace_root: Path) -> Path:
+    return workspace_root / experiment_dir.name / RUNS_DIR_NAME / str(run["run_id"]) / "worktree"
+
+
+def write_worktree_pointer(run_dir: Path, worktree: Path, repo_root: Path) -> None:
+    _write_json(
+        run_dir / "worktree.json",
+        {
+            "schema_version": 1,
+            "path": str(worktree),
+            "inside_repo": _is_relative_to(worktree.resolve(), repo_root.resolve()),
+        },
+    )
+
+
+def worktree_path(run_dir: Path) -> Path:
+    metadata = _read_json(run_dir / "metadata.json")
+    worktree = metadata.get("worktree")
+    if isinstance(worktree, str) and worktree:
+        return Path(worktree)
+    pointer = _read_json(run_dir / "worktree.json")
+    pointer_path = pointer.get("path")
+    if isinstance(pointer_path, str) and pointer_path:
+        return Path(pointer_path)
+    return run_dir / "worktree"
+
+
+def prepare_judge_evidence(run_dir: Path, worktree: Path) -> None:
+    evidence_dir = worktree / "judge_evidence"
+    if evidence_dir.exists():
+        shutil.rmtree(evidence_dir)
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+
+    copied: list[str] = []
+    for name in (
+        "typecheck.log",
+        "typecheck.meta.json",
+        "public_ts.log",
+        "public_ts.meta.json",
+        "public_py.log",
+        "public_py.meta.json",
+        "hidden-results.json",
+        "diff.patch",
+        "diff-numstat.txt",
+        "stderr.log",
+        "final_response.json",
+        "wall_time.json",
+        "hidden-runner.meta.json",
+        "hidden-runner.log",
+    ):
+        source = run_dir / name
+        if not source.exists() or source.is_dir():
+            continue
+        target = evidence_dir / name
+        shutil.copy2(source, target)
+        copied.append(name)
+
+    _write_json(
+        evidence_dir / "manifest.json",
+        {
+            "schema_version": 1,
+            "description": "Blind judge evidence bundle. Source files are in the workspace root.",
+            "files": copied,
+        },
+    )
+
+
 def _typescript_dependency_present(worktree: Path) -> bool:
     return (worktree / "node_modules" / ".bin" / "tsc").exists() or (
         worktree / "node_modules" / ".bin" / "tsc.cmd"
@@ -957,6 +1069,21 @@ def _resolve_path(path_value: str | os.PathLike[str], repo_root: Path) -> Path:
     if path.is_absolute():
         return path
     return repo_root / path
+
+
+def _pythonpath_env(repo_root: Path) -> dict[str, str]:
+    env = dict(os.environ)
+    existing = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = str(repo_root) if not existing else str(repo_root) + os.pathsep + existing
+    return env
+
+
+def _is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
 
 
 def _safe_name(value: str) -> str:

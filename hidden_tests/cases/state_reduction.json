@@ -225,6 +225,71 @@
       "category": "state_reduction",
       "expected": [
         {
+          "accountId": "acct_closed_precedence",
+          "closedAt": "2026-05-02T00:00:00.000Z",
+          "couponActive": false,
+          "couponCode": null,
+          "features": [],
+          "lastEventAt": "2026-05-05T00:00:00.000Z",
+          "overLimit": false,
+          "plan": "starter",
+          "status": "closed",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 0
+        }
+      ],
+      "id": "state.closed-precedence",
+      "input": {
+        "as_of": "2026-07-01T00:00:00.000Z",
+        "raw_events": [
+          {
+            "account_id": "acct_closed_precedence",
+            "id": "evt_open_precedence",
+            "plan": "starter",
+            "timestamp": "2026-05-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_closed_precedence",
+            "id": "evt_close_precedence",
+            "timestamp": "2026-05-02T00:00:00Z",
+            "type": "account_closed"
+          },
+          {
+            "account_id": "acct_closed_precedence",
+            "id": "evt_plan_after_close",
+            "plan": "enterprise",
+            "timestamp": "2026-05-03T00:00:00Z",
+            "type": "plan_changed"
+          },
+          {
+            "account_id": "acct_closed_precedence",
+            "amount": "199.00",
+            "id": "evt_payment_after_close",
+            "timestamp": "2026-05-04T00:00:00Z",
+            "type": "payment_succeeded"
+          },
+          {
+            "account_id": "acct_closed_precedence",
+            "id": "evt_usage_after_close",
+            "timestamp": "2026-05-05T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 999
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "reduce_and_summarize",
+      "points": 2
+    },
+    {
+      "category": "state_reduction",
+      "expected": [
+        {
           "accountId": "acct_usage",
           "closedAt": null,
           "couponActive": false,

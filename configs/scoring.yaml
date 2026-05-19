@@ -3,9 +3,13 @@
   "profile": "initial_quality_v1",
   "weights": {
     "public_tests": 0.15,
-    "hidden_tests": 0.45,
-    "judge": 0.25,
-    "typecheck": 0.10,
-    "parity": 0.05
+    "hidden_tests": 0.50,
+    "judge": 0.15,
+    "typecheck": 0.15,
+    "minimality": 0.05
+  },
+  "minimality": {
+    "target_production_loc": 500,
+    "penalty_window": 1000
   }
 }

@@ -75,6 +75,18 @@ def test_parse_result_warns_for_malformed_and_non_object_lines(tmp_path: Path) -
     assert "Implementation JSONL skipped 1 non-object line(s)." in result.warnings
 
 
+def test_parser_preserves_total_tokens_only_usage_events(tmp_path: Path) -> None:
+    path = tmp_path / "events.jsonl"
+    _write_jsonl(path, [{"usage": {"total_tokens": 42}}])
+
+    events = parse_usage_events(path)
+
+    assert len(events) == 1
+    assert events[0]["input_tokens"] == 0
+    assert events[0]["output_tokens"] == 0
+    assert events[0]["total_tokens"] == 42
+
+
 def test_summary_uses_exact_per_event_model_attribution(runs: list[dict], tmp_path: Path) -> None:
     run = next(candidate for candidate in runs if candidate["run_id"] == "C1_direct_r01")
     impl = tmp_path / "events.jsonl"

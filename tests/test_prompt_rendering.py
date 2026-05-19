@@ -135,12 +135,12 @@ def test_codex_config_for_c0_has_no_subagent_templates(runs: list[dict]) -> None
     assert config["model_reasoning_effort"] == "xhigh"
     assert config["agents"]["max_depth"] == 0
     assert config["agents"]["max_threads"] == 1
-    assert "templates" not in config["agents"]
+    assert set(config["agents"]) == {"max_depth", "max_threads"}
 
 
 def test_codex_config_direct_mode_uses_writable_leaf_roles(runs: list[dict]) -> None:
     config = tomllib.loads(render_codex_config(_run(runs, "C1", "direct"), REPO_ROOT)["config.toml"])
-    templates = {template["name"]: template for template in config["agents"]["templates"]}
+    templates = config["agents"]
 
     assert templates["spark_direct_implementer"]["model"] == "gpt-5.3-codex-spark"
     assert templates["spark_direct_implementer"]["model_reasoning_effort"] == "xhigh"
@@ -152,7 +152,7 @@ def test_codex_config_direct_mode_uses_writable_leaf_roles(runs: list[dict]) -> 
 
 def test_codex_config_proposal_mode_uses_read_only_leaf_roles(runs: list[dict]) -> None:
     config = tomllib.loads(render_codex_config(_run(runs, "C1", "proposal"), REPO_ROOT)["config.toml"])
-    templates = {template["name"]: template for template in config["agents"]["templates"]}
+    templates = config["agents"]
 
     assert templates["spark_proposal_implementer"]["sandbox"] == "read-only"
     assert templates["spark_proposal_tester"]["sandbox"] == "read-only"
@@ -162,7 +162,7 @@ def test_codex_config_proposal_mode_uses_read_only_leaf_roles(runs: list[dict]) 
 
 def test_codex_config_c4_includes_medium_sublead_template(runs: list[dict]) -> None:
     config = tomllib.loads(render_codex_config(_run(runs, "C4", "direct"), REPO_ROOT)["config.toml"])
-    templates = {template["name"]: template for template in config["agents"]["templates"]}
+    templates = config["agents"]
 
     assert config["agents"]["max_depth"] == 2
     assert config["agents"]["max_threads"] >= 24

@@ -207,6 +207,31 @@
       "expected": {
         "error": "invalid_event",
         "issues": [
+          "missing_timestamp"
+        ],
+        "ok": false
+      },
+      "id": "normalize.missing-timestamp",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_hidden",
+          "id": "evt_missing_timestamp",
+          "type": "account_opened"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
           "invalid_amount"
         ],
         "ok": false
@@ -246,6 +271,60 @@
           "timestamp": "2026-01-01T00:00:00Z",
           "type": "usage_recorded",
           "usage": -1
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_usage"
+        ],
+        "ok": false
+      },
+      "id": "normalize.non-string-usage",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_hidden",
+          "id": "evt_usage_string",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "usage_recorded",
+          "usage": "5"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_usage"
+        ],
+        "ok": false
+      },
+      "id": "normalize.fractional-usage",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_hidden",
+          "id": "evt_usage_fraction",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "usage_recorded",
+          "usage": 1.5
         }
       },
       "languages": [

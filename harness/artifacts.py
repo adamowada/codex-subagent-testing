@@ -6,7 +6,7 @@ from typing import Any, Iterable, Mapping
 
 
 PHASE_ARTIFACTS: dict[str, tuple[str, ...]] = {
-    "prepared": ("worktree",),
+    "prepared": ("worktree.json",),
     "baseline_committed": ("metadata.json",),
     "rendered": ("rendered_prompt.md", "judge_prompt.md", "codex_config/config.toml"),
     "implemented": ("events.jsonl", "stderr.log", "wall_time.json", "final_response.json"),
@@ -29,6 +29,7 @@ CODEX_IMPLEMENTATION_ARTIFACTS = PHASE_ARTIFACTS["implemented"]
 CODEX_JUDGE_ARTIFACTS = PHASE_ARTIFACTS["judged"]
 
 CORE_RUN_ARTIFACTS: tuple[str, ...] = (
+    "worktree.json",
     "metadata.json",
     "state.json",
     "rendered_prompt.md",
@@ -80,6 +81,7 @@ EXPERIMENT_METADATA_ARTIFACTS: tuple[str, ...] = (
 )
 
 JSON_WITH_SCHEMA_VERSION = {
+    "worktree.json",
     "metadata.json",
     "state.json",
     "hidden-results.json",
@@ -107,10 +109,12 @@ FORBIDDEN_HIDDEN_RESULT_KEYS = {
     "expected",
     "expected_output",
     "expected_outputs",
+    "operation",
     "raw_event",
     "raw_events",
     "rawEvent",
     "rawEvents",
+    "source_file",
 }
 
 FORBIDDEN_HIDDEN_LOG_MARKERS = (
@@ -234,6 +238,10 @@ def _validate_json_artifact(path: Path) -> list[str]:
         errors.extend(_validate_usage_artifact(path, value))
     if path.name == "score.json":
         errors.extend(_validate_score_artifact(path, value))
+    if path.name == "hidden-results.json":
+        errors.extend(_validate_hidden_results_artifact(path, value))
+    if path.name == "worktree.json":
+        errors.extend(_validate_worktree_artifact(path, value))
     if path.name.endswith(".meta.json") or path.name in {"wall_time.json", "judge.wall_time.json"}:
         if not isinstance(value, Mapping):
             errors.append(f"process metadata artifact is not an object: {path}")
@@ -244,6 +252,40 @@ def _validate_json_artifact(path: Path) -> list[str]:
             if "log_path" not in value and "stdout_path" not in value:
                 errors.append(f"process metadata artifact missing output path: {path}")
     return errors
+
+
+def _validate_hidden_results_artifact(path: Path, value: Any) -> list[str]:
+    if not isinstance(value, Mapping):
+        return [f"hidden results artifact is not an object: {path}"]
+
+    errors: list[str] = []
+    cases = value.get("cases", [])
+    if cases is not None and not isinstance(cases, list):
+        errors.append(f"hidden results cases is not a list: {path}")
+        return errors
+    for index, case in enumerate(cases):
+        if not isinstance(case, Mapping):
+            errors.append(f"hidden results case {index} is not an object: {path}")
+            continue
+        case_id = case.get("id")
+        if not isinstance(case_id, str) or not case_id.startswith("case-"):
+            errors.append(f"hidden results case {index} id is not opaque: {path}")
+        for forbidden in ("operation", "source_file"):
+            if forbidden in case:
+                errors.append(f"hidden results case {index} contains private key {forbidden!r}: {path}")
+    return errors
+
+
+def _validate_worktree_artifact(path: Path, value: Any) -> list[str]:
+    if not isinstance(value, Mapping):
+        return [f"worktree pointer artifact is not an object: {path}"]
+    worktree = value.get("path")
+    if not isinstance(worktree, str) or not worktree:
+        return [f"worktree pointer artifact missing path: {path}"]
+    worktree_path = Path(worktree)
+    if not worktree_path.is_dir():
+        return [f"worktree pointer path is not a directory: {worktree_path}"]
+    return []
 
 
 def _validate_usage_artifact(path: Path, value: Any) -> list[str]:

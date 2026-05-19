@@ -65,12 +65,12 @@ def test_stage11_validates_synthetic_completed_pilot(
     )
     write_validation_report(tmp_path / "validation.json", payload)
 
-    assert payload["status"] == "passed"
+    assert payload["status"] == "warning"
     assert (tmp_path / "validation.json").exists()
     checks = {check["name"]: check for check in payload["checks"]}
     assert checks["run_artifacts"]["status"] == "passed"
     assert checks["hidden_test_isolation"]["status"] == "passed"
-    assert checks["report_outputs"]["status"] == "passed"
+    assert checks["report_outputs"]["status"] == "warning"
     assert checks["resume_contract"]["status"] == "passed"
 
 
@@ -102,6 +102,38 @@ def test_stage11_flags_hidden_case_copied_into_worktree(
     checks = {check["name"]: check for check in payload["checks"]}
     assert checks["hidden_test_isolation"]["status"] == "failed"
     assert "hidden case filename" in checks["hidden_test_isolation"]["details"]
+
+
+def test_stage11_warns_when_malformed_judge_output_is_scored(
+    config: dict,
+    runs: list[dict],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selected = [runs[0]]
+    _write_experiment_shell(tmp_path, config, runs, selected)
+    _write_run_artifacts(tmp_path, selected[0], quality=0.25)
+    run_dir = tmp_path / "runs" / "C0_r01"
+    _write_json(run_dir / "judge.json", {"parsed": False, "raw": "not json", "error": "no_json_object"})
+    score = json.loads((run_dir / "score.json").read_text(encoding="utf-8"))
+    score["component_scores"]["judge"] = 0.0
+    score["warnings"] = ["judge output was not parsed as strict JSON"]
+    _write_json(run_dir / "score.json", score)
+
+    monkeypatch.setenv("CODEX_REPORT_PDF_RENDERER", "minimal")
+    write_results_outputs(tmp_path, selected)
+
+    payload = validate_stage11(
+        config_path=CONFIG_PATH,
+        repo_root=REPO_ROOT,
+        experiment_dir=tmp_path,
+        selected_runs=selected,
+        preflight_result=_preflight_payload(),
+    )
+
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert checks["judge_json"]["status"] == "warning"
+    assert "scored as zero" in checks["judge_json"]["data"]["warnings"][0]
 
 
 def _write_experiment_shell(
@@ -160,7 +192,11 @@ def _write_run_artifacts(experiment_dir: Path, run: dict, *, quality: float) -> 
     for name in ("typecheck.meta.json", "public_ts.meta.json", "public_py.meta.json", "hidden-runner.meta.json"):
         _write_json(run_dir / name, _process_meta(run_dir / name.replace(".meta.json", ".log"), stdout=False))
 
-    _write_json(run_dir / "metadata.json", {"schema_version": 1, "run_id": run["run_id"], "run": run})
+    _write_json(run_dir / "worktree.json", {"schema_version": 1, "path": str(worktree), "inside_repo": False})
+    _write_json(
+        run_dir / "metadata.json",
+        {"schema_version": 1, "run_id": run["run_id"], "run": run, "worktree": str(worktree)},
+    )
     _write_json(run_dir / "final_response.json", {"parsed": True, "value": {"status": "success"}})
     _write_json(
         run_dir / "hidden-results.json",
@@ -170,10 +206,9 @@ def _write_run_artifacts(experiment_dir: Path, run: dict, *, quality: float) -> 
             "categories": {"parity": {"score": quality}},
             "cases": [
                 {
-                    "id": "opaque-001",
+                    "id": "case-000000000001",
                     "category": "parity",
                     "language": "parity",
-                    "operation": "reduce_and_summarize",
                     "status": "failed",
                     "points_earned": 0.0,
                     "points_possible": 1.0,

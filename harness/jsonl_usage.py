@@ -101,8 +101,11 @@ def normalize_usage(usage: Mapping[str, Any]) -> dict[str, Any]:
         )
 
     # Cached input and reasoning output are tracked separately because providers
-    # often include them inside input_tokens/output_tokens already.
-    normalized["total_tokens"] = normalized["input_tokens"] + normalized["output_tokens"]
+    # often include them inside input_tokens/output_tokens already. Some Codex
+    # streams expose only a total, so preserve that total instead of silently
+    # dropping the event to zero.
+    explicit_total = _number_from(usage, ("total_tokens",))
+    normalized["total_tokens"] = explicit_total or normalized["input_tokens"] + normalized["output_tokens"]
     return normalized
 
 

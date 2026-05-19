@@ -5,6 +5,7 @@ import copy
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -217,40 +218,46 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     worktree = args.worktree.resolve()
     out_path = args.out.resolve()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
 
     if not worktree.exists() or not worktree.is_dir():
         print(f"worktree does not exist: {worktree}", file=sys.stderr)
+        write_infrastructure_failure(out_path, worktree, "missing_worktree")
         return 2
 
     try:
         manifest, cases = load_cases(args.cases_dir.resolve())
     except Exception as exc:
         print(f"failed to load hidden cases: {exc}", file=sys.stderr)
+        write_infrastructure_failure(out_path, worktree, "case_load_failed")
         return 2
 
     started_at = iso_now()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with tempfile.TemporaryDirectory(prefix="ruleledger-hidden-") as temp_dir:
+            temp_path = Path(temp_dir)
+            js_runner = temp_path / "ts_case_runner.mjs"
+            py_runner = temp_path / "py_case_runner.py"
+            js_runner.write_text(JS_CASE_RUNNER, encoding="utf-8")
+            py_runner.write_text(PY_CASE_RUNNER, encoding="utf-8")
 
-    with tempfile.TemporaryDirectory(prefix="ruleledger-hidden-") as temp_dir:
-        temp_path = Path(temp_dir)
-        js_runner = temp_path / "ts_case_runner.mjs"
-        py_runner = temp_path / "py_case_runner.py"
-        js_runner.write_text(JS_CASE_RUNNER, encoding="utf-8")
-        py_runner.write_text(PY_CASE_RUNNER, encoding="utf-8")
+            ts_setup = setup_typescript(worktree, install=not args.no_install)
+            results = []
 
-        ts_setup = setup_typescript(worktree, install=not args.no_install)
-        results = []
+            for case in cases:
+                languages = case.get("languages", [])
+                if "parity" in languages:
+                    results.append(run_parity_case(case, worktree, js_runner, py_runner, ts_setup))
+                    continue
 
-        for case in cases:
-            languages = case.get("languages", [])
-            if "parity" in languages:
-                results.append(run_parity_case(case, worktree, js_runner, py_runner, ts_setup))
-                continue
-
-            if "typescript" in languages:
-                results.append(run_language_case("typescript", case, worktree, js_runner, ts_setup))
-            if "python" in languages:
-                results.append(run_language_case("python", case, worktree, py_runner, None))
+                if "typescript" in languages:
+                    results.append(run_language_case("typescript", case, worktree, js_runner, ts_setup))
+                if "python" in languages:
+                    results.append(run_language_case("python", case, worktree, py_runner, None))
+    except Exception as exc:
+        print(f"hidden runner infrastructure failure: {exc}", file=sys.stderr)
+        write_infrastructure_failure(out_path, worktree, "runner_infrastructure_failed")
+        return 2
 
     finished_at = iso_now()
     payload = build_result_payload(
@@ -399,6 +406,8 @@ def execute_case(language: str, case: dict[str, Any], worktree: Path, runner: Pa
     try:
         completed = subprocess.run(
             command,
+            cwd=runner.parent,
+            env=runner_env(),
             input=payload,
             text=True,
             capture_output=True,
@@ -423,7 +432,7 @@ def strip_runner_metadata(case: dict[str, Any]) -> dict[str, Any]:
     return {
         key: copy.deepcopy(value)
         for key, value in case.items()
-        if key not in {"expected", "source_file"}
+        if key not in {"id", "expected", "source_file", "category", "languages", "points"}
     }
 
 
@@ -459,11 +468,9 @@ def case_result(
     reason: str,
 ) -> dict[str, Any]:
     return {
-        "id": case["id"],
+        "id": opaque_case_id(case),
         "category": case["category"],
         "language": language,
-        "operation": case["operation"],
-        "source_file": case.get("source_file"),
         "status": status,
         "points_earned": earned,
         "points_possible": possible,
@@ -493,7 +500,6 @@ def build_result_payload(
     return {
         "schema_version": 1,
         "seed": manifest.get("seed"),
-        "worktree": str(worktree),
         "started_at": started_at,
         "finished_at": finished_at,
         "summary": {
@@ -511,6 +517,31 @@ def build_result_payload(
         "typescript_setup": ts_setup,
         "cases": results,
     }
+
+
+def write_infrastructure_failure(out_path: Path, worktree: Path, reason: str) -> None:
+    now = iso_now()
+    payload = {
+        "schema_version": 1,
+        "started_at": now,
+        "finished_at": now,
+        "summary": {
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+            "errors": 1,
+            "points_earned": 0.0,
+            "points_possible": 0.0,
+            "point_score": 0.0,
+            "score": 0.0,
+        },
+        "categories": {},
+        "languages": {},
+        "typescript_setup": {"ok": False, "reason": reason},
+        "cases": [],
+        "infrastructure_error": reason,
+    }
+    out_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def summarize_by(results: list[dict[str, Any]], key: str) -> dict[str, Any]:
@@ -563,6 +594,7 @@ def run_command(command: list[str], cwd: Path, timeout: int) -> dict[str, Any]:
         completed = subprocess.run(
             command,
             cwd=cwd,
+            env=runner_env(),
             text=True,
             capture_output=True,
             timeout=timeout,
@@ -594,6 +626,18 @@ def canonical(value: Any) -> str:
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def opaque_case_id(case: dict[str, Any]) -> str:
+    raw = str(case.get("id", "unknown")).encode("utf-8", errors="replace")
+    return "case-" + hashlib.sha256(raw).hexdigest()[:12]
+
+
+def runner_env() -> dict[str, str]:
+    env = dict(os.environ)
+    for name in ("PYTHONPATH", "PYTEST_CURRENT_TEST"):
+        env.pop(name, None)
+    return env
 
 
 def iso_now() -> str:

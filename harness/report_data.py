@@ -428,8 +428,19 @@ def _aggregate_bucket(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
 def _failure_rate(rows: Sequence[Mapping[str, Any]]) -> float:
     if not rows:
         return 0.0
-    failures = sum(1 for row in rows if row.get("status") not in {"passed", "partial"})
+    failures = sum(1 for row in rows if _row_has_measured_failure(row))
     return round(failures / len(rows), 6)
+
+
+def _row_has_measured_failure(row: Mapping[str, Any]) -> bool:
+    status = str(row.get("status") or "")
+    artifact_status = str(row.get("artifact_status") or "")
+    failure_phase = str(row.get("failure_phase") or "").strip()
+    if failure_phase:
+        return True
+    if status in {"failed", "missing_score"}:
+        return True
+    return artifact_status not in {"", "complete"}
 
 
 def _best_run(rows: Sequence[Mapping[str, Any]], metric: str) -> dict[str, Any] | None:

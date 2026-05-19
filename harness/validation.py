@@ -345,10 +345,12 @@ def _hidden_isolation_check(
     for run in selected_runs:
         run_id = str(run["run_id"])
         run_dir = experiment_dir / "runs" / run_id
-        worktree = run_dir / "worktree"
+        worktree = _run_worktree_path(run_dir)
         if not worktree.exists():
             errors.append(f"{run_id}: missing implementation worktree")
             continue
+        if _is_relative_to(worktree.resolve(), repo_root.resolve()):
+            errors.append(f"{run_id}: implementation worktree is inside repository: {worktree}")
         errors.extend(f"{run_id}: {error}" for error in _worktree_hidden_leak_errors(worktree, hidden_index))
         privacy_errors = validate_hidden_artifact_privacy(run_dir)
         errors.extend(f"{run_id}: {error}" for error in privacy_errors)
@@ -369,10 +371,16 @@ def _judge_json_check(experiment_dir: Path, selected_runs: Sequence[Mapping[str,
         judge_path = experiment_dir / "runs" / run_id / "judge.json"
         judge = _read_json(judge_path)
         if not judge:
-            errors.append(f"{run_id}: missing or malformed judge.json")
+            if _judge_malformed_scored(judge_path.parent):
+                warnings.append(f"{run_id}: missing or malformed judge output was scored as zero")
+            else:
+                errors.append(f"{run_id}: missing or malformed judge.json")
             continue
         if judge.get("parsed") is not True:
-            errors.append(f"{run_id}: judge.json final response did not parse as strict JSON")
+            if _judge_malformed_scored(judge_path.parent):
+                warnings.append(f"{run_id}: judge final response did not parse and was scored as zero")
+            else:
+                errors.append(f"{run_id}: judge.json final response did not parse as strict JSON")
             continue
         value = judge.get("value")
         if not isinstance(value, Mapping):
@@ -422,6 +430,7 @@ def _resume_contract_check(
 
 def _report_outputs_check(experiment_dir: Path, selected_runs: Sequence[Mapping[str, Any]]) -> Stage11Check:
     errors = validate_experiment_outputs(experiment_dir)
+    warnings: list[str] = []
     aggregate = _read_json(experiment_dir / "results" / "aggregate.json")
     if aggregate:
         if aggregate.get("primary_metric") != PRIMARY_METRIC:
@@ -431,6 +440,14 @@ def _report_outputs_check(experiment_dir: Path, selected_runs: Sequence[Mapping[
         rankings = aggregate.get("rankings")
         if not isinstance(rankings, Mapping) or "primary_by_run_group" not in rankings:
             errors.append("aggregate rankings.primary_by_run_group is missing")
+        pdf_generation = aggregate.get("report_generation")
+        pdf = pdf_generation.get("pdf") if isinstance(pdf_generation, Mapping) else None
+        if isinstance(pdf, Mapping):
+            renderer = pdf.get("renderer")
+            if renderer != "playwright":
+                warnings.append(f"report PDF used non-Playwright renderer: {renderer}")
+        else:
+            warnings.append("aggregate report_generation.pdf is missing")
 
     csv_path = experiment_dir / "results" / "results.csv"
     csv_rows = _csv_data_row_count(csv_path)
@@ -448,6 +465,8 @@ def _report_outputs_check(experiment_dir: Path, selected_runs: Sequence[Mapping[
 
     if errors:
         return _failed("report_outputs", _join_errors(errors), {"error_count": len(errors)})
+    if warnings:
+        return _warning("report_outputs", _join_errors(warnings), {"warning_count": len(warnings)})
     return _passed("report_outputs", "CSV, SQLite, aggregate JSON, HTML, and PDF outputs validate")
 
 
@@ -504,6 +523,29 @@ def _iter_worktree_files(root: Path) -> Iterable[Path]:
                     stack.append(child)
             elif child.is_file():
                 yield child
+
+
+def _run_worktree_path(run_dir: Path) -> Path:
+    metadata = _read_json(run_dir / "metadata.json")
+    worktree = metadata.get("worktree")
+    if isinstance(worktree, str) and worktree:
+        return Path(worktree)
+    pointer = _read_json(run_dir / "worktree.json")
+    pointer_path = pointer.get("path")
+    if isinstance(pointer_path, str) and pointer_path:
+        return Path(pointer_path)
+    return run_dir / "worktree"
+
+
+def _judge_malformed_scored(run_dir: Path) -> bool:
+    score = _read_json(run_dir / "score.json")
+    components = score.get("component_scores")
+    warnings = score.get("warnings")
+    if not isinstance(components, Mapping) or components.get("judge") != 0.0:
+        return False
+    if not isinstance(warnings, list):
+        return False
+    return any("judge" in str(warning).lower() for warning in warnings)
 
 
 def _payload(
@@ -595,6 +637,14 @@ def _judge_has_numeric_score(value: Mapping[str, Any]) -> bool:
         if isinstance(value.get(key), (int, float)) and not isinstance(value.get(key), bool):
             return True
     return False
+
+
+def _is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
 
 
 def _csv_data_row_count(path: Path) -> int | None:

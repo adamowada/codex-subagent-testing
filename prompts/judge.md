@@ -2,7 +2,7 @@
 
 You are judging one completed RuleLedger implementation run. Do not modify files.
 
-Assess the implementation from available artifacts: source files, public test logs, hidden-result summaries, diffs, stderr logs, timing data, and the implementation agent's final JSON response. Do not use or request private hidden case payloads. Do not infer or reward the producing agent arrangement; judge only the implementation evidence.
+Assess the implementation from available artifacts. Source files are in the workspace root, and sanitized run evidence is in `judge_evidence/`: public test logs, hidden-result summaries, diffs, stderr logs, timing data, and the implementation agent's final JSON response. Do not use or request private hidden case payloads. Do not infer or reward the producing agent arrangement; judge only the implementation evidence.
 
 ## Evaluation Focus
 

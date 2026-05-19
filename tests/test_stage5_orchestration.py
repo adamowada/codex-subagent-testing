@@ -8,7 +8,16 @@ import pytest
 from harness.codex_runner import build_implementation_command, build_judge_command
 from harness.jsonl_usage import parse_usage_events, summarize_usage
 from harness.matrix import expand_experiment_matrix, load_experiment_config
-from harness.orchestrator import OrchestrationError, resolve_experiment_dir, select_runs, validate_resume_target
+from harness.orchestrator import (
+    OrchestrationError,
+    capture_diff,
+    initialize_git_baseline,
+    prepare_judge_evidence,
+    resolve_experiment_dir,
+    select_runs,
+    validate_resume_target,
+)
+from harness.prompt_rendering import render_codex_config
 from harness.report_data import write_results_outputs
 
 
@@ -78,10 +87,25 @@ def test_implementation_command_contains_run_settings(runs: list[dict]) -> None:
     assert "workspace-write" in command
     assert "--model" in command
     assert "gpt-5.5" in command
-    assert "model_reasoning_effort=xhigh" in command
+    assert 'model_reasoning_effort="xhigh"' in command
     assert "agents.max_depth=2" in command
     assert "agents.max_threads=24" in command
     assert command[-1] == "prompt text"
+
+
+def test_implementation_command_uses_rendered_agent_config(runs: list[dict], tmp_path: Path) -> None:
+    run = next(candidate for candidate in runs if candidate["run_id"] == "C1_direct_r01")
+    config_dir = tmp_path / "codex_config"
+    for relative_path, contents in render_codex_config(run, REPO_ROOT).items():
+        path = config_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents, encoding="utf-8")
+
+    command = build_implementation_command("codex", run, "prompt text", config_dir=config_dir)
+
+    assert "agents.spark_direct_implementer.config_file" in "\n".join(command)
+    assert "spark_direct_implementer.md" in "\n".join(command)
+    assert "agents.spark_direct_implementer.sandbox=\"workspace-write\"" in command
 
 
 def test_judge_command_is_read_only_xhigh(runs: list[dict]) -> None:
@@ -146,3 +170,39 @@ def test_report_outputs_are_written_for_missing_scores(runs: list[dict], tmp_pat
 
     aggregate = json.loads(Path(outputs["aggregate_json"]).read_text(encoding="utf-8"))
     assert aggregate["total_runs"] == 2
+
+
+def test_capture_diff_includes_untracked_files(tmp_path: Path) -> None:
+    worktree = tmp_path / "worktree"
+    run_dir = tmp_path / "run"
+    (worktree / "src").mkdir(parents=True)
+    (worktree / "src" / "existing.ts").write_text("export const before = true;\n", encoding="utf-8")
+    baseline = initialize_git_baseline(worktree)
+    (run_dir).mkdir()
+    (run_dir / "metadata.json").write_text(json.dumps({"baseline_commit": baseline}), encoding="utf-8")
+
+    (worktree / "src" / "new_file.ts").write_text("export const after = true;\n", encoding="utf-8")
+    capture_diff(run_dir, worktree)
+
+    assert "src/new_file.ts" in (run_dir / "diff.patch").read_text(encoding="utf-8")
+    assert "src/new_file.ts" in (run_dir / "diff-numstat.txt").read_text(encoding="utf-8")
+
+
+def test_prepare_judge_evidence_copies_sanitized_artifacts(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    run_dir.mkdir()
+    (run_dir / "hidden-results.json").write_text(
+        json.dumps({"schema_version": 1, "summary": {"score": 0.5}, "cases": []}),
+        encoding="utf-8",
+    )
+    (run_dir / "public_py.log").write_text("public output\n", encoding="utf-8")
+    (run_dir / "metadata.json").write_text(json.dumps({"cell_id": "C4"}), encoding="utf-8")
+
+    prepare_judge_evidence(run_dir, worktree)
+
+    evidence = worktree / "judge_evidence"
+    assert (evidence / "hidden-results.json").exists()
+    assert (evidence / "public_py.log").read_text(encoding="utf-8") == "public output\n"
+    assert not (evidence / "metadata.json").exists()

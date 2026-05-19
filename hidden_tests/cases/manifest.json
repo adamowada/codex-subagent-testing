@@ -10,27 +10,27 @@
   "files": {
     "immutability.json": {
       "case_count": 1,
-      "sha256": "bb936cddb1e9d825fbdc27363bc660d4f3f4825f5dd274fbc9769bbacd260b62"
+      "sha256": "56a32d594d14545128e2ec024d3dd1087a2f72844742d468a372e5d1d2315191"
     },
     "normalization.json": {
       "case_count": 5,
-      "sha256": "fec46a4d33b261eb89e8dd28c3676dbd8014ece583b560d794ff0e8f6b30f326"
+      "sha256": "29c162712ce45726a5f72d01926fb274f9674b58515aeb18d43dd288216aa5b7"
     },
     "parity.json": {
       "case_count": 1,
-      "sha256": "3471cf9b1c56c34fc4a0bb51d8e41e98be58ad5027f70372b3beb9b05b0e6021"
+      "sha256": "011dc6f3db59a69c96e944dea6bfe5af2678a997d2496054ce8362dfa1f0d3e8"
     },
     "parse_validation.json": {
-      "case_count": 11,
-      "sha256": "d8e7e216632c48b5e8d26e88e97d87623da429f8c2c32936dd8e71634bbae71b"
+      "case_count": 14,
+      "sha256": "feab3e608d18430c55519c2073ab76b18489f6ea769f659dbf288175fcda40fb"
     },
     "reporting.json": {
       "case_count": 1,
-      "sha256": "6c08a3e6db8e589b3b7b5e7199ed4a4f41d7f72a0e33dde0b9a92d1ee7da502a"
+      "sha256": "c66e1fffc08a3a7080b84bc7f35e5d26e878adaace7e07f5c9cb87b4cc351f02"
     },
     "state_reduction.json": {
-      "case_count": 8,
-      "sha256": "0e457dd5f09ad1d58e8040a7b2ffb3cafa82efec54df68d9dda372b1d03a516f"
+      "case_count": 9,
+      "sha256": "d4ea545968dcb0688e08e13ec4ded336bb9fa38828ddff18f11bc0b79c52bd8a"
     }
   },
   "generated_at": "2026-05-19T00:00:00.000Z",

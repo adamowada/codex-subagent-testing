@@ -274,28 +274,33 @@ def _agent_template_toml(
         return "# No custom subagent templates are available for this solo run."
 
     blocks: list[str] = []
-    for name, instructions in rendered_snippets.items():
+    for name in rendered_snippets:
         snippet = AGENT_SNIPPETS[name]
         model = context[str(snippet["model_key"])]
         reasoning = context[str(snippet["reasoning_key"])]
-        sandbox = str(snippet["sandbox"])
+        sandbox = _snippet_sandbox(name, context)
         description = str(snippet["description"])
         blocks.append(
             "\n".join(
                 [
-                    "[[agents.templates]]",
-                    f'name = "{_toml_escape(name)}"',
+                    f"[agents.{_toml_key(name)}]",
                     f'description = "{_toml_escape(description)}"',
                     f'model = "{_toml_escape(model)}"',
                     f'model_reasoning_effort = "{_toml_escape(reasoning)}"',
                     f'sandbox = "{_toml_escape(sandbox)}"',
-                    'instructions = """',
-                    _toml_multiline_escape(_final_text(instructions).rstrip()),
-                    '"""',
+                    f'config_file = "agents/{_toml_escape(name)}.md"',
                 ]
             )
         )
     return "\n\n".join(blocks)
+
+
+def _snippet_sandbox(name: str, context: Mapping[str, str]) -> str:
+    if name == "spark_adversary" or name.startswith("spark_proposal_"):
+        return "read-only"
+    if name.startswith("spark_direct_"):
+        return context["leaf_write_mode"]
+    return str(AGENT_SNIPPETS[name]["sandbox"])
 
 
 def _render_template_file(
@@ -425,8 +430,10 @@ def _toml_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def _toml_multiline_escape(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"""', '\\"\\"\\"')
+def _toml_key(value: str) -> str:
+    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+        return value
+    return f'"{_toml_escape(value)}"'
 
 
 if __name__ == "__main__":

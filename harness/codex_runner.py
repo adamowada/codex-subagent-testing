@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import time
+import tomllib
 from typing import Any, Mapping
 
 
@@ -49,9 +50,21 @@ def resolve_codex_bin(env: Mapping[str, str] | None = None) -> str | None:
     return shutil.which("codex", path=path)
 
 
-def build_implementation_command(codex_bin: str, run: Mapping[str, Any], prompt: str) -> list[str]:
+def build_implementation_command(
+    codex_bin: str,
+    run: Mapping[str, Any],
+    prompt: str,
+    *,
+    config_dir: str | Path | None = None,
+) -> list[str]:
     root = _mapping(run, "root")
     agents = _mapping(run, "agents")
+    rendered = _rendered_config_values(config_dir)
+    model = str(rendered.get("model", root["model"]))
+    reasoning = str(rendered.get("model_reasoning_effort", root["reasoning"]))
+    sandbox = str(rendered.get("sandbox", "workspace-write"))
+    ask_for_approval = str(rendered.get("ask_for_approval", "never"))
+
     return [
         codex_bin,
         "exec",
@@ -59,17 +72,19 @@ def build_implementation_command(codex_bin: str, run: Mapping[str, Any], prompt:
         "--cd",
         "<run_worktree>",
         "--sandbox",
-        "workspace-write",
+        sandbox,
         "--ask-for-approval",
-        "never",
+        ask_for_approval,
         "--model",
-        str(root["model"]),
-        "-c",
-        f"model_reasoning_effort={root['reasoning']}",
-        "-c",
-        f"agents.max_threads={agents['max_threads']}",
-        "-c",
-        f"agents.max_depth={agents['max_depth']}",
+        model,
+        *_config_override_args(
+            [
+                f"model_reasoning_effort={_toml_value(reasoning)}",
+                f"agents.max_threads={int(rendered.get('agents.max_threads', agents['max_threads']))}",
+                f"agents.max_depth={int(rendered.get('agents.max_depth', agents['max_depth']))}",
+                *_agent_override_values(rendered, config_dir),
+            ]
+        ),
         prompt,
     ]
 
@@ -268,6 +283,75 @@ def _mapping(parent: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise TypeError(f"{key}: expected object")
     return value
+
+
+def _rendered_config_values(config_dir: str | Path | None) -> dict[str, Any]:
+    if config_dir is None:
+        return {}
+
+    config_path = Path(config_dir) / "config.toml"
+    if not config_path.exists():
+        return {}
+
+    payload = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    values: dict[str, Any] = {}
+    for key in ("model", "model_reasoning_effort", "sandbox", "ask_for_approval"):
+        if key in payload:
+            values[key] = payload[key]
+
+    agents = payload.get("agents")
+    if isinstance(agents, Mapping):
+        for key in ("max_threads", "max_depth"):
+            if key in agents:
+                values[f"agents.{key}"] = agents[key]
+        for name, role in agents.items():
+            if name in {"max_threads", "max_depth"} or not isinstance(role, Mapping):
+                continue
+            prefix = f"agents.{name}"
+            for key in ("description", "model", "model_reasoning_effort", "sandbox", "config_file"):
+                if key in role:
+                    values[f"{prefix}.{key}"] = role[key]
+    return values
+
+
+def _agent_override_values(rendered: Mapping[str, Any], config_dir: str | Path | None) -> list[str]:
+    if config_dir is None:
+        return []
+
+    overrides: list[str] = []
+    config_root = Path(config_dir).resolve()
+    prefixes = sorted(
+        {
+            ".".join(key.split(".")[:2])
+            for key in rendered
+            if key.startswith("agents.") and key.count(".") >= 2
+        }
+    )
+    for prefix in prefixes:
+        for field in ("description", "model", "model_reasoning_effort", "sandbox", "config_file"):
+            key = f"{prefix}.{field}"
+            if key not in rendered:
+                continue
+            value = rendered[key]
+            if field == "config_file":
+                value = str((config_root / str(value)).resolve())
+            overrides.append(f"{key}={_toml_value(value)}")
+    return overrides
+
+
+def _config_override_args(overrides: list[str]) -> list[str]:
+    args: list[str] = []
+    for override in overrides:
+        args.extend(["-c", override])
+    return args
+
+
+def _toml_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    return json.dumps(str(value))
 
 
 def _collect_text_candidates(value: Any) -> list[str]:

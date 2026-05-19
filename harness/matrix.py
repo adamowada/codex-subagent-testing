@@ -99,8 +99,13 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
     _validate_scoring(scoring, errors)
 
     judge = _mapping(config, "judge", errors)
-    _validate_model(judge.get("model"), "judge.model", errors)
+    if judge.get("model") != INITIAL_GPT55_MODEL:
+        errors.append(f"judge.model: expected {INITIAL_GPT55_MODEL}")
     _validate_reasoning(judge.get("reasoning"), "judge.reasoning", errors)
+    if judge.get("reasoning") != "xhigh":
+        errors.append("judge.reasoning: expected xhigh")
+    if judge.get("sandbox") != "read-only":
+        errors.append("judge.sandbox: expected read-only")
     _validate_prompt_template_reference(
         judge.get("prompt_template"),
         prompt_templates,
@@ -142,6 +147,13 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             f"{path}.prompt_template",
             errors,
         )
+        expected_prompt = {
+            "solo": "solo",
+            "flat_spark": "flat_spark",
+            "depth2_subleads": "depth2_subleads",
+        }.get(str(topology))
+        if expected_prompt is not None and cell.get("prompt_template") != expected_prompt:
+            errors.append(f"{path}.prompt_template: {topology} requires {expected_prompt}")
 
         modes = _cell_spark_modes(cell, path, spark_modes, errors)
         if cell_id == "C0" and modes:
@@ -150,7 +162,8 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             errors.append(f"{path}.spark_modes: {cell_id} must include direct and proposal")
 
         root = _mapping(cell, "root", errors, prefix=path)
-        _validate_model(root.get("model"), f"{path}.root.model", errors)
+        if root.get("model") != INITIAL_GPT55_MODEL:
+            errors.append(f"{path}.root.model: expected {INITIAL_GPT55_MODEL}")
         _validate_reasoning(root.get("reasoning"), f"{path}.root.reasoning", errors)
         _validate_initial_root_reasoning(cell_id, root.get("reasoning"), path, errors)
 
@@ -460,8 +473,12 @@ def _validate_spark_mode_definitions(
     proposal = spark_modes.get("proposal")
     if isinstance(direct, Mapping) and direct.get("proposal_only") is not False:
         errors.append("spark_modes.direct.proposal_only: expected false")
+    if isinstance(direct, Mapping) and direct.get("leaf_write_mode") != "workspace-write":
+        errors.append("spark_modes.direct.leaf_write_mode: expected workspace-write")
     if isinstance(proposal, Mapping) and proposal.get("proposal_only") is not True:
         errors.append("spark_modes.proposal.proposal_only: expected true")
+    if isinstance(proposal, Mapping) and proposal.get("leaf_write_mode") != "read-only":
+        errors.append("spark_modes.proposal.leaf_write_mode: expected read-only")
 
 
 def _validate_scoring(scoring: Mapping[str, Any], errors: list[str]) -> None:
@@ -546,6 +563,9 @@ def _validate_leaf(leaf: Mapping[str, Any], path: str, errors: list[str]) -> Non
     if not isinstance(reasoning_by_role, Mapping) or not reasoning_by_role:
         errors.append(f"{path}.leaf.reasoning_by_role: expected non-empty object")
         return
+    required_roles = {"implementer", "tester", "adversary"}
+    if set(reasoning_by_role) != required_roles:
+        errors.append(f"{path}.leaf.reasoning_by_role: expected exactly {sorted(required_roles)}")
 
     for role, reasoning in reasoning_by_role.items():
         role_path = f"{path}.leaf.reasoning_by_role.{role}"

@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from ruleledger.engine import (
+    evaluate_entitlements,
     export_ledger_report,
     normalize_event,
     parse_event_line,
@@ -96,3 +97,49 @@ def test_export_ledger_report_writes_stable_csv_with_trailing_newline():
             "",
         ]
     )
+
+
+def test_evaluate_entitlements_handles_grace_usage_and_closed_accounts():
+    assert evaluate_entitlements(
+        {
+            "accountId": "acct_due",
+            "status": "past_due",
+            "plan": "starter",
+            "totalPaidCents": 0,
+            "failedPayments": 1,
+            "usage": 1001,
+            "couponCode": "SAVE10",
+            "couponExpiresAt": "2026-02-01T00:00:00.000Z",
+            "closedAt": None,
+            "lastEventAt": "2026-01-01T00:00:00.000Z",
+        },
+        "2026-01-05T00:00:00.000Z",
+    ) == {
+        "active": True,
+        "features": ["dashboard", "exports"],
+        "usageLimit": 1000,
+        "overLimit": True,
+        "couponActive": True,
+    }
+
+    assert evaluate_entitlements(
+        {
+            "accountId": "acct_closed",
+            "status": "closed",
+            "plan": "enterprise",
+            "totalPaidCents": 19900,
+            "failedPayments": 0,
+            "usage": 1,
+            "couponCode": "WELCOME50",
+            "couponExpiresAt": "2026-12-31T00:00:00.000Z",
+            "closedAt": "2026-01-02T00:00:00.000Z",
+            "lastEventAt": "2026-01-02T00:00:00.000Z",
+        },
+        "2026-01-05T00:00:00.000Z",
+    ) == {
+        "active": False,
+        "features": [],
+        "usageLimit": 0,
+        "overLimit": True,
+        "couponActive": False,
+    }

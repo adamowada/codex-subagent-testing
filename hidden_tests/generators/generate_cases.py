@@ -134,6 +134,14 @@ def parse_validation_cases() -> list[dict[str, Any]]:
             },
         ),
         (
+            "normalize.missing-timestamp",
+            {
+                "id": "evt_missing_timestamp",
+                "account_id": "acct_hidden",
+                "type": "account_opened",
+            },
+        ),
+        (
             "normalize.invalid-amount",
             {
                 "id": "evt_bad_amount",
@@ -151,6 +159,26 @@ def parse_validation_cases() -> list[dict[str, Any]]:
                 "type": "usage_recorded",
                 "timestamp": "2026-01-01T00:00:00Z",
                 "usage": -1,
+            },
+        ),
+        (
+            "normalize.non-string-usage",
+            {
+                "id": "evt_usage_string",
+                "account_id": "acct_hidden",
+                "type": "usage_recorded",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "usage": "5",
+            },
+        ),
+        (
+            "normalize.fractional-usage",
+            {
+                "id": "evt_usage_fraction",
+                "account_id": "acct_hidden",
+                "type": "usage_recorded",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "usage": 1.5,
             },
         ),
     ]
@@ -290,6 +318,17 @@ def state_reduction_cases() -> list[dict[str, Any]]:
                 ),
                 event("evt_usage_closed", "acct_closed", "usage_recorded", "2026-05-03T00:00:00Z", usage=25),
                 event("evt_close", "acct_closed", "account_closed", "2026-05-04T00:00:00Z"),
+            ],
+        ),
+        (
+            "state.closed-precedence",
+            "2026-07-01T00:00:00.000Z",
+            [
+                event("evt_open_precedence", "acct_closed_precedence", "account_opened", "2026-05-01T00:00:00Z", plan="starter"),
+                event("evt_close_precedence", "acct_closed_precedence", "account_closed", "2026-05-02T00:00:00Z"),
+                event("evt_plan_after_close", "acct_closed_precedence", "plan_changed", "2026-05-03T00:00:00Z", plan="enterprise"),
+                event("evt_payment_after_close", "acct_closed_precedence", "payment_succeeded", "2026-05-04T00:00:00Z", amount="199.00"),
+                event("evt_usage_after_close", "acct_closed_precedence", "usage_recorded", "2026-05-05T00:00:00Z", usage=999),
             ],
         ),
         (
@@ -476,7 +515,8 @@ def event(
 
 
 def write_json(path: Path, payload: Any) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
 def sha256(path: Path) -> str:

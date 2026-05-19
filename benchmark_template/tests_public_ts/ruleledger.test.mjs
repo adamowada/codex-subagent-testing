@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  evaluateEntitlements,
   exportLedgerReport,
   normalizeEvent,
   parseEventLine,
@@ -104,5 +105,57 @@ test("exportLedgerReport writes stable CSV with a trailing newline", () => {
       "acct_b,closed,free,0,0,0,false,,false,2026-01-02T00:00:00.000Z,2026-01-02T00:00:00.000Z",
       ""
     ].join("\n")
+  );
+});
+
+test("evaluateEntitlements handles grace, over-limit usage, and closed accounts", () => {
+  assert.deepEqual(
+    evaluateEntitlements(
+      {
+        accountId: "acct_due",
+        status: "past_due",
+        plan: "starter",
+        totalPaidCents: 0,
+        failedPayments: 1,
+        usage: 1001,
+        couponCode: "SAVE10",
+        couponExpiresAt: "2026-02-01T00:00:00.000Z",
+        closedAt: null,
+        lastEventAt: "2026-01-01T00:00:00.000Z"
+      },
+      "2026-01-05T00:00:00.000Z"
+    ),
+    {
+      active: true,
+      features: ["dashboard", "exports"],
+      usageLimit: 1000,
+      overLimit: true,
+      couponActive: true
+    }
+  );
+
+  assert.deepEqual(
+    evaluateEntitlements(
+      {
+        accountId: "acct_closed",
+        status: "closed",
+        plan: "enterprise",
+        totalPaidCents: 19900,
+        failedPayments: 0,
+        usage: 1,
+        couponCode: "WELCOME50",
+        couponExpiresAt: "2026-12-31T00:00:00.000Z",
+        closedAt: "2026-01-02T00:00:00.000Z",
+        lastEventAt: "2026-01-02T00:00:00.000Z"
+      },
+      "2026-01-05T00:00:00.000Z"
+    ),
+    {
+      active: false,
+      features: [],
+      usageLimit: 0,
+      overLimit: true,
+      couponActive: false
+    }
   );
 });

@@ -79,6 +79,18 @@ def test_missing_score_rows_remain_visible_with_attribution_warnings(tmp_path: P
     assert "Implementation JSONL did not expose per-model attribution." in html
 
 
+def test_failure_rate_counts_preserved_failed_phases() -> None:
+    rows = [
+        {"run_id": "ok", "status": "partial", "artifact_status": "complete", "failure_phase": ""},
+        {"run_id": "failed", "status": "partial", "artifact_status": "complete", "failure_phase": "judged"},
+        {"run_id": "missing", "status": "missing_score", "artifact_status": "missing_score", "failure_phase": ""},
+    ]
+
+    aggregate = aggregate_rows(rows)
+
+    assert aggregate["failure_rate"] == pytest.approx(2 / 3)
+
+
 def test_pdf_renderer_disables_browser_header_footer() -> None:
     renderer = Path(__file__).resolve().parents[1] / "scripts" / "render_report_pdf.mjs"
 

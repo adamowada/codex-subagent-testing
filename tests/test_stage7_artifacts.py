@@ -43,6 +43,7 @@ def runs(config: dict) -> list[dict]:
 
 def test_contract_names_include_stage7_core_outputs() -> None:
     for name in [
+        "worktree.json",
         "metadata.json",
         "rendered_prompt.md",
         "codex_config/config.toml",
@@ -132,6 +133,38 @@ def test_hidden_result_privacy_validation_flags_private_payload_keys(tmp_path: P
     errors = validate_hidden_artifact_privacy(tmp_path)
 
     assert any("private key" in error for error in errors)
+
+
+def test_hidden_result_artifact_rejects_descriptive_case_metadata(tmp_path: Path) -> None:
+    path = tmp_path / "hidden-results.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "summary": {"score": 0.0},
+                "cases": [
+                    {
+                        "id": "parse.invalid-json",
+                        "category": "parse_validation",
+                        "language": "python",
+                        "operation": "parse_line",
+                        "source_file": "parse_validation.json",
+                        "status": "failed",
+                        "points_earned": 0.0,
+                        "points_possible": 1.0,
+                        "reason": "output_mismatch",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors = validate_phase_artifacts(tmp_path, "hidden_tested")
+
+    assert any("id is not opaque" in error for error in errors)
+    assert any("operation" in error for error in errors)
+    assert any("source_file" in error for error in errors)
 
 
 def test_experiment_metadata_writes_stable_aliases_and_resume_reads_them(
