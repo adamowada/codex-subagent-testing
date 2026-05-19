@@ -102,6 +102,25 @@ class ExperimentMatrixTests(unittest.TestCase):
         with self.assertRaisesRegex(ExperimentConfigError, "sum to 1.0"):
             validate_experiment_config(config)
 
+    def test_unknown_scoring_component_fails_validation(self) -> None:
+        config = copy.deepcopy(self.config)
+        config["scoring"]["weights"] = {"hidden_tests": 0.95, "surprise": 0.05}
+
+        with self.assertRaisesRegex(ExperimentConfigError, "unknown scoring component"):
+            validate_experiment_config(config)
+
+    def test_minimality_scoring_config_is_propagated_to_runs(self) -> None:
+        config = copy.deepcopy(self.config)
+        config["scoring"]["weights"] = {"hidden_tests": 0.95, "minimality": 0.05}
+        config["scoring"]["minimality"] = {"target_production_loc": 400, "penalty_window": 800}
+
+        runs = expand_experiment_matrix(config)
+
+        self.assertEqual(
+            runs[0]["scoring_minimality"],
+            {"target_production_loc": 400, "penalty_window": 800},
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -15,6 +15,7 @@ VALID_REASONING = {"none", "minimal", "low", "medium", "high", "xhigh"}
 INITIAL_SPARK_MODEL = "gpt-5.3-codex-spark"
 INITIAL_GPT55_MODEL = "gpt-5.5"
 INITIAL_SPARK_REASONING = "xhigh"
+SCORING_COMPONENTS = {"public_tests", "hidden_tests", "judge", "typecheck", "parity", "minimality"}
 REQUIRED_PROMPT_TEMPLATE_KEYS = {
     "common",
     "solo",
@@ -229,7 +230,9 @@ def expand_experiment_matrix(config: Mapping[str, Any]) -> list[dict[str, Any]]:
     paths = config["paths"]
     prompt_templates = paths["prompt_templates"]
     spark_modes = config["spark_modes"]
-    scoring_weights = config["scoring"]["weights"]
+    scoring = config["scoring"]
+    scoring_weights = scoring["weights"]
+    scoring_minimality = scoring.get("minimality", {})
     timeouts = config["timeouts"]
     judge = config["judge"]
 
@@ -265,6 +268,7 @@ def expand_experiment_matrix(config: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "judge": copy.deepcopy(judge),
                     "judge_prompt_template_path": prompt_templates[judge["prompt_template"]],
                     "scoring_weights": copy.deepcopy(scoring_weights),
+                    "scoring_minimality": copy.deepcopy(scoring_minimality),
                 }
                 runs.append(record)
 
@@ -396,6 +400,29 @@ def _positive_int(
     return value
 
 
+def _number(
+    parent: Mapping[str, Any],
+    key: str,
+    path: str,
+    errors: list[str],
+    *,
+    must_be_positive: bool = False,
+) -> float | None:
+    value = parent.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        errors.append(f"{path}: expected number")
+        return None
+    if must_be_positive and value <= 0:
+        errors.append(f"{path}: expected positive number")
+        return None
+    if not must_be_positive and value < 0:
+        errors.append(f"{path}: expected non-negative number")
+        return None
+    return float(value)
+
+
 def _validate_prompt_templates(prompt_templates: Mapping[str, Any], errors: list[str]) -> None:
     missing = REQUIRED_PROMPT_TEMPLATE_KEYS - set(prompt_templates)
     if missing:
@@ -446,6 +473,8 @@ def _validate_scoring(scoring: Mapping[str, Any], errors: list[str]) -> None:
     total = 0.0
     for key, value in weights.items():
         path = f"scoring.weights.{key}"
+        if key not in SCORING_COMPONENTS:
+            errors.append(f"{path}: unknown scoring component")
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             errors.append(f"{path}: expected number")
             continue
@@ -456,6 +485,20 @@ def _validate_scoring(scoring: Mapping[str, Any], errors: list[str]) -> None:
 
     if abs(total - 1.0) > 0.000001:
         errors.append(f"scoring.weights: expected weights to sum to 1.0, got {total:.6f}")
+
+    minimality = scoring.get("minimality")
+    if minimality is not None:
+        if not isinstance(minimality, Mapping):
+            errors.append("scoring.minimality: expected object")
+            return
+        _number(minimality, "target_production_loc", "scoring.minimality.target_production_loc", errors)
+        _number(
+            minimality,
+            "penalty_window",
+            "scoring.minimality.penalty_window",
+            errors,
+            must_be_positive=True,
+        )
 
 
 def _validate_model(value: Any, path: str, errors: list[str]) -> None:

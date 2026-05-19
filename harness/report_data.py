@@ -5,7 +5,7 @@ import html
 import json
 from pathlib import Path
 import sqlite3
-from statistics import mean, median
+from statistics import mean, median, stdev
 from typing import Any, Iterable, Mapping
 
 
@@ -23,15 +23,21 @@ RESULT_COLUMNS = [
     "judge",
     "typecheck",
     "parity",
+    "minimality",
     "implementation_tokens",
     "gpt55_implementation_tokens",
     "judge_tokens",
     "quality_per_gpt55_impl_token",
+    "quality_per_judge_inclusive_gpt55_token",
     "quality_per_total_impl_token",
+    "quality_per_wall_clock_minute",
     "implementation_elapsed_seconds",
     "changed_files",
     "insertions",
     "deletions",
+    "binary_files",
+    "production_loc",
+    "test_loc",
     "run_dir",
 ]
 
@@ -64,15 +70,23 @@ def collect_result_rows(experiment_dir: str | Path, runs: Iterable[Mapping[str, 
                 "judge": components.get("judge", 0.0),
                 "typecheck": components.get("typecheck", 0.0),
                 "parity": components.get("parity", 0.0),
+                "minimality": components.get("minimality", 0.0),
                 "implementation_tokens": totals.get("implementation_tokens", 0),
                 "gpt55_implementation_tokens": totals.get("gpt55_implementation_tokens", 0),
                 "judge_tokens": totals.get("judge_tokens", 0),
                 "quality_per_gpt55_impl_token": efficiency.get("quality_per_gpt55_impl_token"),
+                "quality_per_judge_inclusive_gpt55_token": efficiency.get(
+                    "quality_per_judge_inclusive_gpt55_token"
+                ),
                 "quality_per_total_impl_token": efficiency.get("quality_per_total_impl_token"),
+                "quality_per_wall_clock_minute": efficiency.get("quality_per_wall_clock_minute"),
                 "implementation_elapsed_seconds": wall_time.get("implementation_elapsed_seconds", 0.0),
                 "changed_files": diff_stats.get("changed_files", 0),
                 "insertions": diff_stats.get("insertions", 0),
                 "deletions": diff_stats.get("deletions", 0),
+                "binary_files": diff_stats.get("binary_files", 0),
+                "production_loc": diff_stats.get("production_loc", 0),
+                "test_loc": diff_stats.get("test_loc", 0),
                 "run_dir": str(run_dir),
             }
         )
@@ -244,6 +258,7 @@ def _aggregate_bucket(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "runs": len(rows),
         "quality_mean": round(mean(quality), 6) if quality else 0.0,
         "quality_median": round(median(quality), 6) if quality else 0.0,
+        "quality_stdev": round(stdev(quality), 6) if len(quality) > 1 else 0.0,
         "hidden_mean": round(mean(hidden), 6) if hidden else 0.0,
         "gpt55_impl_tokens_mean": round(mean(tokens), 6) if tokens else 0.0,
         "failure_rate": _failure_rate(rows),

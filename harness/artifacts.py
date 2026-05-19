@@ -232,6 +232,8 @@ def _validate_json_artifact(path: Path) -> list[str]:
             errors.append(f"JSON artifact is missing schema_version: {path}")
     if path.name == "usage.json":
         errors.extend(_validate_usage_artifact(path, value))
+    if path.name == "score.json":
+        errors.extend(_validate_score_artifact(path, value))
     if path.name.endswith(".meta.json") or path.name in {"wall_time.json", "judge.wall_time.json"}:
         if not isinstance(value, Mapping):
             errors.append(f"process metadata artifact is not an object: {path}")
@@ -285,6 +287,29 @@ def _validate_usage_artifact(path: Path, value: Any) -> list[str]:
         errors.append(f"usage artifact attribution_method is not a string: {path}")
     if "warnings" in value and not isinstance(value.get("warnings"), list):
         errors.append(f"usage artifact warnings is not a list: {path}")
+
+    return errors
+
+
+def _validate_score_artifact(path: Path, value: Any) -> list[str]:
+    if not isinstance(value, Mapping):
+        return [f"score artifact is not an object: {path}"]
+
+    errors: list[str] = []
+    for key in ("component_scores", "weights", "quality_score", "efficiency", "diff_stats", "wall_time", "status"):
+        if key not in value:
+            errors.append(f"score artifact missing key {key!r}: {path}")
+
+    for section_name in ("component_scores", "weights", "efficiency", "diff_stats", "wall_time"):
+        if section_name in value and not isinstance(value.get(section_name), Mapping):
+            errors.append(f"score artifact section {section_name!r} is not an object: {path}")
+
+    if "quality_score" in value and not _is_nonnegative_number(value.get("quality_score")):
+        errors.append(f"score artifact quality_score is not a non-negative number: {path}")
+    if "status" in value and value.get("status") not in {"passed", "partial", "failed"}:
+        errors.append(f"score artifact status is not recognized: {path}")
+    if "warnings" in value and not isinstance(value.get("warnings"), list):
+        errors.append(f"score artifact warnings is not a list: {path}")
 
     return errors
 
