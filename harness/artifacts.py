@@ -230,6 +230,8 @@ def _validate_json_artifact(path: Path) -> list[str]:
     if path.name in JSON_WITH_SCHEMA_VERSION:
         if not isinstance(value, Mapping) or value.get("schema_version") is None:
             errors.append(f"JSON artifact is missing schema_version: {path}")
+    if path.name == "usage.json":
+        errors.extend(_validate_usage_artifact(path, value))
     if path.name.endswith(".meta.json") or path.name in {"wall_time.json", "judge.wall_time.json"}:
         if not isinstance(value, Mapping):
             errors.append(f"process metadata artifact is not an object: {path}")
@@ -240,6 +242,55 @@ def _validate_json_artifact(path: Path) -> list[str]:
             if "log_path" not in value and "stdout_path" not in value:
                 errors.append(f"process metadata artifact missing output path: {path}")
     return errors
+
+
+def _validate_usage_artifact(path: Path, value: Any) -> list[str]:
+    if not isinstance(value, Mapping):
+        return [f"usage artifact is not an object: {path}"]
+
+    errors: list[str] = []
+    for key in ("implementation", "judge", "totals", "event_counts", "model_totals", "attribution_method", "warnings"):
+        if key not in value:
+            errors.append(f"usage artifact missing key {key!r}: {path}")
+
+    for section_name in ("implementation", "judge"):
+        section = value.get(section_name)
+        if not isinstance(section, Mapping):
+            errors.append(f"usage artifact section {section_name!r} is not an object: {path}")
+            continue
+        for key in ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens", "total_tokens"):
+            if not _is_nonnegative_number(section.get(key)):
+                errors.append(f"usage artifact {section_name}.{key} is not a non-negative number: {path}")
+
+    totals = value.get("totals")
+    if isinstance(totals, Mapping):
+        for key in ("implementation_tokens", "judge_tokens", "judge_inclusive_tokens"):
+            if not _is_nonnegative_number(totals.get(key)):
+                errors.append(f"usage artifact totals.{key} is not a non-negative number: {path}")
+        for key in ("gpt55_implementation_tokens", "gpt55_judge_inclusive_tokens", "spark_implementation_tokens"):
+            if totals.get(key) is not None and not _is_nonnegative_number(totals.get(key)):
+                errors.append(f"usage artifact totals.{key} is not null or a non-negative number: {path}")
+    elif "totals" in value:
+        errors.append(f"usage artifact totals is not an object: {path}")
+
+    event_counts = value.get("event_counts")
+    if isinstance(event_counts, Mapping):
+        for key in ("implementation_usage_events", "judge_usage_events"):
+            if not _is_nonnegative_number(event_counts.get(key)):
+                errors.append(f"usage artifact event_counts.{key} is not a non-negative number: {path}")
+    elif "event_counts" in value:
+        errors.append(f"usage artifact event_counts is not an object: {path}")
+
+    if "attribution_method" in value and not isinstance(value.get("attribution_method"), str):
+        errors.append(f"usage artifact attribution_method is not a string: {path}")
+    if "warnings" in value and not isinstance(value.get("warnings"), list):
+        errors.append(f"usage artifact warnings is not a list: {path}")
+
+    return errors
+
+
+def _is_nonnegative_number(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and value >= 0
 
 
 def _validate_jsonl_artifact(path: Path) -> list[str]:

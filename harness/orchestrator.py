@@ -618,6 +618,7 @@ def parse_usage_and_score(
 ) -> None:
     run_dir = run_directory(experiment_dir, run)
     state = load_state(run_dir)
+    usage_regenerated = False
     if should_run_phase(state, "usage_parsed", run_dir / "usage.json", rerun_failed):
         usage = summarize_usage(
             implementation_events_path=run_dir / "events.jsonl",
@@ -626,9 +627,10 @@ def parse_usage_and_score(
         )
         write_usage_summary(run_dir / "usage.json", usage)
         mark_phase(run_dir, "usage_parsed", "completed", {"parsed_at": iso_now()})
+        usage_regenerated = True
 
     state = load_state(run_dir)
-    if should_run_phase(state, "scored", run_dir / "score.json", rerun_failed):
+    if usage_regenerated or should_run_phase(state, "scored", run_dir / "score.json", rerun_failed):
         score = compute_run_score(run_dir, run)
         write_run_score(run_dir / "score.json", score)
         mark_phase(run_dir, "scored", "completed", {"quality_score": score.get("quality_score")})
@@ -793,6 +795,8 @@ def should_run_phase(state: Mapping[str, Any], phase: str, required_artifact: Pa
             errors = validate_phase_artifacts(required_artifact.parent, phase)
             if not errors and required_artifact.exists():
                 return False
+            if phase == "usage_parsed":
+                return True
             raise OrchestrationError(_format_artifact_errors(f"completed phase has invalid artifacts: {phase}", errors))
         if phase_state.get("status") == "failed" and required_artifact.exists() and not rerun_failed:
             return False
