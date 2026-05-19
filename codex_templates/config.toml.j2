@@ -1,0 +1,13 @@
+# Rendered Codex config for {{ run_id }}
+# Generated from codex_templates/config.toml.j2. Preserve with run artifacts.
+
+model = "{{ root_model }}"
+model_reasoning_effort = "{{ root_reasoning }}"
+sandbox = "workspace-write"
+ask_for_approval = "never"
+
+[agents]
+max_depth = {{ agents_max_depth }}
+max_threads = {{ agents_max_threads }}
+
+{{ agent_templates }}

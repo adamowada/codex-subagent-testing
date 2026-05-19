@@ -263,6 +263,7 @@ def expand_experiment_matrix(config: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "agents": copy.deepcopy(cell["agents"]),
                     "timeouts": copy.deepcopy(timeouts),
                     "judge": copy.deepcopy(judge),
+                    "judge_prompt_template_path": prompt_templates[judge["prompt_template"]],
                     "scoring_weights": copy.deepcopy(scoring_weights),
                 }
                 runs.append(record)
