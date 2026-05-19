@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "experiment": {
+    "id": "initial_subagent_topology",
+    "repeat_count": 5,
+    "seed": 20260519
+  },
+  "parallelism": {
+    "implementation_jobs": 3,
+    "judge_jobs": 2
+  },
+  "timeouts": {
+    "implementation_seconds": 7200,
+    "judge_seconds": 1800
+  },
+  "paths": {
+    "prompt_templates": {
+      "common": "prompts/task_common.md",
+      "solo": "prompts/task_solo.md",
+      "flat_spark": "prompts/task_flat_spark.md",
+      "depth2_subleads": "prompts/task_depth2_subleads.md",
+      "judge": "prompts/judge.md"
+    },
+    "codex_config_template": "codex_templates/config.toml.j2"
+  },
+  "models": {
+    "gpt55": "gpt-5.5",
+    "spark": "gpt-5.3-codex-spark"
+  },
+  "spark_modes": {
+    "direct": {
+      "leaf_write_mode": "workspace-write",
+      "proposal_only": false
+    },
+    "proposal": {
+      "leaf_write_mode": "read-only",
+      "proposal_only": true
+    }
+  },
+  "scoring": {
+    "path": "configs/scoring.yaml"
+  },
+  "judge": {
+    "model": "gpt-5.5",
+    "reasoning": "xhigh",
+    "prompt_template": "judge",
+    "sandbox": "read-only"
+  },
+  "cells": [
+    {
+      "id": "C0",
+      "name": "solo_gpt55_xhigh",
+      "repeats": 5,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "xhigh"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "C1",
+      "name": "flat_spark_gpt55_medium",
+      "repeats": 5,
+      "spark_modes": ["direct", "proposal"],
+      "topology": "flat_spark",
+      "prompt_template": "flat_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "medium"
+      },
+      "leaf": {
+        "model": "gpt-5.3-codex-spark",
+        "count": 6,
+        "reasoning_by_role": {
+          "implementer": "xhigh",
+          "tester": "xhigh",
+          "adversary": "xhigh"
+        }
+      },
+      "agents": {
+        "max_depth": 1,
+        "max_threads": 8
+      }
+    },
+    {
+      "id": "C2",
+      "name": "flat_spark_gpt55_high",
+      "repeats": 5,
+      "spark_modes": ["direct", "proposal"],
+      "topology": "flat_spark",
+      "prompt_template": "flat_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "high"
+      },
+      "leaf": {
+        "model": "gpt-5.3-codex-spark",
+        "count": 6,
+        "reasoning_by_role": {
+          "implementer": "xhigh",
+          "tester": "xhigh",
+          "adversary": "xhigh"
+        }
+      },
+      "agents": {
+        "max_depth": 1,
+        "max_threads": 8
+      }
+    },
+    {
+      "id": "C3",
+      "name": "flat_spark_gpt55_xhigh",
+      "repeats": 5,
+      "spark_modes": ["direct", "proposal"],
+      "topology": "flat_spark",
+      "prompt_template": "flat_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "xhigh"
+      },
+      "leaf": {
+        "model": "gpt-5.3-codex-spark",
+        "count": 6,
+        "reasoning_by_role": {
+          "implementer": "xhigh",
+          "tester": "xhigh",
+          "adversary": "xhigh"
+        }
+      },
+      "agents": {
+        "max_depth": 1,
+        "max_threads": 8
+      }
+    },
+    {
+      "id": "C4",
+      "name": "depth2_subleads_stress",
+      "repeats": 5,
+      "spark_modes": ["direct", "proposal"],
+      "topology": "depth2_subleads",
+      "prompt_template": "depth2_subleads",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "xhigh"
+      },
+      "subleads": {
+        "count": 3,
+        "model": "gpt-5.5",
+        "reasoning": "medium",
+        "leaves_per_sublead": 6
+      },
+      "leaf": {
+        "model": "gpt-5.3-codex-spark",
+        "reasoning_by_role": {
+          "implementer": "xhigh",
+          "tester": "xhigh",
+          "adversary": "xhigh"
+        }
+      },
+      "agents": {
+        "max_depth": 2,
+        "max_threads": 24
+      }
+    }
+  ]
+}

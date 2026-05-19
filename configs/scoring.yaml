@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "profile": "initial_quality_v1",
+  "weights": {
+    "public_tests": 0.15,
+    "hidden_tests": 0.45,
+    "judge": 0.25,
+    "typecheck": 0.10,
+    "parity": 0.05
+  }
+}
