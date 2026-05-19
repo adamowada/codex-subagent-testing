@@ -1,0 +1,67 @@
+{
+  "cases": [
+    {
+      "category": "immutability",
+      "expected": {
+        "inputUnchanged": true,
+        "repeatable": true,
+        "summaries": [
+          {
+            "accountId": "acct_immut",
+            "closedAt": null,
+            "couponActive": true,
+            "couponCode": "SAVE10",
+            "features": [
+              "dashboard",
+              "exports"
+            ],
+            "lastEventAt": "2026-10-03T00:00:00.000Z",
+            "overLimit": false,
+            "plan": "starter",
+            "status": "active",
+            "totalPaidCents": 0,
+            "usage": 10,
+            "usageLimit": 1000
+          }
+        ]
+      },
+      "id": "immutability.repeatable-pipeline",
+      "input": {
+        "as_of": "2026-11-01T00:00:00.000Z",
+        "raw_events": [
+          {
+            "account_id": "acct_immut",
+            "id": "evt_open_immut",
+            "plan": "starter",
+            "timestamp": "2026-10-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_immut",
+            "id": "evt_usage_immut",
+            "timestamp": "2026-10-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 10
+          },
+          {
+            "account_id": "acct_immut",
+            "coupon": "save10",
+            "expires_at": "2026-12-01T00:00:00Z",
+            "id": "evt_coupon_immut",
+            "timestamp": "2026-10-03T00:00:00Z",
+            "type": "coupon_applied"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "immutability_repeatability",
+      "points": 1
+    }
+  ],
+  "generated_at": "2026-05-19T00:00:00.000Z",
+  "schema_version": 1,
+  "seed": 20260519
+}

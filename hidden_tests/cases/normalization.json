@@ -1,0 +1,154 @@
+{
+  "cases": [
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "amountCents": 105,
+          "id": "evt_money_offset",
+          "timestamp": "2026-02-03T09:05:06.000Z",
+          "type": "payment_succeeded"
+        }
+      },
+      "id": "normalization.1",
+      "input": {
+        "raw_event": {
+          "account_id": " acct_norm ",
+          "amount": "001.05",
+          "id": " evt_money_offset ",
+          "timestamp": "2026-02-03T04:05:06-05:00",
+          "type": "payment_succeeded"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "couponCode": "WELCOME50",
+          "couponExpiresAt": "2026-05-31T22:00:00.000Z",
+          "id": "evt_coupon_case",
+          "timestamp": "2026-05-01T21:59:59.000Z",
+          "type": "coupon_applied"
+        }
+      },
+      "id": "normalization.2",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_norm",
+          "coupon": " welcome50 ",
+          "expires_at": "2026-06-01T00:00:00+02:00",
+          "id": "evt_coupon_case",
+          "timestamp": "2026-05-01T23:59:59+02:00",
+          "type": "coupon_applied"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "id": "evt_usage_zero",
+          "timestamp": "2026-03-01T00:00:00.123Z",
+          "type": "usage_recorded",
+          "usage": 0
+        }
+      },
+      "id": "normalization.3",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_norm",
+          "id": "evt_usage_zero",
+          "timestamp": "2026-03-01T00:00:00.123Z",
+          "type": "usage_recorded",
+          "usage": 0
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "id": "evt_plan_trim",
+          "plan": "enterprise",
+          "timestamp": "2026-04-01T00:00:00.000Z",
+          "type": "account_opened"
+        }
+      },
+      "id": "normalization.4",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_norm",
+          "id": "evt_plan_trim",
+          "plan": " enterprise ",
+          "timestamp": "2026-04-01T00:00:00Z",
+          "type": "account_opened"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "amountCents": 0,
+          "id": "evt_pay_zero",
+          "timestamp": "2026-04-02T00:00:00.000Z",
+          "type": "payment_succeeded"
+        }
+      },
+      "id": "normalization.5",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_norm",
+          "amount": "0.00",
+          "id": "evt_pay_zero",
+          "timestamp": "2026-04-02T00:00:00Z",
+          "type": "payment_succeeded"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1
+    }
+  ],
+  "generated_at": "2026-05-19T00:00:00.000Z",
+  "schema_version": 1,
+  "seed": 20260519
+}

@@ -1,0 +1,56 @@
+{
+  "cases": [
+    {
+      "category": "parity",
+      "id": "parity.shared-complex-fixture",
+      "input": {
+        "as_of": "2026-02-01T00:00:00.000Z",
+        "raw_events": [
+          {
+            "account_id": "acct_parity_a",
+            "id": "evt_open_p1",
+            "plan": "starter",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_parity_a",
+            "coupon": "save10",
+            "expires_at": "2026-03-01T00:00:00Z",
+            "id": "evt_coupon_p1",
+            "timestamp": "2026-01-02T00:00:00Z",
+            "type": "coupon_applied"
+          },
+          {
+            "account_id": "acct_parity_a",
+            "id": "evt_usage_p1",
+            "timestamp": "2026-01-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 50
+          },
+          {
+            "account_id": "acct_parity_b",
+            "id": "evt_open_p2",
+            "plan": "free",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_parity_b",
+            "id": "evt_fail_p2",
+            "timestamp": "2026-01-04T00:00:00Z",
+            "type": "payment_failed"
+          }
+        ]
+      },
+      "languages": [
+        "parity"
+      ],
+      "operation": "reduce_and_summarize",
+      "points": 3
+    }
+  ],
+  "generated_at": "2026-05-19T00:00:00.000Z",
+  "schema_version": 1,
+  "seed": 20260519
+}

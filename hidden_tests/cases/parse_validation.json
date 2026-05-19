@@ -1,0 +1,263 @@
+{
+  "cases": [
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "empty_line",
+        "line": "   ",
+        "ok": false
+      },
+      "id": "parse.empty-line",
+      "input": {
+        "line": "   "
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "parse_line",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_json",
+        "line": "{not-json",
+        "ok": false
+      },
+      "id": "parse.invalid-json",
+      "input": {
+        "line": "{not-json"
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "parse_line",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "non_object_json",
+        "line": "[\"evt_1\"]",
+        "ok": false
+      },
+      "id": "parse.non-object-array",
+      "input": {
+        "line": "[\"evt_1\"]"
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "parse_line",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "non_object_json",
+        "line": "null",
+        "ok": false
+      },
+      "id": "parse.non-object-null",
+      "input": {
+        "line": "null"
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "parse_line",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "missing_id"
+        ],
+        "ok": false
+      },
+      "id": "normalize.missing-id",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_hidden",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "account_opened"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "blank_account_id"
+        ],
+        "ok": false
+      },
+      "id": "normalize.blank-account",
+      "input": {
+        "raw_event": {
+          "account_id": "   ",
+          "id": "evt_blank_account",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "account_opened"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_type"
+        ],
+        "ok": false
+      },
+      "id": "normalize.invalid-type",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_hidden",
+          "id": "evt_bad_type",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "subscription_started"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_plan"
+        ],
+        "ok": false
+      },
+      "id": "normalize.invalid-plan",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_hidden",
+          "id": "evt_bad_plan",
+          "plan": "gold",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "account_opened"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "timestamp"
+        ],
+        "ok": false
+      },
+      "id": "normalize.invalid-timestamp",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_hidden",
+          "id": "evt_bad_timestamp",
+          "timestamp": "2026-13-99T99:99:99Z",
+          "type": "account_opened"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_amount"
+        ],
+        "ok": false
+      },
+      "id": "normalize.invalid-amount",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_hidden",
+          "amount": "10.999",
+          "id": "evt_bad_amount",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "payment_succeeded"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_usage"
+        ],
+        "ok": false
+      },
+      "id": "normalize.invalid-usage",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_hidden",
+          "id": "evt_bad_usage",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "usage_recorded",
+          "usage": -1
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1
+    }
+  ],
+  "generated_at": "2026-05-19T00:00:00.000Z",
+  "schema_version": 1,
+  "seed": 20260519
+}

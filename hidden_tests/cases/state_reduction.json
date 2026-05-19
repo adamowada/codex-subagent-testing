@@ -1,0 +1,418 @@
+{
+  "cases": [
+    {
+      "category": "state_reduction",
+      "expected": [
+        {
+          "accountId": "acct_sort",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "lastEventAt": "2026-01-03T00:00:00.000Z",
+          "overLimit": false,
+          "plan": "pro",
+          "status": "active",
+          "totalPaidCents": 2000,
+          "usage": 0,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "state.sort-dedupe",
+      "input": {
+        "as_of": "2026-01-05T00:00:00.000Z",
+        "raw_events": [
+          {
+            "account_id": "acct_sort",
+            "id": "evt_open_late",
+            "plan": "pro",
+            "timestamp": "2026-01-02T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_sort",
+            "amount": "20.00",
+            "id": "evt_pay",
+            "timestamp": "2026-01-03T00:00:00Z",
+            "type": "payment_succeeded"
+          },
+          {
+            "account_id": "acct_sort",
+            "id": "evt_open_early",
+            "plan": "starter",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_sort",
+            "amount": "999.00",
+            "id": "evt_pay",
+            "timestamp": "2026-01-04T00:00:00Z",
+            "type": "payment_succeeded"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "reduce_and_summarize",
+      "points": 2
+    },
+    {
+      "category": "state_reduction",
+      "expected": [
+        {
+          "accountId": "acct_coupon",
+          "closedAt": null,
+          "couponActive": true,
+          "couponCode": "SAVE10",
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "lastEventAt": "2026-05-02T00:00:00.000Z",
+          "overLimit": false,
+          "plan": "starter",
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "state.coupon-boundary-inclusive",
+      "input": {
+        "as_of": "2026-06-01T00:00:00.000Z",
+        "raw_events": [
+          {
+            "account_id": "acct_coupon",
+            "id": "evt_open_coupon",
+            "plan": "starter",
+            "timestamp": "2026-05-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_coupon",
+            "coupon": "save10",
+            "expires_at": "2026-06-01T00:00:00Z",
+            "id": "evt_coupon",
+            "timestamp": "2026-05-02T00:00:00Z",
+            "type": "coupon_applied"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "reduce_and_summarize",
+      "points": 2
+    },
+    {
+      "category": "state_reduction",
+      "expected": [
+        {
+          "accountId": "acct_coupon_exp",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": "SAVE10",
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "lastEventAt": "2026-05-02T00:00:00.000Z",
+          "overLimit": false,
+          "plan": "starter",
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "state.coupon-expired",
+      "input": {
+        "as_of": "2026-06-01T00:00:00.001Z",
+        "raw_events": [
+          {
+            "account_id": "acct_coupon_exp",
+            "id": "evt_open_coupon_exp",
+            "plan": "starter",
+            "timestamp": "2026-05-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_coupon_exp",
+            "coupon": "save10",
+            "expires_at": "2026-06-01T00:00:00Z",
+            "id": "evt_coupon_exp",
+            "timestamp": "2026-05-02T00:00:00Z",
+            "type": "coupon_applied"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "reduce_and_summarize",
+      "points": 2
+    },
+    {
+      "category": "state_reduction",
+      "expected": [
+        {
+          "accountId": "acct_closed",
+          "closedAt": "2026-05-04T00:00:00.000Z",
+          "couponActive": false,
+          "couponCode": "WELCOME50",
+          "features": [],
+          "lastEventAt": "2026-05-04T00:00:00.000Z",
+          "overLimit": true,
+          "plan": "enterprise",
+          "status": "closed",
+          "totalPaidCents": 0,
+          "usage": 25,
+          "usageLimit": 0
+        }
+      ],
+      "id": "state.closed-entitlements",
+      "input": {
+        "as_of": "2026-07-01T00:00:00.000Z",
+        "raw_events": [
+          {
+            "account_id": "acct_closed",
+            "id": "evt_open_closed",
+            "plan": "enterprise",
+            "timestamp": "2026-05-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_closed",
+            "coupon": "welcome50",
+            "expires_at": "2026-12-31T00:00:00Z",
+            "id": "evt_coupon_closed",
+            "timestamp": "2026-05-02T00:00:00Z",
+            "type": "coupon_applied"
+          },
+          {
+            "account_id": "acct_closed",
+            "id": "evt_usage_closed",
+            "timestamp": "2026-05-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 25
+          },
+          {
+            "account_id": "acct_closed",
+            "id": "evt_close",
+            "timestamp": "2026-05-04T00:00:00Z",
+            "type": "account_closed"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "reduce_and_summarize",
+      "points": 2
+    },
+    {
+      "category": "state_reduction",
+      "expected": [
+        {
+          "accountId": "acct_usage",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "features": [
+            "dashboard"
+          ],
+          "lastEventAt": "2026-05-03T00:00:00.000Z",
+          "overLimit": true,
+          "plan": "free",
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 101,
+          "usageLimit": 100
+        }
+      ],
+      "id": "state.usage-over-limit",
+      "input": {
+        "as_of": "2026-08-01T00:00:00.000Z",
+        "raw_events": [
+          {
+            "account_id": "acct_usage",
+            "id": "evt_open_usage",
+            "plan": "free",
+            "timestamp": "2026-05-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_usage",
+            "id": "evt_usage_1",
+            "timestamp": "2026-05-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 60
+          },
+          {
+            "account_id": "acct_usage",
+            "id": "evt_usage_2",
+            "timestamp": "2026-05-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 41
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "reduce_and_summarize",
+      "points": 2
+    },
+    {
+      "category": "state_reduction",
+      "expected": [
+        {
+          "accountId": "acct_recover",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "lastEventAt": "2026-05-03T00:00:00.000Z",
+          "overLimit": false,
+          "plan": "starter",
+          "status": "active",
+          "totalPaidCents": 1200,
+          "usage": 0,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "state.payment-recovery",
+      "input": {
+        "as_of": "2026-09-01T00:00:00.000Z",
+        "raw_events": [
+          {
+            "account_id": "acct_recover",
+            "id": "evt_open_recover",
+            "plan": "starter",
+            "timestamp": "2026-05-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_recover",
+            "id": "evt_fail_recover",
+            "timestamp": "2026-05-02T00:00:00Z",
+            "type": "payment_failed"
+          },
+          {
+            "account_id": "acct_recover",
+            "amount": "12.00",
+            "id": "evt_pay_recover",
+            "timestamp": "2026-05-03T00:00:00Z",
+            "type": "payment_succeeded"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "reduce_and_summarize",
+      "points": 2
+    },
+    {
+      "category": "state_reduction",
+      "expected": {
+        "active": true,
+        "couponActive": false,
+        "features": [
+          "dashboard",
+          "exports",
+          "priority_support",
+          "rules"
+        ],
+        "overLimit": false,
+        "usageLimit": 10000
+      },
+      "id": "state.failed-payment-grace-inclusive",
+      "input": {
+        "account_id": "acct_grace",
+        "as_of": "2026-04-17T00:00:00.000Z",
+        "raw_events": [
+          {
+            "account_id": "acct_grace",
+            "id": "evt_open_grace",
+            "plan": "pro",
+            "timestamp": "2026-04-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_grace",
+            "id": "evt_failed_grace",
+            "timestamp": "2026-04-10T00:00:00Z",
+            "type": "payment_failed"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "reduce_and_evaluate",
+      "points": 2
+    },
+    {
+      "category": "state_reduction",
+      "expected": {
+        "active": false,
+        "couponActive": false,
+        "features": [
+          "dashboard",
+          "exports",
+          "priority_support",
+          "rules"
+        ],
+        "overLimit": false,
+        "usageLimit": 10000
+      },
+      "id": "state.failed-payment-grace-expired",
+      "input": {
+        "account_id": "acct_grace",
+        "as_of": "2026-04-17T00:00:00.001Z",
+        "raw_events": [
+          {
+            "account_id": "acct_grace",
+            "id": "evt_open_grace",
+            "plan": "pro",
+            "timestamp": "2026-04-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_grace",
+            "id": "evt_failed_grace",
+            "timestamp": "2026-04-10T00:00:00Z",
+            "type": "payment_failed"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "reduce_and_evaluate",
+      "points": 2
+    }
+  ],
+  "generated_at": "2026-05-19T00:00:00.000Z",
+  "schema_version": 1,
+  "seed": 20260519
+}

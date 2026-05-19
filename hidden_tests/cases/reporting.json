@@ -1,0 +1,72 @@
+{
+  "cases": [
+    {
+      "category": "reporting",
+      "expected": "account_id,status,plan,total_paid_cents,usage,usage_limit,over_limit,coupon_code,coupon_active,closed_at,last_event_at\nacct_a,closed,enterprise,19900,1,0,true,WELCOME50,false,2026-04-01T00:00:00.000Z,2026-04-01T00:00:00.000Z\nacct_m,past_due,starter,1200,1001,1000,true,SAVE10,true,,2026-03-15T00:00:00.000Z\nacct_z,active,pro,4900,10000,10000,false,,false,,2026-03-01T00:00:00.000Z\n",
+      "id": "report.csv-stable-format",
+      "input": {
+        "summaries": [
+          {
+            "accountId": "acct_z",
+            "closedAt": null,
+            "couponActive": false,
+            "couponCode": null,
+            "features": [
+              "dashboard",
+              "exports",
+              "priority_support",
+              "rules"
+            ],
+            "lastEventAt": "2026-03-01T00:00:00.000Z",
+            "overLimit": false,
+            "plan": "pro",
+            "status": "active",
+            "totalPaidCents": 4900,
+            "usage": 10000,
+            "usageLimit": 10000
+          },
+          {
+            "accountId": "acct_a",
+            "closedAt": "2026-04-01T00:00:00.000Z",
+            "couponActive": false,
+            "couponCode": "WELCOME50",
+            "features": [],
+            "lastEventAt": "2026-04-01T00:00:00.000Z",
+            "overLimit": true,
+            "plan": "enterprise",
+            "status": "closed",
+            "totalPaidCents": 19900,
+            "usage": 1,
+            "usageLimit": 0
+          },
+          {
+            "accountId": "acct_m",
+            "closedAt": null,
+            "couponActive": true,
+            "couponCode": "SAVE10",
+            "features": [
+              "dashboard",
+              "exports"
+            ],
+            "lastEventAt": "2026-03-15T00:00:00.000Z",
+            "overLimit": true,
+            "plan": "starter",
+            "status": "past_due",
+            "totalPaidCents": 1200,
+            "usage": 1001,
+            "usageLimit": 1000
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "export_report",
+      "points": 2
+    }
+  ],
+  "generated_at": "2026-05-19T00:00:00.000Z",
+  "schema_version": 1,
+  "seed": 20260519
+}

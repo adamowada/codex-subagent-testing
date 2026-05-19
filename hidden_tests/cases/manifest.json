@@ -1,0 +1,39 @@
+{
+  "category_weights": {
+    "immutability": 0.05,
+    "normalization": 0.2,
+    "parity": 0.1,
+    "parse_validation": 0.15,
+    "reporting": 0.15,
+    "state_reduction": 0.35
+  },
+  "files": {
+    "immutability.json": {
+      "case_count": 1,
+      "sha256": "bb936cddb1e9d825fbdc27363bc660d4f3f4825f5dd274fbc9769bbacd260b62"
+    },
+    "normalization.json": {
+      "case_count": 5,
+      "sha256": "fec46a4d33b261eb89e8dd28c3676dbd8014ece583b560d794ff0e8f6b30f326"
+    },
+    "parity.json": {
+      "case_count": 1,
+      "sha256": "3471cf9b1c56c34fc4a0bb51d8e41e98be58ad5027f70372b3beb9b05b0e6021"
+    },
+    "parse_validation.json": {
+      "case_count": 11,
+      "sha256": "d8e7e216632c48b5e8d26e88e97d87623da429f8c2c32936dd8e71634bbae71b"
+    },
+    "reporting.json": {
+      "case_count": 1,
+      "sha256": "6c08a3e6db8e589b3b7b5e7199ed4a4f41d7f72a0e33dde0b9a92d1ee7da502a"
+    },
+    "state_reduction.json": {
+      "case_count": 8,
+      "sha256": "0e457dd5f09ad1d58e8040a7b2ffb3cafa82efec54df68d9dda372b1d03a516f"
+    }
+  },
+  "generated_at": "2026-05-19T00:00:00.000Z",
+  "schema_version": 1,
+  "seed": 20260519
+}
