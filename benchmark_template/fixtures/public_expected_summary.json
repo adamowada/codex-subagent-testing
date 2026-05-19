@@ -1,0 +1,16 @@
+[
+  {
+    "accountId": "acct_public",
+    "status": "active",
+    "plan": "pro",
+    "features": ["dashboard", "exports", "priority_support", "rules"],
+    "usage": 250,
+    "usageLimit": 10000,
+    "overLimit": false,
+    "totalPaidCents": 1200,
+    "couponCode": "WELCOME50",
+    "couponActive": true,
+    "closedAt": null,
+    "lastEventAt": "2026-01-05T09:00:00.000Z"
+  }
+]
