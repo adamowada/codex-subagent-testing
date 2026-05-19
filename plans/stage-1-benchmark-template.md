@@ -38,7 +38,7 @@ The exact test runner can change if there is a good reason, but the visible comm
 ```powershell
 npm run typecheck
 npm run test:public
-python -m unittest discover -s tests_public_py
+python -m pytest -q tests_public_py
 ```
 
 ## Public API Contract
@@ -192,7 +192,7 @@ Stage 1 must be safe for measured agents to inspect completely. Therefore:
 4. Add `ruleledger/__init__.py` and `ruleledger/engine.py` with matching Python public functions.
 5. Add small shared public fixtures under `benchmark_template/fixtures/`.
 6. Add public TypeScript tests under `tests_public_ts/`.
-7. Add public Python unittest tests under `tests_public_py/`.
+7. Add public Python pytest tests under `tests_public_py/`.
 8. Run the three visible commands from inside `benchmark_template/`.
 9. Confirm the project is deterministic and contains no hidden tests.
 
@@ -201,7 +201,7 @@ Stage 1 must be safe for measured agents to inspect completely. Therefore:
 - `benchmark_template/` exists and can be copied into a run workspace.
 - `npm run typecheck` is defined.
 - `npm run test:public` is defined.
-- `python -m unittest discover -s tests_public_py` runs.
+- `python -m pytest -q tests_public_py` runs.
 - All required TypeScript exports exist.
 - All required Python exports exist.
 - Public tests exercise both language surfaces.

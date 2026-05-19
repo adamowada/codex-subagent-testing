@@ -712,7 +712,7 @@ def run_public_tests(worktree: Path, run_dir: Path, run: Mapping[str, Any]) -> N
     commands = [
         ("typecheck", ["npm", "run", "typecheck"], "typecheck.log"),
         ("public_ts", ["npm", "run", "test:public"], "public_ts.log"),
-        ("public_py", [sys.executable, "-m", "unittest", "discover", "-s", "tests_public_py"], "public_py.log"),
+        ("public_py", [sys.executable, "-m", "pytest", "-q", "tests_public_py"], "public_py.log"),
     ]
     timeout = int(run["timeouts"]["implementation_seconds"])
     for name, command, log_name in commands:

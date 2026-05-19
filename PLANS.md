@@ -129,7 +129,7 @@ Visible commands inside each copied run workspace:
 ```text
 npm run typecheck
 npm run test:public
-python -m unittest discover -s tests_public_py
+python -m pytest -q tests_public_py
 ```
 
 Public tests should cover normal behavior and obvious edge cases but intentionally leave room for hidden tests to differentiate quality.

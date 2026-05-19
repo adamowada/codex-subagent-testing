@@ -64,6 +64,7 @@ def run_preflight(
             {"version": sys.version.split()[0]},
         )
     )
+    checks.append(_check_python_module("pytest"))
 
     try:
         config = load_experiment_config(config_path)
@@ -171,6 +172,20 @@ def _check_tool(name: str) -> PreflightCheck:
     if resolved is None:
         return PreflightCheck(name, "failed", f"{name} was not found on PATH")
     return PreflightCheck(name, "passed", resolved)
+
+
+def _check_python_module(name: str) -> PreflightCheck:
+    completed = subprocess.run(
+        [sys.executable, "-m", name, "--version"],
+        text=True,
+        capture_output=True,
+        timeout=15,
+        check=False,
+    )
+    if completed.returncode != 0:
+        details = (completed.stderr or completed.stdout).strip()
+        return PreflightCheck(name, "failed", details or f"python module {name!r} is unavailable")
+    return PreflightCheck(name, "passed", (completed.stdout or completed.stderr).strip())
 
 
 def _check_codex_version(codex_bin: str) -> PreflightCheck:

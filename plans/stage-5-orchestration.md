@@ -342,7 +342,7 @@ After implementation, run visible checks inside `worktree/`:
 ```powershell
 npm run typecheck
 npm run test:public
-python -m unittest discover -s tests_public_py
+python -m pytest -q tests_public_py
 ```
 
 Each command should write a log file and structured status. Non-zero exits are normal measured outcomes and should not stop the whole experiment.

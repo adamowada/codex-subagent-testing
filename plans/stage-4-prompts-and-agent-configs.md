@@ -201,7 +201,7 @@ The prompt should list visible commands exactly as the benchmark template expose
 ```powershell
 npm run typecheck
 npm run test:public
-python -m unittest discover -s tests_public_py
+python -m pytest -q tests_public_py
 ```
 
 The prompt should make clear that public tests are useful guidance but intentionally incomplete.
@@ -241,7 +241,7 @@ The implementation agent should finish with strict JSON so the harness can parse
       "notes": ""
     },
     {
-      "command": "python -m unittest discover -s tests_public_py",
+      "command": "python -m pytest -q tests_public_py",
       "status": "passed",
       "notes": ""
     }

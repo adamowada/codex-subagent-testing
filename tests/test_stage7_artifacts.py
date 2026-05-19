@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
-import tempfile
-import unittest
+
+import pytest
 
 from harness.artifacts import (
     CORE_RUN_ARTIFACTS,
@@ -31,147 +31,150 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 
 
-class Stage7ArtifactTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.config = load_experiment_config(CONFIG_PATH)
-        self.runs = expand_experiment_matrix(self.config)
+@pytest.fixture
+def config() -> dict:
+    return load_experiment_config(CONFIG_PATH)
 
-    def test_contract_names_include_stage7_core_outputs(self) -> None:
-        for name in [
-            "metadata.json",
-            "rendered_prompt.md",
-            "codex_config/config.toml",
-            "events.jsonl",
-            "stderr.log",
-            "final_response.json",
-            "wall_time.json",
-            "public_ts.log",
-            "typecheck.log",
-            "public_py.log",
-            "hidden-results.json",
-            "judge.events.jsonl",
-            "judge.stderr.log",
-            "judge.json",
-            "diff.patch",
-            "diff-numstat.txt",
-            "usage.json",
-            "score.json",
-        ]:
-            self.assertIn(name, CORE_RUN_ARTIFACTS)
 
-        self.assertEqual(
-            EXPERIMENT_OUTPUT_ARTIFACTS,
-            (
-                "results/results.csv",
-                "results/results.sqlite",
-                "results/aggregate.json",
-                "report/report.html",
-                "report/report.pdf",
-            ),
-        )
-        self.assertIn("implemented", PHASE_ARTIFACTS)
-        self.assertIn("judged", PHASE_ARTIFACTS)
+@pytest.fixture
+def runs(config: dict) -> list[dict]:
+    return expand_experiment_matrix(config)
 
-    def test_rendered_artifacts_validate_for_solo_and_spark_runs(self) -> None:
-        selected = [
-            next(run for run in self.runs if run["run_id"] == "C0_r01"),
-            next(run for run in self.runs if run["run_id"] == "C4_direct_r01"),
-        ]
-        with tempfile.TemporaryDirectory() as temp_dir:
-            for run in selected:
-                with self.subTest(run_id=run["run_id"]):
-                    run_dir = Path(temp_dir) / run["run_id"]
-                    render_artifacts(REPO_ROOT, run_dir, run)
 
-                    self.assertEqual(validate_phase_artifacts(run_dir, "rendered"), [])
+def test_contract_names_include_stage7_core_outputs() -> None:
+    for name in [
+        "metadata.json",
+        "rendered_prompt.md",
+        "codex_config/config.toml",
+        "events.jsonl",
+        "stderr.log",
+        "final_response.json",
+        "wall_time.json",
+        "public_ts.log",
+        "typecheck.log",
+        "public_py.log",
+        "hidden-results.json",
+        "judge.events.jsonl",
+        "judge.stderr.log",
+        "judge.json",
+        "diff.patch",
+        "diff-numstat.txt",
+        "usage.json",
+        "score.json",
+    ]:
+        assert name in CORE_RUN_ARTIFACTS
 
-    def test_completed_phase_with_corrupt_json_artifact_is_not_skipped(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            run_dir = Path(temp_dir)
-            (run_dir / "events.jsonl").write_text('{"type":"event"}\n', encoding="utf-8")
-            (run_dir / "stderr.log").write_text("", encoding="utf-8")
-            (run_dir / "wall_time.json").write_text("{not-json", encoding="utf-8")
-            (run_dir / "final_response.json").write_text(
-                json.dumps({"parsed": False, "error": "no_strict_json_object_found"}),
-                encoding="utf-8",
-            )
-            state = {"phases": {"implemented": {"status": "completed"}}}
+    assert EXPERIMENT_OUTPUT_ARTIFACTS == (
+        "results/results.csv",
+        "results/results.sqlite",
+        "results/aggregate.json",
+        "report/report.html",
+        "report/report.pdf",
+    )
+    assert "implemented" in PHASE_ARTIFACTS
+    assert "judged" in PHASE_ARTIFACTS
 
-            with self.assertRaisesRegex(OrchestrationError, "invalid JSON artifact"):
-                should_run_phase(state, "implemented", run_dir / "events.jsonl", rerun_failed=False)
 
-    def test_phase_completed_requires_artifact_validation(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            run_dir = Path(temp_dir)
-            score_path = run_dir / "score.json"
-            score_path.write_text("{}", encoding="utf-8")
-            state = {"phases": {"scored": {"status": "completed"}}}
+def test_rendered_artifacts_validate_for_solo_and_spark_runs(runs: list[dict], tmp_path: Path) -> None:
+    selected = [
+        next(run for run in runs if run["run_id"] == "C0_r01"),
+        next(run for run in runs if run["run_id"] == "C4_direct_r01"),
+    ]
+    for run in selected:
+        run_dir = tmp_path / run["run_id"]
+        render_artifacts(REPO_ROOT, run_dir, run)
 
-            self.assertFalse(phase_completed(state, "scored", [score_path]))
+        assert validate_phase_artifacts(run_dir, "rendered") == []
 
-    def test_hidden_result_privacy_validation_flags_private_payload_keys(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            run_dir = Path(temp_dir)
-            (run_dir / "hidden-results.json").write_text(
-                json.dumps(
+
+def test_completed_phase_with_corrupt_json_artifact_is_not_skipped(tmp_path: Path) -> None:
+    run_dir = tmp_path
+    (run_dir / "events.jsonl").write_text('{"type":"event"}\n', encoding="utf-8")
+    (run_dir / "stderr.log").write_text("", encoding="utf-8")
+    (run_dir / "wall_time.json").write_text("{not-json", encoding="utf-8")
+    (run_dir / "final_response.json").write_text(
+        json.dumps({"parsed": False, "error": "no_strict_json_object_found"}),
+        encoding="utf-8",
+    )
+    state = {"phases": {"implemented": {"status": "completed"}}}
+
+    with pytest.raises(OrchestrationError, match="invalid JSON artifact"):
+        should_run_phase(state, "implemented", run_dir / "events.jsonl", rerun_failed=False)
+
+
+def test_phase_completed_requires_artifact_validation(tmp_path: Path) -> None:
+    score_path = tmp_path / "score.json"
+    score_path.write_text("{}", encoding="utf-8")
+    state = {"phases": {"scored": {"status": "completed"}}}
+
+    assert not phase_completed(state, "scored", [score_path])
+
+
+def test_hidden_result_privacy_validation_flags_private_payload_keys(tmp_path: Path) -> None:
+    (tmp_path / "hidden-results.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "cases": [
                     {
-                        "schema_version": 1,
-                        "cases": [
-                            {
-                                "id": "opaque-001",
-                                "category": "normalization",
-                                "input": {"raw_event": {"secret": True}},
-                                "expected": {"ok": True},
-                            }
-                        ],
+                        "id": "opaque-001",
+                        "category": "normalization",
+                        "input": {"raw_event": {"secret": True}},
+                        "expected": {"ok": True},
                     }
-                ),
-                encoding="utf-8",
-            )
-            (run_dir / "hidden-runner.log").write_text("completed\n", encoding="utf-8")
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "hidden-runner.log").write_text("completed\n", encoding="utf-8")
 
-            errors = validate_hidden_artifact_privacy(run_dir)
+    errors = validate_hidden_artifact_privacy(tmp_path)
 
-        self.assertTrue(any("private key" in error for error in errors))
-
-    def test_experiment_metadata_writes_stable_aliases_and_resume_reads_them(self) -> None:
-        selected = self.runs[:2]
-        args = SimpleNamespace(pilot=True, dry_run=True, jobs=1, judge_jobs=1)
-        with tempfile.TemporaryDirectory() as temp_dir:
-            experiment_dir = Path(temp_dir)
-            write_experiment_metadata(
-                experiment_dir=experiment_dir,
-                config_path=CONFIG_PATH,
-                config=self.config,
-                all_runs=self.runs,
-                selected_runs=selected,
-                args=args,
-            )
-            (experiment_dir / "config.resolved.json").unlink()
-
-            validate_resume_target(experiment_dir, self.config, selected)
-
-            self.assertTrue((experiment_dir / "experiment_metadata.json").exists())
-            self.assertTrue((experiment_dir / "experiment-metadata.json").exists())
-            self.assertTrue((experiment_dir / "resolved_config.json").exists())
-
-    def test_experiment_outputs_validate_after_report_generation(self) -> None:
-        selected = self.runs[:2]
-        with tempfile.TemporaryDirectory() as temp_dir:
-            experiment_dir = Path(temp_dir)
-            write_results_outputs(experiment_dir, selected)
-
-            errors = validate_experiment_outputs(experiment_dir)
-
-        self.assertEqual(errors, [])
-
-    def test_phase_artifact_paths_are_rooted_in_run_dir(self) -> None:
-        run_dir = Path("runs") / "experiment" / "runs" / "C0_r01"
-
-        paths = phase_artifact_paths(run_dir, "judged")
-
-        self.assertEqual(paths[0], run_dir / "judge.events.jsonl")
+    assert any("private key" in error for error in errors)
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_experiment_metadata_writes_stable_aliases_and_resume_reads_them(
+    config: dict,
+    runs: list[dict],
+    tmp_path: Path,
+) -> None:
+    selected = runs[:2]
+    args = SimpleNamespace(pilot=True, dry_run=True, jobs=1, judge_jobs=1)
+    write_experiment_metadata(
+        experiment_dir=tmp_path,
+        config_path=CONFIG_PATH,
+        config=config,
+        all_runs=runs,
+        selected_runs=selected,
+        args=args,
+    )
+    (tmp_path / "config.resolved.json").unlink()
+
+    validate_resume_target(tmp_path, config, selected)
+
+    assert (tmp_path / "experiment_metadata.json").exists()
+    assert (tmp_path / "experiment-metadata.json").exists()
+    assert (tmp_path / "resolved_config.json").exists()
+
+
+def test_experiment_outputs_validate_after_report_generation(
+    runs: list[dict],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selected = runs[:2]
+    monkeypatch.setenv("CODEX_REPORT_PDF_RENDERER", "minimal")
+    write_results_outputs(tmp_path, selected)
+
+    errors = validate_experiment_outputs(tmp_path)
+
+    assert errors == []
+
+
+def test_phase_artifact_paths_are_rooted_in_run_dir() -> None:
+    run_dir = Path("runs") / "experiment" / "runs" / "C0_r01"
+
+    paths = phase_artifact_paths(run_dir, "judged")
+
+    assert paths[0] == run_dir / "judge.events.jsonl"

@@ -63,7 +63,7 @@ Run the visible checks when practical:
 ```powershell
 npm run typecheck
 npm run test:public
-python -m unittest discover -s tests_public_py
+python -m pytest -q tests_public_py
 ```
 
 Record commands you actually ran in the final response.
@@ -105,7 +105,7 @@ Finish with strict JSON only, with no prose before or after it. Use this schema:
       "notes": ""
     },
     {
-      "command": "python -m unittest discover -s tests_public_py",
+      "command": "python -m pytest -q tests_public_py",
       "status": "passed",
       "notes": ""
     }
