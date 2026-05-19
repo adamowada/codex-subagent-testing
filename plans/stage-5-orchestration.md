@@ -278,7 +278,7 @@ For each run, call `harness.prompt_rendering` and write:
 - `rendered_prompt.md`
 - `judge_prompt.md`
 - `codex_config/config.toml`
-- `codex_config/agents/*.md`
+- `codex_config/agents/*.toml`
 
 Rendering should be deterministic. Re-rendering during resume should either produce byte-identical output or fail loudly with a clear drift message unless the user explicitly starts a new experiment.
 

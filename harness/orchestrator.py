@@ -17,6 +17,7 @@ from typing import Any, Iterable, Mapping
 from harness.artifacts import (
     CODEX_IMPLEMENTATION_ARTIFACTS,
     CODEX_JUDGE_ARTIFACTS,
+    PHASE_ARTIFACTS,
     phase_artifact_paths,
     validate_artifact,
     validate_experiment_outputs,
@@ -76,6 +77,7 @@ COPY_IGNORE_PATTERNS = [
     "*.pyc",
     "*.tsbuildinfo",
 ]
+WORKTREE_GIT_EXCLUDE_PATTERNS = [*COPY_IGNORE_PATTERNS, "pytest-cache-files-*"]
 LOG_LOCK = threading.Lock()
 
 
@@ -498,6 +500,7 @@ def run_implementation_and_tests(
     state = load_state(run_dir)
     status.update_run(str(run["run_id"]), phase="implementation")
 
+    implementation_reran = False
     if should_run_phase(state, "implemented", run_dir / "events.jsonl", rerun_failed):
         archived_to = archive_failed_phase_artifacts(
             run_dir,
@@ -548,19 +551,46 @@ def run_implementation_and_tests(
                 f"stdout={result.stdout_path} stderr={result.stderr_path}"
             ),
         )
+        implementation_reran = True
 
     state = load_state(run_dir)
-    if should_run_phase(state, "diff_captured", run_dir / "diff.patch", rerun_failed):
+    diff_stale = implementation_reran or phase_stale_after(state, "diff_captured", "implemented")
+    if diff_stale or should_run_phase(state, "diff_captured", run_dir / "diff.patch", rerun_failed):
+        archived_to = (
+            archive_phase_artifacts(run_dir, "diff_captured", PHASE_ARTIFACTS["diff_captured"])
+            if diff_stale
+            else None
+        )
         capture_diff(run_dir, worktree)
-        mark_phase(run_dir, "diff_captured", "completed", {"captured_at": iso_now()})
+        phase_data = {"captured_at": iso_now()}
+        if archived_to is not None:
+            phase_data["previous_artifacts_archived_to"] = archived_to
+            phase_data["rerun_reason"] = "implemented_reran"
+        mark_phase(run_dir, "diff_captured", "completed", phase_data)
 
     state = load_state(run_dir)
-    if should_run_phase(state, "public_tested", run_dir / "typecheck.meta.json", rerun_failed):
+    public_stale = implementation_reran or phase_stale_after(state, "public_tested", "implemented")
+    if public_stale or should_run_phase(state, "public_tested", run_dir / "typecheck.meta.json", rerun_failed):
+        archived_to = (
+            archive_phase_artifacts(run_dir, "public_tested", PHASE_ARTIFACTS["public_tested"])
+            if public_stale
+            else None
+        )
         run_public_tests(worktree, run_dir, run)
-        mark_phase(run_dir, "public_tested", "completed", {"tested_at": iso_now()})
+        phase_data = {"tested_at": iso_now()}
+        if archived_to is not None:
+            phase_data["previous_artifacts_archived_to"] = archived_to
+            phase_data["rerun_reason"] = "implemented_reran"
+        mark_phase(run_dir, "public_tested", "completed", phase_data)
 
     state = load_state(run_dir)
-    if should_run_phase(state, "hidden_tested", run_dir / "hidden-results.json", rerun_failed):
+    hidden_stale = implementation_reran or phase_stale_after(state, "hidden_tested", "implemented")
+    if hidden_stale or should_run_phase(state, "hidden_tested", run_dir / "hidden-results.json", rerun_failed):
+        archived_to = (
+            archive_phase_artifacts(run_dir, "hidden_tested", PHASE_ARTIFACTS["hidden_tested"])
+            if hidden_stale
+            else None
+        )
         run_hidden_tests(repo_root, worktree, run_dir, run)
         hidden_meta = _read_json(run_dir / "hidden-runner.meta.json")
         privacy_errors = validate_hidden_artifact_privacy(run_dir)
@@ -569,6 +599,9 @@ def run_implementation_and_tests(
             "tested_at": iso_now(),
             "returncode": hidden_meta.get("returncode"),
         }
+        if archived_to is not None:
+            phase_data["previous_artifacts_archived_to"] = archived_to
+            phase_data["rerun_reason"] = "implemented_reran"
         if privacy_errors:
             phase_data["privacy_errors"] = privacy_errors
             _append_log(
@@ -598,16 +631,23 @@ def run_judge(
     state = load_state(run_dir)
     status.update_run(str(run["run_id"]), phase="judge")
 
-    if not should_run_phase(state, "judged", run_dir / "judge.events.jsonl", rerun_failed):
+    judge_stale = any(
+        phase_stale_after(state, "judged", upstream)
+        for upstream in ("diff_captured", "public_tested", "hidden_tested")
+    )
+    if not judge_stale and not should_run_phase(state, "judged", run_dir / "judge.events.jsonl", rerun_failed):
         return
 
-    archived_to = archive_failed_phase_artifacts(
-        run_dir,
-        "judged",
-        CODEX_JUDGE_ARTIFACTS,
-        state,
-        rerun_failed,
-    )
+    if judge_stale:
+        archived_to = archive_phase_artifacts(run_dir, "judged", CODEX_JUDGE_ARTIFACTS)
+    else:
+        archived_to = archive_failed_phase_artifacts(
+            run_dir,
+            "judged",
+            CODEX_JUDGE_ARTIFACTS,
+            state,
+            rerun_failed,
+        )
     prepare_judge_evidence(run_dir, worktree)
     prompt = (run_dir / "judge_prompt.md").read_text(encoding="utf-8")
     command = materialize_worktree_command(build_judge_command(codex_bin, run, prompt), worktree)
@@ -634,6 +674,8 @@ def run_judge(
     }
     if archived_to is not None:
         phase_data["previous_artifacts_archived_to"] = archived_to
+        if judge_stale:
+            phase_data["rerun_reason"] = "upstream_artifacts_reran"
     mark_phase(
         run_dir,
         "judged",
@@ -662,21 +704,44 @@ def parse_usage_and_score(
     run_dir = run_directory(experiment_dir, run)
     state = load_state(run_dir)
     usage_regenerated = False
-    if should_run_phase(state, "usage_parsed", run_dir / "usage.json", rerun_failed):
+    usage_stale = any(phase_stale_after(state, "usage_parsed", upstream) for upstream in ("implemented", "judged"))
+    if usage_stale or should_run_phase(state, "usage_parsed", run_dir / "usage.json", rerun_failed):
+        archived_to = (
+            archive_phase_artifacts(run_dir, "usage_parsed", PHASE_ARTIFACTS["usage_parsed"])
+            if usage_stale
+            else None
+        )
         usage = summarize_usage(
             implementation_events_path=run_dir / "events.jsonl",
             judge_events_path=run_dir / "judge.events.jsonl",
             run=run,
         )
         write_usage_summary(run_dir / "usage.json", usage)
-        mark_phase(run_dir, "usage_parsed", "completed", {"parsed_at": iso_now()})
+        phase_data = {"parsed_at": iso_now()}
+        if archived_to is not None:
+            phase_data["previous_artifacts_archived_to"] = archived_to
+            phase_data["rerun_reason"] = "codex_events_reran"
+        mark_phase(run_dir, "usage_parsed", "completed", phase_data)
         usage_regenerated = True
 
     state = load_state(run_dir)
-    if usage_regenerated or should_run_phase(state, "scored", run_dir / "score.json", rerun_failed):
+    score_stale = any(
+        phase_stale_after(state, "scored", upstream)
+        for upstream in ("diff_captured", "public_tested", "hidden_tested", "judged", "usage_parsed")
+    )
+    if usage_regenerated or score_stale or should_run_phase(state, "scored", run_dir / "score.json", rerun_failed):
+        archived_to = (
+            archive_phase_artifacts(run_dir, "scored", PHASE_ARTIFACTS["scored"])
+            if score_stale
+            else None
+        )
         score = compute_run_score(run_dir, run)
         write_run_score(run_dir / "score.json", score)
-        mark_phase(run_dir, "scored", "completed", {"quality_score": score.get("quality_score")})
+        phase_data = {"quality_score": score.get("quality_score")}
+        if archived_to is not None:
+            phase_data["previous_artifacts_archived_to"] = archived_to
+            phase_data["rerun_reason"] = "score_inputs_reran"
+        mark_phase(run_dir, "scored", "completed", phase_data)
         _append_log(log_path, f"{run['run_id']} scored quality={score.get('quality_score')}")
         status.update_run(str(run["run_id"]), phase="scored", quality_score=score.get("quality_score"))
 
@@ -717,14 +782,41 @@ def initialize_git_baseline(worktree: Path) -> str:
         ["git", "init"],
         ["git", "config", "user.email", "codex-harness@example.invalid"],
         ["git", "config", "user.name", "Codex Harness"],
-        ["git", "add", "."],
-        ["git", "commit", "-m", "baseline"],
     ]
     for command in commands:
-        completed = subprocess.run(command, cwd=worktree, text=True, capture_output=True, check=False)
+        completed = subprocess.run(
+            command,
+            cwd=worktree,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            check=False,
+        )
         if completed.returncode != 0:
             raise OrchestrationError(f"git command failed in {worktree}: {' '.join(command)}\n{completed.stderr}")
-    completed = subprocess.run(["git", "rev-parse", "HEAD"], cwd=worktree, text=True, capture_output=True, check=False)
+    configure_worktree_git_excludes(worktree)
+    for command in (["git", "add", "."], ["git", "commit", "-m", "baseline"]):
+        completed = subprocess.run(
+            command,
+            cwd=worktree,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise OrchestrationError(f"git command failed in {worktree}: {' '.join(command)}\n{completed.stderr}")
+    completed = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=worktree,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        check=False,
+    )
     if completed.returncode != 0:
         raise OrchestrationError(f"failed to read baseline commit in {worktree}: {completed.stderr}")
     return completed.stdout.strip()
@@ -791,10 +883,13 @@ def run_hidden_tests(repo_root: Path, worktree: Path, run_dir: Path, run: Mappin
 def capture_diff(run_dir: Path, worktree: Path) -> None:
     metadata = _read_json(run_dir / "metadata.json")
     baseline = metadata.get("baseline_commit", "HEAD")
+    configure_worktree_git_excludes(worktree)
     subprocess.run(
         ["git", "add", "--intent-to-add", "."],
         cwd=worktree,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
@@ -802,6 +897,8 @@ def capture_diff(run_dir: Path, worktree: Path) -> None:
         ["git", "diff", "--patch", "--binary", str(baseline), "--"],
         cwd=worktree,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
@@ -810,10 +907,26 @@ def capture_diff(run_dir: Path, worktree: Path) -> None:
         ["git", "diff", "--numstat", str(baseline), "--"],
         cwd=worktree,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
     (run_dir / "diff-numstat.txt").write_text(numstat.stdout, encoding="utf-8", errors="replace")
+
+
+def configure_worktree_git_excludes(worktree: Path) -> None:
+    exclude_path = worktree / ".git" / "info" / "exclude"
+    exclude_path.parent.mkdir(parents=True, exist_ok=True)
+    existing = exclude_path.read_text(encoding="utf-8", errors="replace") if exclude_path.exists() else ""
+    existing_patterns = {line.strip() for line in existing.splitlines() if line.strip() and not line.startswith("#")}
+    additions = [pattern for pattern in WORKTREE_GIT_EXCLUDE_PATTERNS if pattern not in existing_patterns]
+    if not additions:
+        return
+
+    prefix = "" if not existing or existing.endswith("\n") else "\n"
+    block = "# Codex subagent benchmark generated artifacts\n" + "\n".join(additions) + "\n"
+    exclude_path.write_text(existing + prefix + block, encoding="utf-8")
 
 
 def run_metadata(run: Mapping[str, Any], run_dir: Path, worktree: Path, baseline_sha: str) -> dict[str, Any]:
@@ -854,6 +967,25 @@ def should_run_phase(state: Mapping[str, Any], phase: str, required_artifact: Pa
     return True
 
 
+def phase_stale_after(state: Mapping[str, Any], phase: str, upstream_phase: str) -> bool:
+    phase_updated = _phase_updated_at(state, phase)
+    upstream_updated = _phase_updated_at(state, upstream_phase)
+    return phase_updated is not None and upstream_updated is not None and upstream_updated > phase_updated
+
+
+def archive_phase_artifacts(run_dir: Path, phase: str, artifact_names: Iterable[str]) -> str | None:
+    existing = [run_dir / name for name in artifact_names if (run_dir / name).exists()]
+    if not existing:
+        return None
+
+    archive_dir = _unique_archive_dir(run_dir / "reruns", phase)
+    for source in existing:
+        target = archive_dir / source.relative_to(run_dir)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source.rename(target)
+    return str(archive_dir)
+
+
 def archive_failed_phase_artifacts(
     run_dir: Path,
     phase: str,
@@ -869,16 +1001,7 @@ def archive_failed_phase_artifacts(
     if not isinstance(phase_state, Mapping) or phase_state.get("status") != "failed":
         return None
 
-    existing = [run_dir / name for name in artifact_names if (run_dir / name).exists()]
-    if not existing:
-        return None
-
-    archive_dir = _unique_archive_dir(run_dir / "reruns", phase)
-    for source in existing:
-        target = archive_dir / source.relative_to(run_dir)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        source.rename(target)
-    return str(archive_dir)
+    return archive_phase_artifacts(run_dir, phase, artifact_names)
 
 
 def phase_completed(state: Mapping[str, Any], phase: str, artifacts: Iterable[Path]) -> bool:
@@ -914,6 +1037,13 @@ def load_state(run_dir: Path) -> dict[str, Any]:
             "phases": {phase: {"status": "pending"} for phase in STATE_PHASES},
         }
     return _read_json(path)
+
+
+def _phase_updated_at(state: Mapping[str, Any], phase: str) -> str | None:
+    phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
+    phase_state = phases.get(phase, {}) if isinstance(phases, Mapping) else {}
+    updated_at = phase_state.get("updated_at") if isinstance(phase_state, Mapping) else None
+    return updated_at if isinstance(updated_at, str) else None
 
 
 def run_directory(experiment_dir: Path, run: Mapping[str, Any]) -> Path:
@@ -993,7 +1123,7 @@ def prepare_judge_evidence(run_dir: Path, worktree: Path) -> None:
         copied.append(name)
 
     _write_json(
-        evidence_dir / "manifest.json",
+        evidence_dir / "evidence-manifest.json",
         {
             "schema_version": 1,
             "description": "Blind judge evidence bundle. Source files are in the workspace root.",

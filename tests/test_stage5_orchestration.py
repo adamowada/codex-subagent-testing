@@ -11,6 +11,7 @@ from harness.matrix import expand_experiment_matrix, load_experiment_config
 from harness.orchestrator import (
     OrchestrationError,
     capture_diff,
+    configure_worktree_git_excludes,
     initialize_git_baseline,
     prepare_judge_evidence,
     resolve_experiment_dir,
@@ -82,6 +83,7 @@ def test_implementation_command_contains_run_settings(runs: list[dict]) -> None:
     run = next(candidate for candidate in runs if candidate["run_id"] == "C4_direct_r01")
     command = build_implementation_command("codex", run, "prompt text")
 
+    assert command[:4] == ["codex", "--ask-for-approval", "never", "exec"]
     assert "--json" in command
     assert "--sandbox" in command
     assert "workspace-write" in command
@@ -91,6 +93,12 @@ def test_implementation_command_contains_run_settings(runs: list[dict]) -> None:
     assert "agents.max_depth=2" in command
     assert "agents.max_threads=24" in command
     assert command[-1] == "prompt text"
+
+
+def test_solo_command_uses_cli_minimum_agent_depth(runs: list[dict]) -> None:
+    command = build_implementation_command("codex", runs[0], "prompt text")
+
+    assert "agents.max_depth=1" in command
 
 
 def test_implementation_command_uses_rendered_agent_config(runs: list[dict], tmp_path: Path) -> None:
@@ -104,13 +112,14 @@ def test_implementation_command_uses_rendered_agent_config(runs: list[dict], tmp
     command = build_implementation_command("codex", run, "prompt text", config_dir=config_dir)
 
     assert "agents.spark_direct_implementer.config_file" in "\n".join(command)
-    assert "spark_direct_implementer.md" in "\n".join(command)
+    assert "spark_direct_implementer.toml" in "\n".join(command)
     assert "agents.spark_direct_implementer.sandbox=\"workspace-write\"" in command
 
 
 def test_judge_command_is_read_only_xhigh(runs: list[dict]) -> None:
     command = build_judge_command("codex", runs[0], "judge prompt")
 
+    assert command[:4] == ["codex", "--ask-for-approval", "never", "exec"]
     assert "read-only" in command
     assert "model_reasoning_effort=xhigh" in command
     assert command[-1] == "judge prompt"
@@ -182,10 +191,32 @@ def test_capture_diff_includes_untracked_files(tmp_path: Path) -> None:
     (run_dir / "metadata.json").write_text(json.dumps({"baseline_commit": baseline}), encoding="utf-8")
 
     (worktree / "src" / "new_file.ts").write_text("export const after = true;\n", encoding="utf-8")
+    (worktree / "dist").mkdir()
+    (worktree / "dist" / "index.js").write_text("generated\n", encoding="utf-8")
+    (worktree / "node_modules").mkdir()
+    (worktree / "node_modules" / "package.js").write_text("generated\n", encoding="utf-8")
     capture_diff(run_dir, worktree)
 
-    assert "src/new_file.ts" in (run_dir / "diff.patch").read_text(encoding="utf-8")
-    assert "src/new_file.ts" in (run_dir / "diff-numstat.txt").read_text(encoding="utf-8")
+    diff = (run_dir / "diff.patch").read_text(encoding="utf-8")
+    numstat = (run_dir / "diff-numstat.txt").read_text(encoding="utf-8")
+    assert "src/new_file.ts" in diff
+    assert "src/new_file.ts" in numstat
+    assert "dist/index.js" not in diff
+    assert "node_modules/package.js" not in diff
+
+
+def test_configure_worktree_git_excludes_is_idempotent(tmp_path: Path) -> None:
+    worktree = tmp_path / "worktree"
+    worktree.mkdir()
+    (worktree / "README.md").write_text("baseline\n", encoding="utf-8")
+    initialize_git_baseline(worktree)
+
+    configure_worktree_git_excludes(worktree)
+    configure_worktree_git_excludes(worktree)
+
+    exclude_text = (worktree / ".git" / "info" / "exclude").read_text(encoding="utf-8")
+    assert exclude_text.count("node_modules") == 1
+    assert "pytest-cache-files-*" in exclude_text
 
 
 def test_prepare_judge_evidence_copies_sanitized_artifacts(tmp_path: Path) -> None:
@@ -205,4 +236,6 @@ def test_prepare_judge_evidence_copies_sanitized_artifacts(tmp_path: Path) -> No
     evidence = worktree / "judge_evidence"
     assert (evidence / "hidden-results.json").exists()
     assert (evidence / "public_py.log").read_text(encoding="utf-8") == "public output\n"
+    assert (evidence / "evidence-manifest.json").exists()
+    assert not (evidence / "manifest.json").exists()
     assert not (evidence / "metadata.json").exists()

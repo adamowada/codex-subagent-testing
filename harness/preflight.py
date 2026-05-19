@@ -178,6 +178,8 @@ def _check_python_module(name: str) -> PreflightCheck:
     completed = subprocess.run(
         [sys.executable, "-m", name, "--version"],
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         timeout=15,
         check=False,
@@ -193,6 +195,8 @@ def _check_codex_version(codex_bin: str) -> PreflightCheck:
         completed = subprocess.run(
             [codex_bin, "--version"],
             text=True,
+            encoding="utf-8",
+            errors="replace",
             capture_output=True,
             timeout=15,
             check=False,

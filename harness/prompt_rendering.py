@@ -122,7 +122,7 @@ def render_codex_config(
         "config.toml": _render_template_file(root, config_path, context),
     }
     for name, instructions in rendered_snippets.items():
-        rendered[f"agents/{name}.md"] = _final_text(instructions)
+        rendered[f"agents/{name}.toml"] = _agent_role_toml(instructions)
 
     return {path: _final_text(text) for path, text in rendered.items()}
 
@@ -288,11 +288,18 @@ def _agent_template_toml(
                     f'model = "{_toml_escape(model)}"',
                     f'model_reasoning_effort = "{_toml_escape(reasoning)}"',
                     f'sandbox = "{_toml_escape(sandbox)}"',
-                    f'config_file = "agents/{_toml_escape(name)}.md"',
+                    f'config_file = "agents/{_toml_escape(name)}.toml"',
                 ]
             )
         )
     return "\n\n".join(blocks)
+
+
+def _agent_role_toml(instructions: str) -> str:
+    text = _final_text(instructions)
+    if "'''" not in text:
+        return f"instructions = '''\n{text}'''\n"
+    return f"instructions = {json.dumps(text)}\n"
 
 
 def _snippet_sandbox(name: str, context: Mapping[str, str]) -> str:

@@ -12,7 +12,8 @@ from harness.codex_runner import (
     resolve_codex_bin,
     run_process_to_files,
 )
-from harness.orchestrator import archive_failed_phase_artifacts
+from harness.hidden_runner import run_command as run_hidden_command
+from harness.orchestrator import archive_failed_phase_artifacts, archive_phase_artifacts, phase_stale_after
 from harness.preflight import _check_codex_version
 
 
@@ -67,6 +68,15 @@ def test_run_process_to_files_captures_success_stdout_stderr_and_final_json(tmp_
     assert "warning from fake codex" in stderr
     assert final["parsed"]
     assert final["value"]["status"] == "success"
+
+
+def test_hidden_runner_command_decodes_utf8_output_on_windows(tmp_path: Path) -> None:
+    script = "import sys; sys.stdout.buffer.write('unicode: \\u271d'.encode('utf-8'))"
+
+    result = run_hidden_command([sys.executable, "-c", script], tmp_path, timeout=15)
+
+    assert result["returncode"] == 0
+    assert "unicode: \u271d" in result["stdout"]
 
 
 def test_run_process_to_files_records_timeout_and_partial_output(tmp_path: Path) -> None:
@@ -158,6 +168,29 @@ def test_failed_phase_artifacts_are_archived_before_rerun(tmp_path: Path) -> Non
     assert not (run_dir / "stderr.log").exists()
     assert (archive_dir / "events.jsonl").read_text(encoding="utf-8") == "old events\n"
     assert (archive_dir / "stderr.log").read_text(encoding="utf-8") == "old stderr\n"
+
+
+def test_completed_phase_artifacts_can_be_archived_for_stale_rerun(tmp_path: Path) -> None:
+    (tmp_path / "score.json").write_text("old score\n", encoding="utf-8")
+
+    archived = archive_phase_artifacts(tmp_path, "scored", ["score.json"])
+
+    assert archived is not None
+    assert not (tmp_path / "score.json").exists()
+    assert (Path(archived) / "score.json").read_text(encoding="utf-8") == "old score\n"
+
+
+def test_phase_stale_after_detects_newer_upstream_phase() -> None:
+    state = {
+        "phases": {
+            "implemented": {"updated_at": "2026-05-19T21:08:23+00:00"},
+            "public_tested": {"updated_at": "2026-05-19T21:04:40+00:00"},
+            "hidden_tested": {"updated_at": "2026-05-19T21:09:00+00:00"},
+        }
+    }
+
+    assert phase_stale_after(state, "public_tested", "implemented")
+    assert not phase_stale_after(state, "hidden_tested", "implemented")
 
 
 def _fake_executable(directory: Path, name: str) -> Path:

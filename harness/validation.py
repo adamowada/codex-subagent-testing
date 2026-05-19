@@ -485,7 +485,7 @@ def _selected_runs(
 
 
 def _hidden_case_index(cases_dir: Path) -> dict[str, Any]:
-    files = [path for path in cases_dir.glob("*.json") if path.is_file()]
+    files = [path for path in cases_dir.glob("*.json") if path.is_file() and path.name != "manifest.json"]
     by_size: dict[int, set[str]] = {}
     names: set[str] = set()
     for path in files:

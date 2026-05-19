@@ -48,7 +48,9 @@ def test_rendering_succeeds_for_all_runs(runs: list[dict]) -> None:
         assert "Rendered Implementation Prompt" in implementation_prompt
         assert "Blind RuleLedger Judge" in judge_prompt
         assert "config.toml" in config_files
-        tomllib.loads(config_files["config.toml"])
+        for relative_path, contents in config_files.items():
+            if relative_path.endswith(".toml"):
+                tomllib.loads(contents)
 
 
 def test_rendering_is_deterministic(runs: list[dict]) -> None:
@@ -145,6 +147,7 @@ def test_codex_config_direct_mode_uses_writable_leaf_roles(runs: list[dict]) -> 
     assert templates["spark_direct_implementer"]["model"] == "gpt-5.3-codex-spark"
     assert templates["spark_direct_implementer"]["model_reasoning_effort"] == "xhigh"
     assert templates["spark_direct_implementer"]["sandbox"] == "workspace-write"
+    assert templates["spark_direct_implementer"]["config_file"] == "agents/spark_direct_implementer.toml"
     assert templates["spark_direct_tester"]["sandbox"] == "workspace-write"
     assert templates["spark_adversary"]["sandbox"] == "read-only"
     assert "spark_proposal_implementer" not in templates
@@ -168,6 +171,19 @@ def test_codex_config_c4_includes_medium_sublead_template(runs: list[dict]) -> N
     assert config["agents"]["max_threads"] >= 24
     assert templates["gpt55_medium_sublead"]["model"] == "gpt-5.5"
     assert templates["gpt55_medium_sublead"]["model_reasoning_effort"] == "medium"
+
+
+def test_agent_role_files_are_toml_with_instructions(runs: list[dict]) -> None:
+    config_files = render_codex_config(_run(runs, "C1", "proposal"), REPO_ROOT)
+
+    assert "agents/spark_proposal_implementer.toml" in config_files
+    assert not any(path.endswith(".md") for path in config_files)
+    for path, contents in config_files.items():
+        if not path.startswith("agents/"):
+            continue
+        role = tomllib.loads(contents)
+        assert "instructions" in role
+        assert "Do not edit files" in role["instructions"]
 
 
 def test_template_context_has_explicit_empty_values_for_c0(runs: list[dict]) -> None:

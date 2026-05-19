@@ -104,6 +104,34 @@ def test_stage11_flags_hidden_case_copied_into_worktree(
     assert "hidden case filename" in checks["hidden_test_isolation"]["details"]
 
 
+def test_stage11_allows_non_case_manifest_in_worktree(
+    config: dict,
+    runs: list[dict],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selected = [runs[0]]
+    _write_experiment_shell(tmp_path, config, runs, selected)
+    _write_run_artifacts(tmp_path, selected[0], quality=0.25)
+    evidence_dir = tmp_path / "runs" / "C0_r01" / "worktree" / "judge_evidence"
+    evidence_dir.mkdir()
+    _write_json(evidence_dir / "manifest.json", {"schema_version": 1, "files": []})
+
+    monkeypatch.setenv("CODEX_REPORT_PDF_RENDERER", "minimal")
+    write_results_outputs(tmp_path, selected)
+
+    payload = validate_stage11(
+        config_path=CONFIG_PATH,
+        repo_root=REPO_ROOT,
+        experiment_dir=tmp_path,
+        selected_runs=selected,
+        preflight_result=_preflight_payload(),
+    )
+
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert checks["hidden_test_isolation"]["status"] == "passed"
+
+
 def test_stage11_warns_when_malformed_judge_output_is_scored(
     config: dict,
     runs: list[dict],

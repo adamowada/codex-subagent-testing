@@ -67,21 +67,21 @@ def build_implementation_command(
 
     return [
         codex_bin,
+        "--ask-for-approval",
+        ask_for_approval,
         "exec",
         "--json",
         "--cd",
         "<run_worktree>",
         "--sandbox",
         sandbox,
-        "--ask-for-approval",
-        ask_for_approval,
         "--model",
         model,
         *_config_override_args(
             [
                 f"model_reasoning_effort={_toml_value(reasoning)}",
                 f"agents.max_threads={int(rendered.get('agents.max_threads', agents['max_threads']))}",
-                f"agents.max_depth={int(rendered.get('agents.max_depth', agents['max_depth']))}",
+                f"agents.max_depth={_codex_cli_agent_depth(rendered.get('agents.max_depth', agents['max_depth']))}",
                 *_agent_override_values(rendered, config_dir),
             ]
         ),
@@ -93,14 +93,14 @@ def build_judge_command(codex_bin: str, run: Mapping[str, Any], prompt: str) -> 
     judge = _mapping(run, "judge")
     return [
         codex_bin,
+        "--ask-for-approval",
+        "never",
         "exec",
         "--json",
         "--cd",
         "<run_worktree>",
         "--sandbox",
         str(judge.get("sandbox", "read-only")),
-        "--ask-for-approval",
-        "never",
         "--model",
         str(judge["model"]),
         "-c",
@@ -150,6 +150,8 @@ def run_process_to_files(
                     stdout=stdout_file,
                     stderr=stderr_file,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     env=dict(env) if env is not None else None,
                 )
                 try:
@@ -208,6 +210,8 @@ def run_logged_command(
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 env=dict(env) if env is not None else None,
             )
             try:
@@ -344,6 +348,10 @@ def _config_override_args(overrides: list[str]) -> list[str]:
     for override in overrides:
         args.extend(["-c", override])
     return args
+
+
+def _codex_cli_agent_depth(value: Any) -> int:
+    return max(1, int(value))
 
 
 def _toml_value(value: Any) -> str:
