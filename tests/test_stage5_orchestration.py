@@ -26,6 +26,7 @@ from harness.report_data import write_results_outputs
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
+RULELEDGER_V2_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
 
 
 @pytest.fixture
@@ -50,6 +51,16 @@ def test_pilot_selection_handles_solo_only_matrix() -> None:
     selected = select_runs(solo_runs, pilot=True)
 
     assert [run["run_id"] for run in selected] == ["C5_r01", "C6_r01"]
+
+
+def test_pilot_selection_uses_v2_calibration_runs() -> None:
+    v2_runs = expand_experiment_matrix(load_experiment_config(RULELEDGER_V2_PILOT_CONFIG_PATH))
+
+    selected = select_runs(v2_runs, pilot=True)
+
+    assert [run["run_id"] for run in selected] == ["V2P0_r01", "V2P1_proposal_r01"]
+    assert [run["root"]["reasoning"] for run in selected] == ["low", "xhigh"]
+    assert [run["spark_mode"] for run in selected] == [None, "proposal"]
 
 
 def test_run_id_selection_preserves_matrix_order(runs: list[dict]) -> None:

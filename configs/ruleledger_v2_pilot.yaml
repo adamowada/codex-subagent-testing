@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "benchmark": {
+    "version": "ruleledger_v2"
+  },
+  "experiment": {
+    "id": "ruleledger_v2_pilot",
+    "repeat_count": 1,
+    "seed": 20260520
+  },
+  "parallelism": {
+    "implementation_jobs": 1,
+    "judge_jobs": 1
+  },
+  "timeouts": {
+    "implementation_seconds": 7200,
+    "judge_seconds": 1800
+  },
+  "paths": {
+    "benchmark_template": "benchmark_template_v2",
+    "hidden_cases": "hidden_tests/cases_v2",
+    "prompt_templates": {
+      "common": "prompts/task_common.md",
+      "solo": "prompts/task_solo.md",
+      "flat_spark": "prompts/task_flat_spark.md",
+      "depth2_subleads": "prompts/task_depth2_subleads.md",
+      "judge": "prompts/judge.md"
+    },
+    "codex_config_template": "codex_templates/config.toml.j2"
+  },
+  "models": {
+    "gpt55": "gpt-5.5",
+    "spark": "gpt-5.3-codex-spark"
+  },
+  "spark_modes": {
+    "proposal": {
+      "leaf_write_mode": "read-only",
+      "proposal_only": true
+    }
+  },
+  "scoring": {
+    "path": "configs/scoring_v2.yaml"
+  },
+  "judge": {
+    "model": "gpt-5.5",
+    "reasoning": "xhigh",
+    "prompt_template": "judge",
+    "sandbox": "read-only"
+  },
+  "cells": [
+    {
+      "id": "V2P0",
+      "name": "ruleledger_v2_low_solo",
+      "repeats": 1,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "low"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "V2P1",
+      "name": "ruleledger_v2_xhigh_spark_proposal",
+      "repeats": 1,
+      "spark_modes": [
+        "proposal"
+      ],
+      "topology": "flat_spark",
+      "prompt_template": "flat_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "xhigh"
+      },
+      "leaf": {
+        "model": "gpt-5.3-codex-spark",
+        "count": 6,
+        "reasoning_by_role": {
+          "implementer": "xhigh",
+          "tester": "xhigh",
+          "adversary": "xhigh"
+        }
+      },
+      "agents": {
+        "max_depth": 1,
+        "max_threads": 7
+      }
+    }
+  ]
+}

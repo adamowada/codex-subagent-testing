@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2.yaml"
+RULELEDGER_V2_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -118,6 +119,32 @@ def test_ruleledger_v2_config_selects_real_v2_starter_assets() -> None:
     }
     assert summary["by_benchmark_version"] == {"ruleledger_v2": 1}
     assert summary["benchmark_assets"]["template_path"] == "benchmark_template_v2"
+
+
+def test_ruleledger_v2_pilot_config_expands_to_calibration_runs() -> None:
+    config = load_experiment_config(RULELEDGER_V2_PILOT_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert [run["run_id"] for run in runs] == ["V2P0_r01", "V2P1_proposal_r01"]
+    assert [run["root"]["reasoning"] for run in runs] == ["low", "xhigh"]
+    assert [run["topology"] for run in runs] == ["solo", "flat_spark"]
+    assert [run["spark_mode"] for run in runs] == [None, "proposal"]
+    assert runs[0]["leaf"] is None
+    assert runs[1]["leaf"]["count"] == 6
+    assert runs[1]["agents"]["max_threads"] == 7
+    assert runs[1]["spark_mode_config"] == {"leaf_write_mode": "read-only", "proposal_only": True}
+    assert runs[0]["benchmark"] == {
+        "version": "ruleledger_v2",
+        "template_path": "benchmark_template_v2",
+        "hidden_cases_path": "hidden_tests/cases_v2",
+        "scoring_path": "configs/scoring_v2.yaml",
+        "scoring_profile": "starter_quality_v2",
+    }
+    assert summary["total_runs"] == 2
+    assert summary["by_benchmark_version"] == {"ruleledger_v2": 2}
+    assert summary["by_root_reasoning"] == {"low": 1, "xhigh": 1}
+    assert summary["by_spark_mode"] == {"none": 1, "proposal": 1}
 
 
 def test_c4_topology_resolves_to_eighteen_spark_leaves(config: dict) -> None:
