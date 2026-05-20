@@ -145,10 +145,10 @@ def test_implementation_command_contains_run_settings(runs: list[dict]) -> None:
     assert command[-1] == "prompt text"
 
 
-def test_solo_command_preserves_configured_zero_agent_depth(runs: list[dict]) -> None:
+def test_solo_command_uses_cli_minimum_agent_depth(runs: list[dict]) -> None:
     command = build_implementation_command("codex", runs[0], "prompt text")
 
-    assert "agents.max_depth=0" in command
+    assert "agents.max_depth=1" in command
 
 
 def test_implementation_command_uses_rendered_agent_config(runs: list[dict], tmp_path: Path) -> None:

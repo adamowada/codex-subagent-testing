@@ -372,7 +372,10 @@ def _codex_cli_agent_depth(value: Any) -> int:
     depth = int(value)
     if depth < 0:
         raise ValueError("agents.max_depth must be non-negative")
-    return depth
+    # The experiment matrix uses 0 to mean "solo/no delegated agents".
+    # Current Codex CLI config validation is one-based, so keep the matrix
+    # semantics in metadata while sending the lowest accepted CLI value.
+    return max(depth, 1)
 
 
 def _process_group_kwargs() -> dict[str, Any]:
