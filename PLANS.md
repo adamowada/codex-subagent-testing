@@ -616,7 +616,7 @@ Target calibration:
 - Difficulty should come from deterministic interacting rules, not ambiguity.
 - V2 should extend existing API names rather than replacing the RuleLedger task.
 
-### Stage 13.1: Version Benchmark Assets
+### Stage 14: Version Benchmark Assets
 
 Implementation:
 
@@ -638,7 +638,7 @@ Done when:
   and scoring path for both v1 and v2.
 - Stage 11 validation passes for v1 and for a synthetic v2 config.
 
-### Stage 13.2: Create The V2 Starter Template
+### Stage 15: Create The V2 Starter Template
 
 Implementation:
 
@@ -667,7 +667,7 @@ Done when:
 - Public docs describe the added event fields, ordering rules, and billing rules
   without revealing hidden cases.
 
-### Stage 13.3: Specify Hard-Mode Semantics
+### Stage 16: Specify Hard-Mode Semantics
 
 Implementation:
 
@@ -699,7 +699,7 @@ Done when:
 - The oracle, hidden generator, hidden runner, and starter tests all reference
   the same rule names and output fields.
 
-### Stage 13.4: Build The V2 Oracle And Hidden Case Generator
+### Stage 17: Build The V2 Oracle And Hidden Case Generator
 
 Implementation:
 
@@ -726,7 +726,7 @@ Done when:
 - Category weights and points are visible in the manifest, while concrete hidden
   expectations remain outside implementation workspaces.
 
-### Stage 13.5: Upgrade The Hidden Runner
+### Stage 18: Upgrade The Hidden Runner
 
 Implementation:
 
@@ -750,7 +750,7 @@ Done when:
 - Hidden-test privacy validation scans the selected hidden case directory and
   still catches copied case files or matching contents.
 
-### Stage 13.6: Revise V2 Scoring And Reporting
+### Stage 19: Revise V2 Scoring And Reporting
 
 Implementation:
 
@@ -772,7 +772,7 @@ Done when:
 - Public/typecheck success cannot hide poor hidden correctness.
 - Existing v1 report tests still pass.
 
-### Stage 13.7: Calibrate With Pilot Runs
+### Stage 20: Calibrate With Pilot Runs
 
 Implementation:
 
@@ -793,7 +793,7 @@ Done when:
 - Any calibration adjustment is reproducible from generator code and a fixed
   seed.
 
-### Stage 13.8: Full V2 Experiment Readiness
+### Stage 21: Full V2 Experiment Readiness
 
 Implementation:
 
