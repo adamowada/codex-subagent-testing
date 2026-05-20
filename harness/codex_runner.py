@@ -50,6 +50,21 @@ def resolve_codex_bin(env: Mapping[str, str] | None = None) -> str | None:
     return shutil.which("codex", path=path)
 
 
+def resolve_npm_bin(env: Mapping[str, str] | None = None) -> str | None:
+    """Return an npm executable path that Python can launch on this platform."""
+
+    environment = env if env is not None else os.environ
+    path = environment.get("PATH")
+    configured = environment.get("NPM_BIN")
+    if configured:
+        candidate = Path(configured)
+        if candidate.is_absolute() and candidate.exists():
+            return str(candidate)
+        resolved = shutil.which(configured, path=path)
+        return resolved or configured
+    return shutil.which("npm.cmd", path=path) or shutil.which("npm", path=path)
+
+
 def build_implementation_command(
     codex_bin: str,
     run: Mapping[str, Any],

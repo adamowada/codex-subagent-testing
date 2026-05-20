@@ -10,10 +10,16 @@ from harness.codex_runner import (
     command_for_display,
     extract_final_response,
     resolve_codex_bin,
+    resolve_npm_bin,
     run_process_to_files,
 )
 from harness.hidden_runner import run_command as run_hidden_command
-from harness.orchestrator import archive_failed_phase_artifacts, archive_phase_artifacts, phase_stale_after
+from harness.orchestrator import (
+    _public_tests_have_launch_errors,
+    archive_failed_phase_artifacts,
+    archive_phase_artifacts,
+    phase_stale_after,
+)
 from harness.preflight import _check_codex_version
 
 
@@ -31,6 +37,23 @@ def test_resolve_codex_bin_uses_supplied_path_for_command_names(tmp_path: Path) 
     resolved = resolve_codex_bin({"CODEX_BIN": "codex", "PATH": str(tmp_path)})
 
     assert Path(resolved or "").resolve() == executable.resolve()
+
+
+def test_resolve_npm_bin_prefers_windows_cmd_shim(tmp_path: Path) -> None:
+    npm = _fake_executable(tmp_path, "npm")
+    (tmp_path / "npm.ps1").write_text("Write-Output fake npm\n", encoding="utf-8")
+
+    resolved = resolve_npm_bin({"PATH": str(tmp_path)})
+
+    assert Path(resolved or "").resolve() == npm.resolve()
+
+
+def test_resolve_npm_bin_honors_override(tmp_path: Path) -> None:
+    custom = _fake_executable(tmp_path, "custom-npm")
+
+    resolved = resolve_npm_bin({"NPM_BIN": str(custom), "PATH": ""})
+
+    assert resolved == str(custom)
 
 
 def test_command_for_display_masks_prompt() -> None:
@@ -178,6 +201,15 @@ def test_completed_phase_artifacts_can_be_archived_for_stale_rerun(tmp_path: Pat
     assert archived is not None
     assert not (tmp_path / "score.json").exists()
     assert (Path(archived) / "score.json").read_text(encoding="utf-8") == "old score\n"
+
+
+def test_public_test_launch_errors_are_repairable(tmp_path: Path) -> None:
+    (tmp_path / "typecheck.meta.json").write_text(
+        json.dumps({"returncode": None, "timed_out": False}),
+        encoding="utf-8",
+    )
+
+    assert _public_tests_have_launch_errors(tmp_path)
 
 
 def test_phase_stale_after_detects_newer_upstream_phase() -> None:

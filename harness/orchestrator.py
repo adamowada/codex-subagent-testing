@@ -26,6 +26,7 @@ from harness.artifacts import (
     validate_run_metadata,
 )
 from harness.codex_runner import (
+    ProcessResult,
     build_implementation_command,
     build_judge_command,
     command_for_display,
@@ -33,6 +34,7 @@ from harness.codex_runner import (
     iso_now,
     materialize_worktree_command,
     resolve_codex_bin,
+    resolve_npm_bin,
     run_logged_command,
     run_process_to_files,
     write_process_result,
@@ -570,18 +572,23 @@ def run_implementation_and_tests(
 
     state = load_state(run_dir)
     public_stale = implementation_reran or phase_stale_after(state, "public_tested", "implemented")
-    if public_stale or should_run_phase(state, "public_tested", run_dir / "typecheck.meta.json", rerun_failed):
+    public_repair = rerun_failed and _public_tests_have_launch_errors(run_dir)
+    if public_stale or public_repair or should_run_phase(state, "public_tested", run_dir / "typecheck.meta.json", rerun_failed):
         archived_to = (
             archive_phase_artifacts(run_dir, "public_tested", PHASE_ARTIFACTS["public_tested"])
-            if public_stale
+            if public_stale or public_repair
             else None
         )
-        run_public_tests(worktree, run_dir, run)
-        phase_data = {"tested_at": iso_now()}
+        public_results = run_public_tests(worktree, run_dir, run)
+        public_launch_errors = _results_have_launch_errors(public_results.values())
+        phase_data = {
+            "tested_at": iso_now(),
+            "returncodes": {name: result.returncode for name, result in public_results.items()},
+        }
         if archived_to is not None:
             phase_data["previous_artifacts_archived_to"] = archived_to
-            phase_data["rerun_reason"] = "implemented_reran"
-        mark_phase(run_dir, "public_tested", "completed", phase_data)
+            phase_data["rerun_reason"] = "implemented_reran" if public_stale else "launch_error_repair"
+        mark_phase(run_dir, "public_tested", "failed" if public_launch_errors else "completed", phase_data)
 
     state = load_state(run_dir)
     hidden_stale = implementation_reran or phase_stale_after(state, "hidden_tested", "implemented")
@@ -834,19 +841,22 @@ def render_artifacts(repo_root: Path, run_dir: Path, run: Mapping[str, Any]) -> 
         path.write_text(contents, encoding="utf-8")
 
 
-def run_public_tests(worktree: Path, run_dir: Path, run: Mapping[str, Any]) -> None:
+def run_public_tests(worktree: Path, run_dir: Path, run: Mapping[str, Any]) -> dict[str, ProcessResult]:
+    results: dict[str, ProcessResult] = {}
+    npm = resolve_npm_bin() or "npm"
     if (worktree / "package.json").exists() and not _typescript_dependency_present(worktree):
         npm_ci = run_logged_command(
-            ["npm", "ci"],
+            [npm, "ci"],
             cwd=worktree,
             log_path=run_dir / "npm-ci.log",
             timeout_seconds=180,
         )
         write_process_result(run_dir / "npm-ci.meta.json", npm_ci)
+        results["npm_ci"] = npm_ci
 
     commands = [
-        ("typecheck", ["npm", "run", "typecheck"], "typecheck.log"),
-        ("public_ts", ["npm", "run", "test:public"], "public_ts.log"),
+        ("typecheck", [npm, "run", "typecheck"], "typecheck.log"),
+        ("public_ts", [npm, "run", "test:public"], "public_ts.log"),
         ("public_py", [sys.executable, "-m", "pytest", "-q", "tests_public_py"], "public_py.log"),
     ]
     timeout = int(run["timeouts"]["implementation_seconds"])
@@ -858,6 +868,8 @@ def run_public_tests(worktree: Path, run_dir: Path, run: Mapping[str, Any]) -> N
             timeout_seconds=min(timeout, 600),
         )
         write_process_result(run_dir / f"{name}.meta.json", result)
+        results[name] = result
+    return results
 
 
 def run_hidden_tests(repo_root: Path, worktree: Path, run_dir: Path, run: Mapping[str, Any]) -> None:
@@ -1136,6 +1148,20 @@ def _typescript_dependency_present(worktree: Path) -> bool:
     return (worktree / "node_modules" / ".bin" / "tsc").exists() or (
         worktree / "node_modules" / ".bin" / "tsc.cmd"
     ).exists()
+
+
+def _public_tests_have_launch_errors(run_dir: Path) -> bool:
+    names = ("npm-ci.meta.json", "typecheck.meta.json", "public_ts.meta.json", "public_py.meta.json")
+    return any(_metadata_has_launch_error(run_dir / name) for name in names)
+
+
+def _metadata_has_launch_error(path: Path) -> bool:
+    meta = _read_json(path)
+    return bool(meta) and meta.get("returncode") is None and not meta.get("timed_out")
+
+
+def _results_have_launch_errors(results: Iterable[ProcessResult]) -> bool:
+    return any(result.returncode is None and not result.timed_out for result in results)
 
 
 def _archive_path(path: Path) -> Path:

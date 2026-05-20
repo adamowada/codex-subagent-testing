@@ -8,7 +8,7 @@ import subprocess
 import sys
 from typing import Any
 
-from harness.codex_runner import resolve_codex_bin
+from harness.codex_runner import resolve_codex_bin, resolve_npm_bin
 from harness.hidden_runner import load_cases
 from harness.matrix import (
     REPO_ROOT,
@@ -53,8 +53,9 @@ def run_preflight(
     checks.append(_check_path(root / "prompts", "prompts", directory=True))
     checks.append(_check_path(root / "codex_templates", "codex_templates", directory=True))
 
-    for tool in ["git", "node", "npm"]:
+    for tool in ["git", "node"]:
         checks.append(_check_tool(tool))
+    checks.append(_check_npm())
 
     checks.append(
         PreflightCheck(
@@ -172,6 +173,51 @@ def _check_tool(name: str) -> PreflightCheck:
     if resolved is None:
         return PreflightCheck(name, "failed", f"{name} was not found on PATH")
     return PreflightCheck(name, "passed", resolved)
+
+
+def _check_npm() -> PreflightCheck:
+    resolved = resolve_npm_bin()
+    if resolved is None:
+        return PreflightCheck("npm", "failed", "npm was not found on PATH")
+
+    try:
+        completed = subprocess.run(
+            [resolved, "--version"],
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            timeout=15,
+            check=False,
+        )
+    except Exception as exc:
+        return PreflightCheck("npm", "failed", f"failed to run {resolved!r}: {exc}", {"npm_bin": resolved})
+
+    if completed.returncode != 0:
+        details = (completed.stderr or completed.stdout).strip()
+        return PreflightCheck(
+            "npm",
+            "failed",
+            details or f"{resolved!r} exited with {completed.returncode}",
+            {
+                "npm_bin": resolved,
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            },
+        )
+
+    return PreflightCheck(
+        "npm",
+        "passed",
+        completed.stdout.strip() or resolved,
+        {
+            "npm_bin": resolved,
+            "returncode": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        },
+    )
 
 
 def _check_python_module(name: str) -> PreflightCheck:

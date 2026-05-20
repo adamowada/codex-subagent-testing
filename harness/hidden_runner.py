@@ -6,12 +6,13 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 from typing import Any
+
+from harness.codex_runner import resolve_npm_bin
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -317,7 +318,7 @@ def setup_typescript(worktree: Path, install: bool) -> dict[str, Any]:
     if not (worktree / "package.json").exists():
         return {"ok": False, "reason": "missing_package_json"}
 
-    npm = shutil.which("npm")
+    npm = resolve_npm_bin()
     if npm is None:
         return {"ok": False, "reason": "missing_npm"}
 
