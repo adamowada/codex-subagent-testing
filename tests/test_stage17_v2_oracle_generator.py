@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import sys
 from types import ModuleType
 from typing import Any
@@ -202,6 +203,46 @@ def test_checked_in_cases_v2_match_generator_output(tmp_path: Path) -> None:
     generator.main(cases_dir)
 
     assert _snapshot(cases_dir) == _snapshot(CASES_V2_DIR)
+
+
+def test_generate_v2_cases_cli_supports_safe_output_directory(tmp_path: Path) -> None:
+    cases_dir = tmp_path / "cli_cases_v2"
+
+    completed = subprocess.run(
+        [sys.executable, str(GENERATOR_PATH), "--cases-dir", str(cases_dir)],
+        cwd=REPO_ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert _snapshot(cases_dir) == _snapshot(CASES_V2_DIR)
+
+
+def test_generate_v2_cases_cli_rejects_unscoped_output_directory(tmp_path: Path) -> None:
+    unsafe_dir = tmp_path / "unsafe_output"
+    unsafe_dir.mkdir()
+    sentinel = unsafe_dir / "sentinel.json"
+    sentinel.write_text('{"keep": true}\n', encoding="utf-8")
+
+    completed = subprocess.run(
+        [sys.executable, str(GENERATOR_PATH), "--cases-dir", str(unsafe_dir)],
+        cwd=REPO_ROOT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
+
+    assert completed.returncode != 0
+    assert "output directory name must include 'cases'" in completed.stderr
+    assert sentinel.exists()
 
 
 def test_cases_v2_manifest_matches_generated_files() -> None:

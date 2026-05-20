@@ -18,6 +18,7 @@ CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2.yaml"
 RULELEDGER_V2_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
+RULELEDGER_V2_EXPERIMENT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_experiment.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -112,6 +113,27 @@ def test_stage11_static_contract_accepts_ruleledger_v2_pilot_config() -> None:
         "versions": {"ruleledger_v2": 2},
     }
     assert checks["pilot_selection"]["data"]["run_ids"] == ["V2P0_r01", "V2P1_proposal_r01"]
+
+
+def test_stage11_static_contract_accepts_ruleledger_v2_full_config() -> None:
+    payload = validate_stage11(
+        config_path=RULELEDGER_V2_EXPERIMENT_CONFIG_PATH,
+        repo_root=REPO_ROOT,
+        run_preflight_check=False,
+    )
+
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "passed"
+    assert payload["full_run_count"] == 18
+    assert payload["benchmark"] == {
+        "version": "ruleledger_v2",
+        "template_path": "benchmark_template_v2",
+        "hidden_cases_path": "hidden_tests/cases_v2",
+        "scoring_path": "configs/scoring_v2.yaml",
+        "scoring_profile": "starter_quality_v2",
+        "versions": {"ruleledger_v2": 18},
+    }
+    assert checks["pilot_selection"]["data"]["run_ids"] == ["V2C0_r01", "V2C5_proposal_r01"]
 
 
 def test_stage11_validates_synthetic_completed_pilot(

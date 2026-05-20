@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -63,6 +64,7 @@ CATEGORY_WEIGHTS = {
 
 
 def main(cases_dir: Path = CASES_DIR) -> None:
+    cases_dir = _validate_cases_dir(cases_dir)
     cases_dir.mkdir(parents=True, exist_ok=True)
     for stale_file in cases_dir.glob("*.json"):
         stale_file.unlink()
@@ -1048,5 +1050,49 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Generate deterministic RuleLedger v2 hidden cases.")
+    parser.add_argument(
+        "--cases-dir",
+        default=CASES_DIR,
+        type=Path,
+        help="Directory to write generated v2 hidden case JSON files.",
+    )
+    return parser.parse_args(argv)
+
+
+def _validate_cases_dir(cases_dir: Path) -> Path:
+    output_dir = cases_dir.resolve()
+    if output_dir == CASES_DIR.resolve():
+        return output_dir
+    if "cases" not in output_dir.name.lower():
+        raise ValueError(
+            f"{cases_dir}: output directory name must include 'cases' so stale JSON cleanup is scoped safely"
+        )
+    if output_dir.exists() and not output_dir.is_dir():
+        raise ValueError(f"{cases_dir}: output path exists and is not a directory")
+    if output_dir.exists():
+        unexpected = [
+            child.name
+            for child in output_dir.iterdir()
+            if child.is_dir() or child.suffix.lower() != ".json"
+        ]
+        if unexpected:
+            shown = ", ".join(sorted(unexpected)[:5])
+            raise ValueError(
+                f"{cases_dir}: output directory contains non-case entries and will not be cleaned: {shown}"
+            )
+    return output_dir
+
+
+def run(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
+    try:
+        main(args.cases_dir)
+    except ValueError as exc:
+        raise SystemExit(f"error: {exc}") from None
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    raise SystemExit(run())

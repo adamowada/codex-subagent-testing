@@ -20,6 +20,7 @@ CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2.yaml"
 RULELEDGER_V2_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
+RULELEDGER_V2_EXPERIMENT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_experiment.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -145,6 +146,48 @@ def test_ruleledger_v2_pilot_config_expands_to_calibration_runs() -> None:
     assert summary["by_benchmark_version"] == {"ruleledger_v2": 2}
     assert summary["by_root_reasoning"] == {"low": 1, "xhigh": 1}
     assert summary["by_spark_mode"] == {"none": 1, "proposal": 1}
+
+
+def test_ruleledger_v2_full_config_expands_to_readiness_matrix() -> None:
+    config = load_experiment_config(RULELEDGER_V2_EXPERIMENT_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert len(runs) == 18
+    assert runs[0]["run_id"] == "V2C0_r01"
+    assert runs[-1]["run_id"] == "V2C5_proposal_r03"
+    assert summary["by_benchmark_version"] == {"ruleledger_v2": 18}
+    assert summary["by_cell"] == {
+        "V2C0": 3,
+        "V2C1": 3,
+        "V2C2": 3,
+        "V2C3": 3,
+        "V2C4": 3,
+        "V2C5": 3,
+    }
+    assert summary["by_root_reasoning"] == {"high": 3, "low": 3, "medium": 3, "xhigh": 9}
+    assert summary["by_spark_mode"] == {"direct": 3, "none": 12, "proposal": 3}
+    assert summary["by_topology"] == {"flat_spark": 6, "solo": 12}
+    assert {run["benchmark"]["scoring_profile"] for run in runs} == {"starter_quality_v2"}
+    assert {tuple(sorted(run["scoring_weights"].items())) for run in runs} == {
+        (
+            ("hidden_correctness", 0.55),
+            ("hidden_parity", 0.15),
+            ("judge", 0.15),
+            ("minimality", 0.05),
+            ("performance", 0.10),
+        )
+    }
+
+    spark_runs = [run for run in runs if run["spark_mode"] in {"direct", "proposal"}]
+    assert {run["leaf"]["count"] for run in spark_runs} == {6}
+    assert {run["agents"]["max_depth"] for run in spark_runs} == {1}
+    assert {run["agents"]["max_threads"] for run in spark_runs} == {8}
+    assert {
+        run["spark_mode"]: run["spark_mode_config"]["leaf_write_mode"]
+        for run in spark_runs
+        if run["repeat_index"] == 1
+    } == {"direct": "workspace-write", "proposal": "read-only"}
 
 
 def test_c4_topology_resolves_to_eighteen_spark_leaves(config: dict) -> None:
