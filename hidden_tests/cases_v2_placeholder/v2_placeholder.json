@@ -1,0 +1,44 @@
+{
+  "cases": [
+    {
+      "id": "v2.placeholder.normalize_new_fields",
+      "category": "synthetic_v2",
+      "languages": ["typescript", "python"],
+      "operation": "normalize_event",
+      "input": {
+        "raw_event": {
+          "id": "evt_placeholder",
+          "account_id": "acct_placeholder",
+          "type": "payment_succeeded",
+          "timestamp": "2026-01-01T05:00:00-05:00",
+          "effective_at": "2026-01-01T00:00:00Z",
+          "recorded_at": "2026-01-01T10:00:00Z",
+          "sequence": 7,
+          "amount": "10.00",
+          "currency": "usd",
+          "invoice_id": "inv_placeholder",
+          "period_start": "2026-01-01T00:00:00Z",
+          "period_end": "2026-02-01T00:00:00Z"
+        }
+      },
+      "expected": {
+        "ok": true,
+        "value": {
+          "id": "evt_placeholder",
+          "accountId": "acct_placeholder",
+          "type": "payment_succeeded",
+          "timestamp": "2026-01-01T10:00:00.000Z",
+          "effectiveAt": "2026-01-01T00:00:00.000Z",
+          "recordedAt": "2026-01-01T10:00:00.000Z",
+          "sequence": 7,
+          "amountCents": 1000,
+          "currency": "USD",
+          "invoiceId": "inv_placeholder",
+          "periodStart": "2026-01-01T00:00:00.000Z",
+          "periodEnd": "2026-02-01T00:00:00.000Z"
+        }
+      },
+      "points": 1.0
+    }
+  ]
+}

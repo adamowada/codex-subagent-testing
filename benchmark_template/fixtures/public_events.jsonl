@@ -1,0 +1,6 @@
+{"id":"evt_payment_1","account_id":" acct_public ","type":"payment_succeeded","timestamp":"2026-01-03T10:00:00-05:00","amount":"12.00"}
+{"id":"evt_open","account_id":"acct_public","type":"account_opened","timestamp":"2026-01-01T09:00:00Z","plan":"starter"}
+{"id":"evt_usage_1","account_id":"acct_public","type":"usage_recorded","timestamp":"2026-01-02T09:00:00Z","usage":250}
+{"id":"evt_payment_1","account_id":"acct_public","type":"payment_succeeded","timestamp":"2026-01-03T10:00:00-05:00","amount":"12.00"}
+{"id":"evt_coupon","account_id":"acct_public","type":"coupon_applied","timestamp":"2026-01-04T09:00:00Z","coupon":"WELCOME50","expires_at":"2026-01-31T23:59:59Z"}
+{"id":"evt_plan","account_id":"acct_public","type":"plan_changed","timestamp":"2026-01-05T09:00:00Z","plan":"pro"}

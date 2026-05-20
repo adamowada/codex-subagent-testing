@@ -16,6 +16,7 @@ from harness.validation import validate_stage11, write_validation_report
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
+RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -70,6 +71,25 @@ def test_stage11_static_contract_accepts_synthetic_v2_config() -> None:
     assert payload["status"] == "passed"
     assert payload["full_run_count"] == 1
     assert payload["benchmark"]["version"] == "ruleledger_v2"
+
+
+def test_stage11_static_contract_accepts_real_ruleledger_v2_config() -> None:
+    payload = validate_stage11(
+        config_path=RULELEDGER_V2_CONFIG_PATH,
+        repo_root=REPO_ROOT,
+        run_preflight_check=False,
+    )
+
+    assert payload["status"] == "passed"
+    assert payload["full_run_count"] == 1
+    assert payload["benchmark"] == {
+        "version": "ruleledger_v2",
+        "template_path": "benchmark_template_v2",
+        "hidden_cases_path": "hidden_tests/cases_v2_placeholder",
+        "scoring_path": "configs/scoring_v2.yaml",
+        "scoring_profile": "starter_quality_v2",
+        "versions": {"ruleledger_v2": 1},
+    }
 
 
 def test_stage11_validates_synthetic_completed_pilot(
@@ -226,6 +246,29 @@ def test_preflight_loads_synthetic_v2_assets(monkeypatch: pytest.MonkeyPatch) ->
     assert checks["benchmark_template"]["status"] == "passed"
     assert checks["hidden_cases"]["status"] == "passed"
     assert checks["hidden_cases"]["data"]["benchmark"]["hidden_cases_path"].endswith("ruleledger_v2_cases")
+
+
+def test_preflight_loads_real_ruleledger_v2_assets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("harness.preflight._check_tool", lambda name: PreflightCheck(name, "passed", name))
+    monkeypatch.setattr("harness.preflight._check_npm", lambda: PreflightCheck("npm", "passed", "npm"))
+    monkeypatch.setattr(
+        "harness.preflight._check_python_module",
+        lambda name: PreflightCheck("pytest", "passed", name),
+    )
+    monkeypatch.setattr("harness.preflight.resolve_codex_bin", lambda: None)
+
+    payload = run_preflight(
+        config_path=RULELEDGER_V2_CONFIG_PATH,
+        repo_root=REPO_ROOT,
+        require_codex=False,
+    )
+
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["benchmark"]["version"] == "ruleledger_v2"
+    assert checks["benchmark_template"]["status"] == "passed"
+    assert checks["hidden_cases"]["status"] == "passed"
+    assert checks["hidden_cases"]["data"]["benchmark"]["template_path"] == "benchmark_template_v2"
+    assert checks["hidden_cases"]["data"]["benchmark"]["hidden_cases_path"].endswith("cases_v2_placeholder")
 
 
 def test_stage11_flags_preflight_benchmark_mismatch() -> None:

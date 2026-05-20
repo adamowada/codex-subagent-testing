@@ -18,6 +18,7 @@ from harness.matrix import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
+RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -92,6 +93,24 @@ def test_synthetic_v2_config_selects_separate_assets() -> None:
         "scoring_path": "tests/fixtures/stage14/scoring_v2.yaml",
         "scoring_profile": "synthetic_quality_v2",
     }
+
+
+def test_ruleledger_v2_config_selects_real_v2_starter_assets() -> None:
+    config = load_experiment_config(RULELEDGER_V2_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert len(runs) == 1
+    assert runs[0]["run_id"] == "V2C0_r01"
+    assert runs[0]["benchmark"] == {
+        "version": "ruleledger_v2",
+        "template_path": "benchmark_template_v2",
+        "hidden_cases_path": "hidden_tests/cases_v2_placeholder",
+        "scoring_path": "configs/scoring_v2.yaml",
+        "scoring_profile": "starter_quality_v2",
+    }
+    assert summary["by_benchmark_version"] == {"ruleledger_v2": 1}
+    assert summary["benchmark_assets"]["template_path"] == "benchmark_template_v2"
 
 
 def test_c4_topology_resolves_to_eighteen_spark_leaves(config: dict) -> None:

@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "benchmark": {
+    "version": "ruleledger_v2"
+  },
+  "experiment": {
+    "id": "ruleledger_v2_starter",
+    "repeat_count": 1,
+    "seed": 20260520
+  },
+  "parallelism": {
+    "implementation_jobs": 1,
+    "judge_jobs": 1
+  },
+  "timeouts": {
+    "implementation_seconds": 7200,
+    "judge_seconds": 1800
+  },
+  "paths": {
+    "benchmark_template": "benchmark_template_v2",
+    "hidden_cases": "hidden_tests/cases_v2_placeholder",
+    "prompt_templates": {
+      "common": "prompts/task_common.md",
+      "solo": "prompts/task_solo.md",
+      "flat_spark": "prompts/task_flat_spark.md",
+      "depth2_subleads": "prompts/task_depth2_subleads.md",
+      "judge": "prompts/judge.md"
+    },
+    "codex_config_template": "codex_templates/config.toml.j2"
+  },
+  "models": {
+    "gpt55": "gpt-5.5",
+    "spark": "gpt-5.3-codex-spark"
+  },
+  "spark_modes": {},
+  "scoring": {
+    "path": "configs/scoring_v2.yaml"
+  },
+  "judge": {
+    "model": "gpt-5.5",
+    "reasoning": "xhigh",
+    "prompt_template": "judge",
+    "sandbox": "read-only"
+  },
+  "cells": [
+    {
+      "id": "V2C0",
+      "name": "ruleledger_v2_solo",
+      "repeats": 1,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "xhigh"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    }
+  ]
+}
