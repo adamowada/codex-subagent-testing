@@ -16,6 +16,7 @@ from harness.matrix import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
+SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 
 
 @pytest.fixture
@@ -29,6 +30,23 @@ def test_initial_config_expands_to_45_runs(config: dict) -> None:
     assert len(runs) == 45
     assert runs[0]["run_id"] == "C0_r01"
     assert runs[-1]["run_id"] == "C4_proposal_r05"
+
+
+def test_solo_reasoning_config_expands_to_c5_c7_only() -> None:
+    runs = expand_experiment_matrix(load_experiment_config(SOLO_REASONING_CONFIG_PATH))
+
+    assert len(runs) == 15
+    assert runs[0]["run_id"] == "C5_r01"
+    assert runs[-1]["run_id"] == "C7_r05"
+    assert {run["cell_id"] for run in runs} == {"C5", "C6", "C7"}
+    assert {run["topology"] for run in runs} == {"solo"}
+    assert {run["spark_mode"] for run in runs} == {None}
+    assert {run["leaf"] for run in runs} == {None}
+    assert {
+        run["cell_id"]: run["root"]["reasoning"]
+        for run in runs
+        if run["repeat_index"] == 1
+    } == {"C5": "low", "C6": "medium", "C7": "high"}
 
 
 def test_summary_counts_match_initial_matrix(config: dict) -> None:

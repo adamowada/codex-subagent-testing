@@ -5,7 +5,7 @@ from collections import Counter
 import copy
 import json
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -72,6 +72,7 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
         errors.append("experiment.id: expected non-empty string")
     elif not _is_filesystem_safe_id(experiment_id):
         errors.append("experiment.id: expected filesystem-safe identifier")
+    strict_initial_contract = experiment_id == "initial_subagent_topology"
 
     parallelism = _mapping(config, "parallelism", errors)
     _positive_int(parallelism, "implementation_jobs", "parallelism.implementation_jobs", errors)
@@ -156,16 +157,17 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             errors.append(f"{path}.prompt_template: {topology} requires {expected_prompt}")
 
         modes = _cell_spark_modes(cell, path, spark_modes, errors)
-        if cell_id == "C0" and modes:
+        if strict_initial_contract and cell_id == "C0" and modes:
             errors.append(f"{path}.spark_modes: C0 must not define Spark modes")
-        if cell_id in {"C1", "C2", "C3", "C4"} and set(modes) != REQUIRED_SPARK_MODES:
+        if strict_initial_contract and cell_id in {"C1", "C2", "C3", "C4"} and set(modes) != REQUIRED_SPARK_MODES:
             errors.append(f"{path}.spark_modes: {cell_id} must include direct and proposal")
 
         root = _mapping(cell, "root", errors, prefix=path)
         if root.get("model") != INITIAL_GPT55_MODEL:
             errors.append(f"{path}.root.model: expected {INITIAL_GPT55_MODEL}")
         _validate_reasoning(root.get("reasoning"), f"{path}.root.reasoning", errors)
-        _validate_initial_root_reasoning(cell_id, root.get("reasoning"), path, errors)
+        if strict_initial_contract:
+            _validate_initial_root_reasoning(cell_id, root.get("reasoning"), path, errors)
 
         agents = _mapping(cell, "agents", errors, prefix=path)
         max_depth = _positive_int(agents, "max_depth", f"{path}.agents.max_depth", errors, allow_zero=True)
@@ -183,7 +185,7 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             _validate_leaf(leaf, path, errors)
             if leaf_count is not None:
                 breadth += leaf_count
-                if cell_id in {"C1", "C2", "C3"} and leaf_count != 6:
+                if strict_initial_contract and cell_id in {"C1", "C2", "C3"} and leaf_count != 6:
                     errors.append(f"{path}.leaf.count: {cell_id} requires exactly 6 Spark leaves")
         elif topology == "depth2_subleads":
             if max_depth != 2:
@@ -198,7 +200,7 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             )
             _validate_model(subleads.get("model"), f"{path}.subleads.model", errors)
             _validate_reasoning(subleads.get("reasoning"), f"{path}.subleads.reasoning", errors)
-            if cell_id == "C4":
+            if strict_initial_contract and cell_id == "C4":
                 if subleads.get("model") != INITIAL_GPT55_MODEL:
                     errors.append(f"{path}.subleads.model: C4 requires gpt-5.5")
                 if subleads.get("reasoning") != "medium":
@@ -212,24 +214,25 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             if sublead_count is not None and leaves_per_sublead is not None:
                 leaf_total = sublead_count * leaves_per_sublead
                 breadth += sublead_count + leaf_total
-                if cell_id == "C4" and leaf_total != 18:
+                if strict_initial_contract and cell_id == "C4" and leaf_total != 18:
                     errors.append(f"{path}.leaf.count: C4 requires exactly 18 Spark leaves")
 
         if max_threads is not None and max_threads < breadth:
             errors.append(
                 f"{path}.agents.max_threads: expected at least {breadth} for configured breadth"
             )
-        if cell_id == "C4" and max_threads is not None and max_threads < 24:
+        if strict_initial_contract and cell_id == "C4" and max_threads is not None and max_threads < 24:
             errors.append(f"{path}.agents.max_threads: C4 requires at least 24")
 
         if repeats is not None:
             expanded_count += repeats * (len(modes) if modes else 1)
 
-    expected_cells = {"C0", "C1", "C2", "C3", "C4"}
-    if cell_ids and cell_ids != expected_cells:
-        errors.append(f"cells: expected exactly {sorted(expected_cells)}, got {sorted(cell_ids)}")
-    if expanded_count and expanded_count != 45:
-        errors.append(f"cells: expected expansion to 45 implementation runs, got {expanded_count}")
+    if strict_initial_contract:
+        expected_cells = {"C0", "C1", "C2", "C3", "C4"}
+        if cell_ids and cell_ids != expected_cells:
+            errors.append(f"cells: expected exactly {sorted(expected_cells)}, got {sorted(cell_ids)}")
+        if expanded_count and expanded_count != 45:
+            errors.append(f"cells: expected expansion to 45 implementation runs, got {expanded_count}")
 
     if errors:
         raise ExperimentConfigError("\n".join(errors))
@@ -305,6 +308,37 @@ def summarize_matrix(runs: list[Mapping[str, Any]]) -> dict[str, Any]:
         "by_root_model": dict(sorted(by_root_model.items())),
         "by_root_reasoning": dict(sorted(by_root_reasoning.items())),
     }
+
+
+def select_pilot_runs(runs: Sequence[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+    """Choose a small representative smoke-test subset for any valid matrix."""
+
+    if not runs:
+        return []
+
+    selected: list[Mapping[str, Any]] = []
+    selected_ids: set[str] = set()
+
+    def add(run: Mapping[str, Any] | None) -> None:
+        if run is None:
+            return
+        run_id = str(run.get("run_id"))
+        if run_id not in selected_ids:
+            selected.append(run)
+            selected_ids.add(run_id)
+
+    add(next((run for run in runs if run.get("cell_id") == "C0"), None))
+    if not selected:
+        add(runs[0])
+
+    add(next((run for run in runs if run.get("spark_mode") == "proposal"), None))
+    if len(selected) < 2:
+        first_cell = selected[0].get("cell_id") if selected else None
+        add(next((run for run in runs if run.get("cell_id") != first_cell), None))
+    if len(selected) < 2:
+        add(next((run for run in runs if str(run.get("run_id")) not in selected_ids), None))
+
+    return selected[:2]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -457,9 +491,6 @@ def _validate_spark_mode_definitions(
     spark_modes: Mapping[str, Any],
     errors: list[str],
 ) -> None:
-    missing = REQUIRED_SPARK_MODES - set(spark_modes)
-    if missing:
-        errors.append(f"spark_modes: missing modes {sorted(missing)}")
     for mode_name, value in spark_modes.items():
         path = f"spark_modes.{mode_name}"
         if not isinstance(value, Mapping):

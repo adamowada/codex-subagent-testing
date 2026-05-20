@@ -14,6 +14,7 @@ from harness.validation import validate_stage11, write_validation_report
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
+SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 
 
 @pytest.fixture
@@ -40,6 +41,21 @@ def test_stage11_static_contract_validates_matrix_scripts_and_pilot_selection(ru
     assert checks["matrix_contract"]["status"] == "passed"
     assert checks["pilot_selection"]["data"]["run_ids"] == ["C0_r01", "C1_proposal_r01"]
     assert checks["script_contract"]["status"] == "passed"
+
+
+def test_stage11_static_contract_accepts_solo_reasoning_config() -> None:
+    payload = validate_stage11(
+        config_path=SOLO_REASONING_CONFIG_PATH,
+        repo_root=REPO_ROOT,
+        run_preflight_check=False,
+    )
+
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert payload["status"] == "passed"
+    assert payload["full_run_count"] == 15
+    assert payload["selected_run_count"] == 15
+    assert checks["matrix_contract"]["status"] == "passed"
+    assert checks["pilot_selection"]["data"]["run_ids"] == ["C5_r01", "C6_r01"]
 
 
 def test_stage11_validates_synthetic_completed_pilot(

@@ -45,6 +45,7 @@ from harness.matrix import (
     REPO_ROOT,
     expand_experiment_matrix,
     load_experiment_config,
+    select_pilot_runs,
     summarize_matrix,
 )
 from harness.preflight import run_preflight, write_preflight
@@ -371,11 +372,10 @@ def select_runs(
     if not pilot:
         return list(runs)
 
-    c0 = next((run for run in runs if run.get("cell_id") == "C0"), None)
-    c1_proposal = next((run for run in runs if run.get("cell_id") == "C1" and run.get("spark_mode") == "proposal"), None)
-    if c0 is None or c1_proposal is None:
-        raise OrchestrationError("pilot selection requires one C0 run and one C1 proposal run")
-    return [c0, c1_proposal]
+    selected = select_pilot_runs(runs)
+    if not selected:
+        raise OrchestrationError("pilot selection requires at least one configured run")
+    return list(selected)
 
 
 def resolve_experiment_dir(

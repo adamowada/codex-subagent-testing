@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "experiment": {
+    "id": "c5_c7_solo_reasoning",
+    "repeat_count": 5,
+    "seed": 20260520
+  },
+  "parallelism": {
+    "implementation_jobs": 3,
+    "judge_jobs": 2
+  },
+  "timeouts": {
+    "implementation_seconds": 7200,
+    "judge_seconds": 1800
+  },
+  "paths": {
+    "prompt_templates": {
+      "common": "prompts/task_common.md",
+      "solo": "prompts/task_solo.md",
+      "flat_spark": "prompts/task_flat_spark.md",
+      "depth2_subleads": "prompts/task_depth2_subleads.md",
+      "judge": "prompts/judge.md"
+    },
+    "codex_config_template": "codex_templates/config.toml.j2"
+  },
+  "models": {
+    "gpt55": "gpt-5.5",
+    "spark": "gpt-5.3-codex-spark"
+  },
+  "spark_modes": {},
+  "scoring": {
+    "path": "configs/scoring.yaml"
+  },
+  "judge": {
+    "model": "gpt-5.5",
+    "reasoning": "xhigh",
+    "prompt_template": "judge",
+    "sandbox": "read-only"
+  },
+  "cells": [
+    {
+      "id": "C5",
+      "name": "solo_gpt55_low",
+      "repeats": 5,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "low"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "C6",
+      "name": "solo_gpt55_medium",
+      "repeats": 5,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "medium"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "C7",
+      "name": "solo_gpt55_high",
+      "repeats": 5,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "high"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    }
+  ]
+}

@@ -307,6 +307,7 @@ def render_html_report(rows: list[Mapping[str, Any]], aggregate: Mapping[str, An
     token_attribution = (
         aggregate.get("token_attribution", {}) if isinstance(aggregate.get("token_attribution"), Mapping) else {}
     )
+    c4_section = _c4_section(group_items)
 
     sections = [
         _html_document_start(),
@@ -318,7 +319,7 @@ def render_html_report(rows: list[Mapping[str, Any]], aggregate: Mapping[str, An
         _experiment_matrix_section(group_items),
         _results_section(group_items, aggregate),
         _direct_proposal_section(aggregate),
-        _c4_section(group_items),
+        c4_section,
         _token_attribution_section(token_attribution),
         _limitations_section(),
         _appendix_section(sorted_rows),
@@ -639,7 +640,7 @@ def _abstract_section(aggregate: Mapping[str, Any], top_group: Any) -> str:
         )
     return f"""<section>
   <h2>Abstract</h2>
-  <p>This report summarizes {int(_float(aggregate.get('total_runs')))} measured Codex implementation runs on the mixed-language RuleLedger benchmark. It compares solo GPT-5.5, flat Spark-assisted topologies, and a depth-2 C4 stress topology using a primary metric of implementation quality per GPT-5.5 implementation token.</p>
+  <p>This report summarizes {int(_float(aggregate.get('total_runs')))} measured Codex implementation runs on the mixed-language RuleLedger benchmark. It compares the configured Codex topologies using a primary metric of implementation quality per GPT-5.5 implementation token.</p>
   <p>{top_sentence} Partial and failed runs remain visible because they are part of the measurement.</p>
 </section>"""
 
@@ -741,6 +742,9 @@ def _direct_proposal_section(aggregate: Mapping[str, Any]) -> str:
 
 def _c4_section(group_items: list[dict[str, Any]]) -> str:
     c4_items = [item for item in group_items if str(item.get("label", "")).startswith("C4")]
+    if not c4_items:
+        return ""
+
     c4_rows = []
     for item in c4_items:
         bucket = item["bucket"]
@@ -804,7 +808,7 @@ def _limitations_section() -> str:
     return """<section>
   <h2>Limitations</h2>
   <p>The benchmark is contrived but structured, so results should be interpreted as evidence about this task family rather than all coding work. Five repeats per group may still leave meaningful variance. GPT-5.5 judge scores are a useful blind review signal but not ground truth.</p>
-  <p>Token attribution can be best effort for mixed-agent runs, wall-clock time depends on local and service conditions, and C4 is deliberately outside normal default guidance.</p>
+  <p>Token attribution can be best effort for mixed-agent runs, and wall-clock time depends on local and service conditions. Coordination-heavy cells should be interpreted as stress tests rather than default deployment guidance.</p>
 </section>"""
 
 

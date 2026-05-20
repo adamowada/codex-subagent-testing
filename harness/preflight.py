@@ -46,9 +46,12 @@ def run_preflight(
     checks: list[PreflightCheck] = []
     config: dict[str, Any] | None = None
     runs: list[dict[str, Any]] = []
+    config_file = Path(config_path)
+    if not config_file.is_absolute():
+        config_file = root / config_file
 
     checks.append(_check_path(root / "benchmark_template", "benchmark_template", directory=True))
-    checks.append(_check_path(root / "configs" / "initial_experiment.yaml", "initial_config"))
+    checks.append(_check_path(config_file, "experiment_config_file"))
     checks.append(_check_path(root / "hidden_tests" / "cases" / "manifest.json", "hidden_manifest"))
     checks.append(_check_path(root / "prompts", "prompts", directory=True))
     checks.append(_check_path(root / "codex_templates", "codex_templates", directory=True))
@@ -68,7 +71,7 @@ def run_preflight(
     checks.append(_check_python_module("pytest"))
 
     try:
-        config = load_experiment_config(config_path)
+        config = load_experiment_config(config_file)
         runs = expand_experiment_matrix(config)
     except Exception as exc:
         checks.append(PreflightCheck("experiment_config", "failed", str(exc)))

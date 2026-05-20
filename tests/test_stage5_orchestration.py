@@ -25,6 +25,7 @@ from harness.report_data import write_results_outputs
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
+SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 
 
 @pytest.fixture
@@ -41,6 +42,14 @@ def test_pilot_selection_chooses_c0_and_c1_proposal(runs: list[dict]) -> None:
     selected = select_runs(runs, pilot=True)
 
     assert [run["run_id"] for run in selected] == ["C0_r01", "C1_proposal_r01"]
+
+
+def test_pilot_selection_handles_solo_only_matrix() -> None:
+    solo_runs = expand_experiment_matrix(load_experiment_config(SOLO_REASONING_CONFIG_PATH))
+
+    selected = select_runs(solo_runs, pilot=True)
+
+    assert [run["run_id"] for run in selected] == ["C5_r01", "C6_r01"]
 
 
 def test_run_id_selection_preserves_matrix_order(runs: list[dict]) -> None:

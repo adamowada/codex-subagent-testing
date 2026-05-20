@@ -16,6 +16,7 @@ def test_report_contains_required_sections_and_primary_ranking(
         _run("C0_r01", "C0", None, quality=0.9, gpt55_tokens=900, topology="solo"),
         _run("C1_direct_r01", "C1", "direct", quality=0.8, gpt55_tokens=400),
         _run("C1_proposal_r01", "C1", "proposal", quality=0.7, gpt55_tokens=700),
+        _run("C4_direct_r01", "C4", "direct", quality=0.5, gpt55_tokens=1000),
     ]
     for run in runs:
         _write_run_artifacts(tmp_path, run)
@@ -47,6 +48,40 @@ def test_report_contains_required_sections_and_primary_ranking(
         assert section in html
     assert "C1 direct" in html
     assert "quality_per_gpt55_impl_token" in html
+
+
+def test_report_omits_c4_section_when_c4_is_not_selected() -> None:
+    runs = [
+        _run("C5_r01", "C5", None, quality=0.7, gpt55_tokens=500, topology="solo"),
+        _run("C6_r01", "C6", None, quality=0.8, gpt55_tokens=600, topology="solo"),
+    ]
+    rows = []
+    for run in runs:
+        rows.append(
+            {
+                "run_id": run["run_id"],
+                "cell_id": run["cell_id"],
+                "cell_name": run["cell_name"],
+                "topology": run["topology"],
+                "spark_mode": "none",
+                "repeat_index": run["repeat_index"],
+                "quality_score": run["quality"],
+                "hidden_tests": run["quality"],
+                "gpt55_implementation_tokens": run["gpt55_tokens"],
+                "quality_per_gpt55_impl_token": float(run["quality"]) / float(run["gpt55_tokens"]),
+                "implementation_elapsed_seconds": 120.0,
+                "failure_phase": "",
+                "artifact_status": "complete",
+                "root_model": "gpt-5.5",
+                "root_reasoning": run["root"]["reasoning"],
+                "max_depth": 0,
+                "max_threads": 1,
+            }
+        )
+
+    html = render_html_report(rows, aggregate_rows(rows))
+
+    assert "C4 Stress-Test Analysis" not in html
 
 
 def test_missing_score_rows_remain_visible_with_attribution_warnings(tmp_path: Path) -> None:
