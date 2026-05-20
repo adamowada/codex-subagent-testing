@@ -1,0 +1,15 @@
+{
+  "cases": [
+    {
+      "id": "v2.synthetic.case",
+      "category": "synthetic_v2",
+      "languages": ["python"],
+      "operation": "parse_line",
+      "input": "{\"type\":\"payment\",\"account_id\":\"acct_v2\"}",
+      "expected": {
+        "ok": true
+      },
+      "points": 1.0
+    }
+  ]
+}

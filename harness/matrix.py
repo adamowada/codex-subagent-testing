@@ -15,6 +15,9 @@ VALID_REASONING = {"none", "minimal", "low", "medium", "high", "xhigh"}
 INITIAL_SPARK_MODEL = "gpt-5.3-codex-spark"
 INITIAL_GPT55_MODEL = "gpt-5.5"
 INITIAL_SPARK_REASONING = "xhigh"
+DEFAULT_BENCHMARK_VERSION = "ruleledger_v1"
+DEFAULT_BENCHMARK_TEMPLATE_PATH = "benchmark_template"
+DEFAULT_HIDDEN_CASES_PATH = "hidden_tests/cases"
 SCORING_COMPONENTS = {"public_tests", "hidden_tests", "judge", "typecheck", "parity", "minimality"}
 REQUIRED_PROMPT_TEMPLATE_KEYS = {
     "common",
@@ -34,11 +37,11 @@ def load_experiment_config(path: str | Path) -> dict[str, Any]:
     """Load an experiment config and resolve referenced scoring config."""
 
     config_path = Path(path)
-    config = _load_mapping_file(config_path)
+    config = _with_benchmark_defaults(_load_mapping_file(config_path))
     scoring = config.get("scoring")
 
     if isinstance(scoring, Mapping) and isinstance(scoring.get("path"), str):
-        scoring_path = _repo_path(scoring["path"])
+        scoring_path = _repo_path(scoring["path"], "scoring.path")
         scoring_config = _load_mapping_file(scoring_path)
         resolved_scoring = copy.deepcopy(scoring_config)
         for key, value in scoring.items():
@@ -50,6 +53,21 @@ def load_experiment_config(path: str | Path) -> dict[str, Any]:
         config["scoring"] = resolved_scoring
 
     return config
+
+
+def benchmark_metadata(config: Mapping[str, Any]) -> dict[str, str]:
+    """Return the normalized benchmark asset selection for a resolved config."""
+
+    benchmark = config.get("benchmark") if isinstance(config.get("benchmark"), Mapping) else {}
+    paths = config.get("paths") if isinstance(config.get("paths"), Mapping) else {}
+    scoring = config.get("scoring") if isinstance(config.get("scoring"), Mapping) else {}
+    return {
+        "version": str(benchmark.get("version") or DEFAULT_BENCHMARK_VERSION),
+        "template_path": str(paths.get("benchmark_template") or DEFAULT_BENCHMARK_TEMPLATE_PATH),
+        "hidden_cases_path": str(paths.get("hidden_cases") or DEFAULT_HIDDEN_CASES_PATH),
+        "scoring_path": str(scoring.get("path") or ""),
+        "scoring_profile": str(scoring.get("profile") or ""),
+    }
 
 
 def validate_experiment_config(config: Mapping[str, Any]) -> None:
@@ -74,6 +92,13 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
         errors.append("experiment.id: expected filesystem-safe identifier")
     strict_initial_contract = experiment_id == "initial_subagent_topology"
 
+    benchmark = _mapping(config, "benchmark", errors)
+    benchmark_version = benchmark.get("version")
+    if not isinstance(benchmark_version, str) or not benchmark_version:
+        errors.append("benchmark.version: expected non-empty string")
+    elif not _is_filesystem_safe_id(benchmark_version):
+        errors.append("benchmark.version: expected filesystem-safe identifier")
+
     parallelism = _mapping(config, "parallelism", errors)
     _positive_int(parallelism, "implementation_jobs", "parallelism.implementation_jobs", errors)
     _positive_int(parallelism, "judge_jobs", "parallelism.judge_jobs", errors)
@@ -83,6 +108,8 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
     _positive_int(timeouts, "judge_seconds", "timeouts.judge_seconds", errors)
 
     paths = _mapping(config, "paths", errors)
+    _relative_path(paths.get("benchmark_template"), "paths.benchmark_template", errors)
+    _relative_path(paths.get("hidden_cases"), "paths.hidden_cases", errors)
     prompt_templates = _mapping(paths, "prompt_templates", errors, prefix="paths")
     _validate_prompt_templates(prompt_templates, errors)
     _relative_path(paths.get("codex_config_template"), "paths.codex_config_template", errors)
@@ -249,6 +276,7 @@ def expand_experiment_matrix(config: Mapping[str, Any]) -> list[dict[str, Any]]:
     scoring = config["scoring"]
     scoring_weights = scoring["weights"]
     scoring_minimality = scoring.get("minimality", {})
+    benchmark = benchmark_metadata(config)
     timeouts = config["timeouts"]
     judge = config["judge"]
 
@@ -285,6 +313,7 @@ def expand_experiment_matrix(config: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "judge_prompt_template_path": prompt_templates[judge["prompt_template"]],
                     "scoring_weights": copy.deepcopy(scoring_weights),
                     "scoring_minimality": copy.deepcopy(scoring_minimality),
+                    "benchmark": copy.deepcopy(benchmark),
                 }
                 runs.append(record)
 
@@ -299,9 +328,12 @@ def summarize_matrix(runs: list[Mapping[str, Any]]) -> dict[str, Any]:
     by_topology = Counter(str(run["topology"]) for run in runs)
     by_root_model = Counter(str(run["root"]["model"]) for run in runs)
     by_root_reasoning = Counter(str(run["root"]["reasoning"]) for run in runs)
+    by_benchmark_version = Counter(_run_benchmark_version(run) for run in runs)
 
     return {
         "total_runs": len(runs),
+        "by_benchmark_version": dict(sorted(by_benchmark_version.items())),
+        "benchmark_assets": _run_benchmark_summary(runs),
         "by_cell": dict(sorted(by_cell.items())),
         "by_spark_mode": dict(sorted(by_mode.items())),
         "by_topology": dict(sorted(by_topology.items())),
@@ -395,10 +427,31 @@ def _load_mapping_file(path: Path) -> dict[str, Any]:
     return loaded
 
 
-def _repo_path(path_value: str) -> Path:
+def _with_benchmark_defaults(config: Mapping[str, Any]) -> dict[str, Any]:
+    updated = copy.deepcopy(dict(config))
+
+    if "benchmark" not in updated:
+        updated["benchmark"] = {"version": DEFAULT_BENCHMARK_VERSION}
+    elif isinstance(updated.get("benchmark"), Mapping):
+        benchmark = dict(updated["benchmark"])
+        benchmark.setdefault("version", DEFAULT_BENCHMARK_VERSION)
+        updated["benchmark"] = benchmark
+
+    if "paths" not in updated:
+        updated["paths"] = {}
+    if isinstance(updated.get("paths"), Mapping):
+        paths = dict(updated["paths"])
+        paths.setdefault("benchmark_template", DEFAULT_BENCHMARK_TEMPLATE_PATH)
+        paths.setdefault("hidden_cases", DEFAULT_HIDDEN_CASES_PATH)
+        updated["paths"] = paths
+
+    return updated
+
+
+def _repo_path(path_value: str, field: str) -> Path:
     path = Path(path_value)
-    if path.is_absolute():
-        return path
+    if path.is_absolute() or ".." in path.parts:
+        raise ExperimentConfigError(f"{field}: expected repository-relative path without parent traversal")
     return REPO_ROOT / path
 
 
@@ -513,6 +566,11 @@ def _validate_spark_mode_definitions(
 
 
 def _validate_scoring(scoring: Mapping[str, Any], errors: list[str]) -> None:
+    _relative_path(scoring.get("path"), "scoring.path", errors)
+    profile = scoring.get("profile")
+    if not isinstance(profile, str) or not profile:
+        errors.append("scoring.profile: expected non-empty string")
+
     weights = scoring.get("weights")
     if not isinstance(weights, Mapping):
         errors.append("scoring.weights: expected object")
@@ -640,6 +698,34 @@ def _expanded_leaf(cell: Mapping[str, Any]) -> dict[str, Any] | None:
     if "count" not in expanded and isinstance(subleads, Mapping):
         expanded["count"] = int(subleads["count"]) * int(subleads["leaves_per_sublead"])
     return expanded
+
+
+def _run_benchmark_version(run: Mapping[str, Any]) -> str:
+    benchmark = run.get("benchmark")
+    if isinstance(benchmark, Mapping):
+        value = benchmark.get("version")
+        if isinstance(value, str) and value:
+            return value
+    return DEFAULT_BENCHMARK_VERSION
+
+
+def _run_benchmark_summary(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    keys = ("version", "template_path", "hidden_cases_path", "scoring_path", "scoring_profile")
+    values: dict[str, list[str]] = {key: [] for key in keys}
+    for run in runs:
+        benchmark = run.get("benchmark")
+        if not isinstance(benchmark, Mapping):
+            continue
+        for key in keys:
+            value = benchmark.get(key)
+            if isinstance(value, str) and value:
+                values[key].append(value)
+
+    summary: dict[str, Any] = {}
+    for key in keys:
+        unique = sorted(set(values[key]))
+        summary[key] = unique[0] if len(unique) == 1 else "mixed" if unique else ""
+    return summary
 
 
 def _run_id(cell_id: str, mode: str | None, repeat_index: int) -> str:

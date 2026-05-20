@@ -18,7 +18,9 @@ from harness.artifacts import (
     validate_run_metadata,
 )
 from harness.matrix import (
+    DEFAULT_HIDDEN_CASES_PATH,
     REPO_ROOT,
+    benchmark_metadata,
     expand_experiment_matrix,
     load_experiment_config,
     select_pilot_runs,
@@ -233,12 +235,22 @@ def _preflight_check(
 
     status = result.get("status")
     details = f"preflight status: {status}"
+    expected_benchmark: dict[str, Any] | None = None
+    try:
+        expected_benchmark = benchmark_metadata(load_experiment_config(config_path))
+    except Exception:
+        expected_benchmark = None
+    actual_benchmark = result.get("benchmark")
     data = {
         "status": status,
+        "benchmark": actual_benchmark,
+        "expected_benchmark": expected_benchmark,
         "codex_bin": result.get("codex_bin"),
         "failed_checks": _check_names(result, "failed"),
         "warning_checks": _check_names(result, "warning"),
     }
+    if expected_benchmark is not None and actual_benchmark != expected_benchmark:
+        return _failed("preflight", "preflight benchmark metadata does not match selected config", data)
     if status == "failed":
         return _failed("preflight", details, data)
     if status == "warning":
@@ -281,6 +293,9 @@ def _experiment_metadata_check(
         count = metadata.get("selected_run_count")
         if count != len(selected_runs):
             errors.append(f"experiment_metadata.selected_run_count expected {len(selected_runs)}, got {count}")
+        expected_benchmark = benchmark_metadata(config)
+        if metadata.get("benchmark") != expected_benchmark:
+            errors.append("experiment_metadata.benchmark does not match selected config")
 
     if errors:
         return _failed("experiment_metadata", _join_errors(errors), {"error_count": len(errors)})
@@ -332,11 +347,17 @@ def _hidden_isolation_check(
     repo_root: Path,
 ) -> Stage11Check:
     errors: list[str] = []
-    hidden_index = _hidden_case_index(repo_root / "hidden_tests" / "cases")
+    hidden_indexes: dict[str, dict[str, Any]] = {}
     for run in selected_runs:
         run_id = str(run["run_id"])
         run_dir = experiment_dir / "runs" / run_id
         worktree = _run_worktree_path(run_dir)
+        hidden_cases_path = _run_hidden_cases_path(run)
+        cases_dir = _resolve_path(hidden_cases_path, repo_root)
+        if not cases_dir.is_dir():
+            errors.append(f"{run_id}: selected hidden cases directory does not exist: {cases_dir}")
+            continue
+        hidden_index = hidden_indexes.setdefault(str(cases_dir), _hidden_case_index(cases_dir))
         if not worktree.exists():
             errors.append(f"{run_id}: missing implementation worktree")
             continue
@@ -424,6 +445,9 @@ def _report_outputs_check(experiment_dir: Path, selected_runs: Sequence[Mapping[
     warnings: list[str] = []
     aggregate = _read_json(experiment_dir / "results" / "aggregate.json")
     if aggregate:
+        expected_benchmark = _benchmark_summary(selected_runs)
+        if aggregate.get("benchmark") != expected_benchmark:
+            errors.append("aggregate benchmark metadata does not match selected runs")
         if aggregate.get("primary_metric") != PRIMARY_METRIC:
             errors.append(f"aggregate primary_metric expected {PRIMARY_METRIC!r}")
         if aggregate.get("total_runs") != len(selected_runs):
@@ -558,6 +582,7 @@ def _payload(
         "repo_root": str(root),
         "config_path": str(config_path),
         "experiment_dir": str(experiment_dir) if experiment_dir is not None else None,
+        "benchmark": _benchmark_summary(selected or all_runs),
         "full_run_count": len(all_runs),
         "selected_run_count": len(selected),
         "checks": [check.to_dict() for check in checks],
@@ -581,6 +606,43 @@ def _resolve_path(path_value: str | Path, repo_root: Path) -> Path:
     if path.is_absolute():
         return path
     return repo_root / path
+
+
+def _run_hidden_cases_path(run: Mapping[str, Any]) -> str:
+    benchmark = run.get("benchmark")
+    if isinstance(benchmark, Mapping):
+        value = benchmark.get("hidden_cases_path")
+        if isinstance(value, str) and value:
+            return value
+    return DEFAULT_HIDDEN_CASES_PATH
+
+
+def _benchmark_summary(runs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    values: dict[str, list[str]] = {
+        "version": [],
+        "template_path": [],
+        "hidden_cases_path": [],
+        "scoring_path": [],
+        "scoring_profile": [],
+    }
+    for run in runs:
+        benchmark = run.get("benchmark")
+        if not isinstance(benchmark, Mapping):
+            continue
+        for key in values:
+            value = benchmark.get(key)
+            if isinstance(value, str):
+                values[key].append(value)
+
+    summary: dict[str, Any] = {}
+    for key, items in values.items():
+        unique = sorted(set(items))
+        summary[key] = unique[0] if len(unique) == 1 else "mixed" if unique else ""
+    summary["versions"] = {
+        version: values["version"].count(version)
+        for version in sorted(set(values["version"]))
+    }
+    return summary
 
 
 def _read_json(path: Path) -> dict[str, Any]:

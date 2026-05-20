@@ -29,6 +29,7 @@ def test_report_contains_required_sections_and_primary_ranking(
     pdf_bytes = Path(outputs["report_pdf"]).read_bytes()
 
     assert aggregate["schema_version"] == 2
+    assert aggregate["benchmark"]["version"] == "ruleledger_v1"
     assert aggregate["rankings"]["primary_by_run_group"][0]["group_id"] == "C1:direct"
     assert aggregate["direct_proposal_deltas"]["C1"]["direct_minus_proposal"]["quality_mean"] == pytest.approx(0.1)
     assert aggregate["report_generation"]["pdf"]["renderer"] == "minimal"
@@ -47,6 +48,7 @@ def test_report_contains_required_sections_and_primary_ranking(
     ]:
         assert section in html
     assert "C1 direct" in html
+    assert "ruleledger_v1" in html
     assert "quality_per_gpt55_impl_token" in html
 
 

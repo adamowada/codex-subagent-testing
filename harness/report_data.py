@@ -12,6 +12,12 @@ from statistics import mean, median, stdev
 import subprocess
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
+from harness.matrix import (
+    DEFAULT_BENCHMARK_TEMPLATE_PATH,
+    DEFAULT_BENCHMARK_VERSION,
+    DEFAULT_HIDDEN_CASES_PATH,
+)
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PRIMARY_METRIC = "quality_per_gpt55_impl_token"
@@ -23,6 +29,11 @@ RESULT_COLUMNS = [
     "topology",
     "spark_mode",
     "repeat_index",
+    "benchmark_version",
+    "benchmark_template_path",
+    "hidden_cases_path",
+    "scoring_path",
+    "scoring_profile",
     "status",
     "quality_score",
     "public_tests",
@@ -68,6 +79,7 @@ APPENDIX_COLUMNS = [
     "cell_id",
     "spark_mode",
     "repeat_index",
+    "benchmark_version",
     "status",
     "quality_score",
     "hidden_tests",
@@ -103,6 +115,7 @@ def collect_result_rows(experiment_dir: str | Path, runs: Iterable[Mapping[str, 
         leaf_config = run.get("leaf") if isinstance(run.get("leaf"), Mapping) else {}
         sublead_config = run.get("subleads") if isinstance(run.get("subleads"), Mapping) else {}
         agent_config = run.get("agents") if isinstance(run.get("agents"), Mapping) else {}
+        benchmark = _run_benchmark_metadata(run)
         usage_warnings = _string_list(usage.get("warnings"))
         score_warnings = _string_list(score.get("warnings"))
         rows.append(
@@ -113,6 +126,11 @@ def collect_result_rows(experiment_dir: str | Path, runs: Iterable[Mapping[str, 
                 "topology": run.get("topology"),
                 "spark_mode": run.get("spark_mode") or "none",
                 "repeat_index": run.get("repeat_index"),
+                "benchmark_version": benchmark["version"],
+                "benchmark_template_path": benchmark["template_path"],
+                "hidden_cases_path": benchmark["hidden_cases_path"],
+                "scoring_path": benchmark["scoring_path"],
+                "scoring_profile": benchmark["scoring_profile"],
                 "status": score.get("status", "missing_score"),
                 "quality_score": score.get("quality_score", 0.0),
                 "public_tests": components.get("public_tests", 0.0),
@@ -228,6 +246,7 @@ def aggregate_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "schema_version": 2,
         "generated_at": _utc_now(),
         "primary_metric": PRIMARY_METRIC,
+        "benchmark": _benchmark_summary(rows),
         "total_runs": len(rows),
         "by_cell": by_cell,
         "by_spark_mode": by_spark_mode,
@@ -314,7 +333,7 @@ def render_html_report(rows: list[Mapping[str, Any]], aggregate: Mapping[str, An
         "<main>",
         _title_section(aggregate),
         _abstract_section(aggregate, top_group),
-        _methods_section(),
+        _methods_section(aggregate),
         _benchmark_task_section(),
         _experiment_matrix_section(group_items),
         _results_section(group_items, aggregate),
@@ -386,6 +405,8 @@ def _aggregate_bucket(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "cell_name": _common_value(rows, "cell_name"),
         "topology": _common_value(rows, "topology"),
         "spark_mode": _common_value(rows, "spark_mode"),
+        "benchmark_version": _common_value(rows, "benchmark_version"),
+        "scoring_profile": _common_value(rows, "scoring_profile"),
         "root_model": _common_value(rows, "root_model"),
         "root_reasoning": _common_value(rows, "root_reasoning"),
         "leaf_model": _common_value(rows, "leaf_model"),
@@ -612,6 +633,9 @@ def _html_document_start() -> str:
 
 def _title_section(aggregate: Mapping[str, Any]) -> str:
     top = _top_primary(aggregate)
+    benchmark = aggregate.get("benchmark") if isinstance(aggregate.get("benchmark"), Mapping) else {}
+    benchmark_version = benchmark.get("version") or "unknown"
+    scoring_profile = benchmark.get("scoring_profile") or "unknown"
     top_text = "No primary ranking is available yet."
     if top:
         top_text = (
@@ -620,9 +644,11 @@ def _title_section(aggregate: Mapping[str, Any]) -> str:
         )
     return f"""<section>
   <h1>Codex Subagent Topology Benchmark</h1>
-  <p class="lede">Quality, token efficiency, wall-clock time, and failure behavior across Codex subagent topologies.</p>
+  <p class="lede">Quality, token efficiency, wall-clock time, and failure behavior across Codex subagent topologies on benchmark {_escape(str(benchmark_version))}.</p>
   <div class="kpis">
     <div class="kpi"><span class="kpi-label">Runs</span><span class="kpi-value">{_escape(str(aggregate.get('total_runs', 0)))}</span></div>
+    <div class="kpi"><span class="kpi-label">Benchmark</span><span class="kpi-value">{_escape(str(benchmark_version))}</span></div>
+    <div class="kpi"><span class="kpi-label">Scoring</span><span class="kpi-value">{_escape(str(scoring_profile))}</span></div>
     <div class="kpi"><span class="kpi-label">Failure Rate</span><span class="kpi-value">{_fmt_percent(aggregate.get('failure_rate'))}</span></div>
     <div class="kpi"><span class="kpi-label">Primary Metric</span><span class="kpi-value">GPT-5.5 Eff.</span></div>
     <div class="kpi"><span class="kpi-label">Generated</span><span class="kpi-value">{_escape(str(aggregate.get('generated_at', '')))}</span></div>
@@ -645,10 +671,16 @@ def _abstract_section(aggregate: Mapping[str, Any], top_group: Any) -> str:
 </section>"""
 
 
-def _methods_section() -> str:
-    return """<section>
+def _methods_section(aggregate: Mapping[str, Any]) -> str:
+    benchmark = aggregate.get("benchmark") if isinstance(aggregate.get("benchmark"), Mapping) else {}
+    template_path = benchmark.get("template_path") or "unknown"
+    hidden_cases_path = benchmark.get("hidden_cases_path") or "unknown"
+    scoring_path = benchmark.get("scoring_path") or "unknown"
+    scoring_profile = benchmark.get("scoring_profile") or "unknown"
+    return f"""<section>
   <h2>Methods</h2>
   <p>Each measured run starts from the same frozen starter project and writes artifacts into a run-specific directory. Implementation and judge runs are launched through <code>codex exec --json</code>, preserving JSONL events, stderr logs, prompts, rendered config, diffs, test logs, judge output, usage summaries, metadata, and scores.</p>
+  <p>Selected assets: template <code>{_escape(str(template_path))}</code>, hidden cases <code>{_escape(str(hidden_cases_path))}</code>, scoring profile <code>{_escape(str(scoring_profile))}</code> from <code>{_escape(str(scoring_path))}</code>.</p>
   <p>Hidden tests stay outside implementation workspaces and are not copied into prompts, worktrees, report rows, or appendices. Scoring is computed before this report from configured component weights, and this report consumes <code>score.json</code> plus <code>usage.json</code> rather than reparsing raw logs.</p>
 </section>"""
 
@@ -909,6 +941,35 @@ def _common_value(rows: Sequence[Mapping[str, Any]], key: str) -> Any:
     return "mixed"
 
 
+def _run_benchmark_metadata(run: Mapping[str, Any]) -> dict[str, str]:
+    benchmark = run.get("benchmark") if isinstance(run.get("benchmark"), Mapping) else {}
+    return {
+        "version": str(benchmark.get("version") or DEFAULT_BENCHMARK_VERSION),
+        "template_path": str(benchmark.get("template_path") or DEFAULT_BENCHMARK_TEMPLATE_PATH),
+        "hidden_cases_path": str(benchmark.get("hidden_cases_path") or DEFAULT_HIDDEN_CASES_PATH),
+        "scoring_path": str(benchmark.get("scoring_path") or ""),
+        "scoring_profile": str(benchmark.get("scoring_profile") or ""),
+    }
+
+
+def _benchmark_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    key_map = {
+        "version": "benchmark_version",
+        "template_path": "benchmark_template_path",
+        "hidden_cases_path": "hidden_cases_path",
+        "scoring_path": "scoring_path",
+        "scoring_profile": "scoring_profile",
+    }
+    summary: dict[str, Any] = {}
+    for output_key, row_key in key_map.items():
+        values = [str(row.get(row_key)) for row in rows if row.get(row_key) not in {None, ""}]
+        unique = sorted(set(values))
+        summary[output_key] = unique[0] if len(unique) == 1 else "mixed" if unique else ""
+    versions = [str(row.get("benchmark_version")) for row in rows if row.get("benchmark_version") not in {None, ""}]
+    summary["versions"] = {version: versions.count(version) for version in sorted(set(versions))}
+    return summary
+
+
 def _mean_metric(rows: Sequence[Mapping[str, Any]], key: str) -> float:
     values = [_float(row.get(key)) for row in rows]
     return round(mean(values), 6) if values else 0.0
@@ -1124,8 +1185,11 @@ def _pdf_escape(text: str) -> str:
 
 
 def _pdf_lines(rows: list[Mapping[str, Any]], aggregate: Mapping[str, Any]) -> list[str]:
+    benchmark = aggregate.get("benchmark") if isinstance(aggregate.get("benchmark"), Mapping) else {}
     lines = [
         "Codex Subagent Experiment Report",
+        f"Benchmark: {benchmark.get('version', 'unknown')}",
+        f"Scoring profile: {benchmark.get('scoring_profile', 'unknown')}",
         f"Total runs: {aggregate.get('total_runs', 0)}",
         f"Failure rate: {aggregate.get('failure_rate', 0.0)}",
         f"Primary metric: {PRIMARY_METRIC}",

@@ -14,6 +14,7 @@ from harness.artifacts import (
     validate_experiment_outputs,
     validate_hidden_artifact_privacy,
     validate_phase_artifacts,
+    validate_run_metadata,
 )
 from harness.matrix import expand_experiment_matrix, load_experiment_config
 from harness.orchestrator import (
@@ -189,6 +190,31 @@ def test_experiment_metadata_writes_stable_aliases_and_resume_reads_them(
     assert (tmp_path / "experiment_metadata.json").exists()
     assert (tmp_path / "experiment-metadata.json").exists()
     assert (tmp_path / "resolved_config.json").exists()
+    metadata = json.loads((tmp_path / "experiment_metadata.json").read_text(encoding="utf-8"))
+    assert metadata["benchmark"]["version"] == "ruleledger_v1"
+
+
+def test_run_metadata_validation_accepts_defaulted_benchmark_for_legacy_run(tmp_path: Path) -> None:
+    run = {"run_id": "legacy_r01"}
+    (tmp_path / "metadata.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "run_id": "legacy_r01",
+                "run": run,
+                "benchmark": {
+                    "version": "ruleledger_v1",
+                    "template_path": "benchmark_template",
+                    "hidden_cases_path": "hidden_tests/cases",
+                    "scoring_path": "",
+                    "scoring_profile": "",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert validate_run_metadata(tmp_path, run) == []
 
 
 def test_experiment_outputs_validate_after_report_generation(

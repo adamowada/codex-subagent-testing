@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
   "benchmark": {
-    "version": "ruleledger_v1"
+    "version": "ruleledger_v2"
   },
   "experiment": {
-    "id": "c5_c7_solo_reasoning",
-    "repeat_count": 5,
+    "id": "synthetic_ruleledger_v2",
+    "repeat_count": 1,
     "seed": 20260520
   },
   "parallelism": {
-    "implementation_jobs": 3,
-    "judge_jobs": 2
+    "implementation_jobs": 1,
+    "judge_jobs": 1
   },
   "timeouts": {
     "implementation_seconds": 7200,
     "judge_seconds": 1800
   },
   "paths": {
-    "benchmark_template": "benchmark_template",
-    "hidden_cases": "hidden_tests/cases",
+    "benchmark_template": "tests/fixtures/stage14/ruleledger_v2_template",
+    "hidden_cases": "tests/fixtures/stage14/ruleledger_v2_cases",
     "prompt_templates": {
       "common": "prompts/task_common.md",
       "solo": "prompts/task_solo.md",
@@ -34,7 +34,7 @@
   },
   "spark_modes": {},
   "scoring": {
-    "path": "configs/scoring.yaml"
+    "path": "tests/fixtures/stage14/scoring_v2.yaml"
   },
   "judge": {
     "model": "gpt-5.5",
@@ -44,47 +44,15 @@
   },
   "cells": [
     {
-      "id": "C5",
-      "name": "solo_gpt55_low",
-      "repeats": 5,
+      "id": "V2C0",
+      "name": "synthetic_v2_solo",
+      "repeats": 1,
       "spark_modes": [],
       "topology": "solo",
       "prompt_template": "solo",
       "root": {
         "model": "gpt-5.5",
-        "reasoning": "low"
-      },
-      "agents": {
-        "max_depth": 0,
-        "max_threads": 1
-      }
-    },
-    {
-      "id": "C6",
-      "name": "solo_gpt55_medium",
-      "repeats": 5,
-      "spark_modes": [],
-      "topology": "solo",
-      "prompt_template": "solo",
-      "root": {
-        "model": "gpt-5.5",
-        "reasoning": "medium"
-      },
-      "agents": {
-        "max_depth": 0,
-        "max_threads": 1
-      }
-    },
-    {
-      "id": "C7",
-      "name": "solo_gpt55_high",
-      "repeats": 5,
-      "spark_modes": [],
-      "topology": "solo",
-      "prompt_template": "solo",
-      "root": {
-        "model": "gpt-5.5",
-        "reasoning": "high"
+        "reasoning": "xhigh"
       },
       "agents": {
         "max_depth": 0,

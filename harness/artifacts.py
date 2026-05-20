@@ -4,6 +4,12 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from harness.matrix import (
+    DEFAULT_BENCHMARK_TEMPLATE_PATH,
+    DEFAULT_BENCHMARK_VERSION,
+    DEFAULT_HIDDEN_CASES_PATH,
+)
+
 
 PHASE_ARTIFACTS: dict[str, tuple[str, ...]] = {
     "prepared": ("worktree.json",),
@@ -176,7 +182,11 @@ def run_metadata_matches(run_dir: str | Path, run: Mapping[str, Any]) -> bool:
     metadata = read_json(Path(run_dir) / "metadata.json")
     if not isinstance(metadata, Mapping):
         return False
-    return metadata.get("run_id") == run.get("run_id") and metadata.get("run") == run
+    return (
+        metadata.get("run_id") == run.get("run_id")
+        and metadata.get("run") == run
+        and metadata.get("benchmark") == _run_benchmark_metadata(run)
+    )
 
 
 def validate_run_metadata(run_dir: str | Path, run: Mapping[str, Any]) -> list[str]:
@@ -381,3 +391,14 @@ def _find_forbidden_hidden_keys(value: Any, path: str = "$") -> list[str]:
         for index, child in enumerate(value):
             errors.extend(_find_forbidden_hidden_keys(child, f"{path}[{index}]"))
     return errors
+
+
+def _run_benchmark_metadata(run: Mapping[str, Any]) -> dict[str, str]:
+    benchmark = run.get("benchmark") if isinstance(run.get("benchmark"), Mapping) else {}
+    return {
+        "version": str(benchmark.get("version") or DEFAULT_BENCHMARK_VERSION),
+        "template_path": str(benchmark.get("template_path") or DEFAULT_BENCHMARK_TEMPLATE_PATH),
+        "hidden_cases_path": str(benchmark.get("hidden_cases_path") or DEFAULT_HIDDEN_CASES_PATH),
+        "scoring_path": str(benchmark.get("scoring_path") or ""),
+        "scoring_profile": str(benchmark.get("scoring_profile") or ""),
+    }

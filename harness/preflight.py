@@ -12,6 +12,7 @@ from harness.codex_runner import resolve_codex_bin, resolve_npm_bin
 from harness.hidden_runner import load_cases
 from harness.matrix import (
     REPO_ROOT,
+    benchmark_metadata,
     expand_experiment_matrix,
     load_experiment_config,
     summarize_matrix,
@@ -50,9 +51,7 @@ def run_preflight(
     if not config_file.is_absolute():
         config_file = root / config_file
 
-    checks.append(_check_path(root / "benchmark_template", "benchmark_template", directory=True))
     checks.append(_check_path(config_file, "experiment_config_file"))
-    checks.append(_check_path(root / "hidden_tests" / "cases" / "manifest.json", "hidden_manifest"))
     checks.append(_check_path(root / "prompts", "prompts", directory=True))
     checks.append(_check_path(root / "codex_templates", "codex_templates", directory=True))
 
@@ -76,12 +75,20 @@ def run_preflight(
     except Exception as exc:
         checks.append(PreflightCheck("experiment_config", "failed", str(exc)))
     else:
+        benchmark = benchmark_metadata(config)
+        checks.append(_check_path(root / benchmark["template_path"], "benchmark_template", directory=True))
+        checks.append(_check_path(root / benchmark["hidden_cases_path"] / "manifest.json", "hidden_manifest"))
+        if benchmark["scoring_path"]:
+            checks.append(_check_path(root / benchmark["scoring_path"], "scoring_config"))
         checks.append(
             PreflightCheck(
                 "experiment_config",
                 "passed",
                 f"expanded {len(runs)} runs",
-                summarize_matrix(runs),
+                {
+                    "summary": summarize_matrix(runs),
+                    "benchmark": benchmark,
+                },
             )
         )
 
@@ -105,23 +112,26 @@ def run_preflight(
                 )
             )
 
-    try:
-        manifest, cases = load_cases(root / "hidden_tests" / "cases")
-    except Exception as exc:
-        checks.append(PreflightCheck("hidden_cases", "failed", str(exc)))
-    else:
-        checks.append(
-            PreflightCheck(
-                "hidden_cases",
-                "passed",
-                f"loaded {len(cases)} hidden case definitions",
-                {
-                    "seed": manifest.get("seed"),
-                    "files": sorted(manifest.get("files", {})),
-                    "case_count": len(cases),
-                },
+    if config is not None:
+        benchmark = benchmark_metadata(config)
+        try:
+            manifest, cases = load_cases(root / benchmark["hidden_cases_path"])
+        except Exception as exc:
+            checks.append(PreflightCheck("hidden_cases", "failed", str(exc)))
+        else:
+            checks.append(
+                PreflightCheck(
+                    "hidden_cases",
+                    "passed",
+                    f"loaded {len(cases)} hidden case definitions",
+                    {
+                        "benchmark": benchmark,
+                        "seed": manifest.get("seed"),
+                        "files": sorted(manifest.get("files", {})),
+                        "case_count": len(cases),
+                    },
+                )
             )
-        )
 
     codex_bin = resolve_codex_bin()
     if codex_bin is None:
@@ -147,6 +157,7 @@ def run_preflight(
         "status": status,
         "repo_root": str(root),
         "config_path": str(Path(config_path)),
+        "benchmark": benchmark_metadata(config) if config is not None else None,
         "codex_bin": codex_bin,
         "checks": [check.to_dict() for check in checks],
     }

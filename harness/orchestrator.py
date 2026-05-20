@@ -42,7 +42,11 @@ from harness.codex_runner import (
 )
 from harness.jsonl_usage import summarize_usage, write_usage_summary
 from harness.matrix import (
+    DEFAULT_BENCHMARK_TEMPLATE_PATH,
+    DEFAULT_BENCHMARK_VERSION,
+    DEFAULT_HIDDEN_CASES_PATH,
     REPO_ROOT,
+    benchmark_metadata,
     expand_experiment_matrix,
     load_experiment_config,
     select_pilot_runs,
@@ -434,6 +438,7 @@ def write_experiment_metadata(
         "workspace_root": str(workspace_root) if workspace_root is not None else None,
         "selected_run_count": len(selected_runs),
         "full_run_count": len(all_runs),
+        "benchmark": benchmark_metadata(config),
         "matrix_summary": summarize_matrix(selected_runs),
         "config_sha256": _json_sha256(config),
     }
@@ -498,7 +503,7 @@ def prepare_run(
                 _archive_path(worktree)
             else:
                 raise OrchestrationError(f"worktree exists but prepared phase is incomplete: {worktree}")
-        copy_benchmark_template(repo_root / "benchmark_template", worktree)
+        copy_benchmark_template(_run_benchmark_path(repo_root, run, "template_path"), worktree)
         write_worktree_pointer(run_dir, worktree, repo_root)
         mark_phase(run_dir, "prepared", "completed", {"worktree": str(worktree)})
         _append_log(log_path, f"{run['run_id']} prepared worktree")
@@ -929,6 +934,8 @@ def run_hidden_tests(repo_root: Path, worktree: Path, run_dir: Path, run: Mappin
         str(worktree),
         "--out",
         str(run_dir / "hidden-results.json"),
+        "--cases-dir",
+        str(_run_benchmark_path(repo_root, run, "hidden_cases_path")),
     ]
     result = run_logged_command(
         command,
@@ -1004,6 +1011,7 @@ def run_metadata(run: Mapping[str, Any], run_dir: Path, worktree: Path, baseline
         "leaf": run.get("leaf"),
         "agents": run["agents"],
         "timeouts": run["timeouts"],
+        "benchmark": _run_benchmark(run),
         "run_dir": str(run_dir),
         "worktree": str(worktree),
         "baseline_commit": baseline_sha,
@@ -1150,6 +1158,29 @@ def worktree_path(run_dir: Path) -> Path:
     if isinstance(pointer_path, str) and pointer_path:
         return Path(pointer_path)
     return run_dir / "worktree"
+
+
+def _run_benchmark(run: Mapping[str, Any]) -> dict[str, Any]:
+    benchmark = run.get("benchmark")
+    if not isinstance(benchmark, Mapping):
+        return {
+            "version": DEFAULT_BENCHMARK_VERSION,
+            "template_path": DEFAULT_BENCHMARK_TEMPLATE_PATH,
+            "hidden_cases_path": DEFAULT_HIDDEN_CASES_PATH,
+            "scoring_path": "",
+            "scoring_profile": "",
+        }
+    return dict(benchmark)
+
+
+def _run_benchmark_path(repo_root: Path, run: Mapping[str, Any], key: str) -> Path:
+    benchmark = _run_benchmark(run)
+    default = DEFAULT_BENCHMARK_TEMPLATE_PATH if key == "template_path" else DEFAULT_HIDDEN_CASES_PATH
+    value = benchmark.get(key) or default
+    path = Path(str(value))
+    if path.is_absolute():
+        return path
+    return repo_root / path
 
 
 def prepare_judge_evidence(run_dir: Path, worktree: Path) -> None:

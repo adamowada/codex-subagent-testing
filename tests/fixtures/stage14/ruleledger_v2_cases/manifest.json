@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "seed": 20260520,
+  "category_weights": {
+    "synthetic_v2": 1.0
+  },
+  "files": {
+    "v2_synthetic.json": {
+      "sha256": "f58d3679c099528ce07f007e16c88a33c199084eae936fc722bed571ca28d069"
+    }
+  }
+}

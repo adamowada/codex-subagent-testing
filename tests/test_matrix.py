@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from harness.matrix import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
+SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
 @pytest.fixture
@@ -61,6 +63,35 @@ def test_summary_counts_match_initial_matrix(config: dict) -> None:
         "C4": 10,
     }
     assert summary["by_spark_mode"] == {"direct": 20, "none": 5, "proposal": 20}
+    assert summary["by_benchmark_version"] == {"ruleledger_v1": 45}
+    assert summary["benchmark_assets"]["template_path"] == "benchmark_template"
+    assert summary["benchmark_assets"]["hidden_cases_path"] == "hidden_tests/cases"
+
+
+def test_benchmark_asset_metadata_is_propagated_to_v1_runs(config: dict) -> None:
+    runs = expand_experiment_matrix(config)
+
+    assert runs[0]["benchmark"] == {
+        "version": "ruleledger_v1",
+        "template_path": "benchmark_template",
+        "hidden_cases_path": "hidden_tests/cases",
+        "scoring_path": "configs/scoring.yaml",
+        "scoring_profile": "initial_quality_v1",
+    }
+
+
+def test_synthetic_v2_config_selects_separate_assets() -> None:
+    config = load_experiment_config(SYNTHETIC_V2_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+
+    assert len(runs) == 1
+    assert runs[0]["benchmark"] == {
+        "version": "ruleledger_v2",
+        "template_path": "tests/fixtures/stage14/ruleledger_v2_template",
+        "hidden_cases_path": "tests/fixtures/stage14/ruleledger_v2_cases",
+        "scoring_path": "tests/fixtures/stage14/scoring_v2.yaml",
+        "scoring_profile": "synthetic_quality_v2",
+    }
 
 
 def test_c4_topology_resolves_to_eighteen_spark_leaves(config: dict) -> None:
@@ -133,6 +164,16 @@ def test_unknown_scoring_component_fails_validation(config: dict) -> None:
 
     with pytest.raises(ExperimentConfigError, match="unknown scoring component"):
         validate_experiment_config(candidate)
+
+
+def test_scoring_path_cannot_escape_repository(config: dict, tmp_path: Path) -> None:
+    candidate = copy.deepcopy(config)
+    candidate["scoring"] = {"path": "../outside-scoring.yaml"}
+    path = tmp_path / "experiment.yaml"
+    path.write_text(json.dumps(candidate), encoding="utf-8")
+
+    with pytest.raises(ExperimentConfigError, match="scoring.path"):
+        load_experiment_config(path)
 
 
 def test_judge_must_remain_gpt55_xhigh_read_only(config: dict) -> None:

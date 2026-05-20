@@ -1,5 +1,8 @@
 {
   "schema_version": 1,
+  "benchmark": {
+    "version": "ruleledger_v1"
+  },
   "experiment": {
     "id": "initial_subagent_topology",
     "repeat_count": 5,
@@ -14,6 +17,8 @@
     "judge_seconds": 1800
   },
   "paths": {
+    "benchmark_template": "benchmark_template",
+    "hidden_cases": "hidden_tests/cases",
     "prompt_templates": {
       "common": "prompts/task_common.md",
       "solo": "prompts/task_solo.md",
