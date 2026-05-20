@@ -17,6 +17,7 @@ from harness.prompt_rendering import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
+RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
 
 
 @pytest.fixture
@@ -120,6 +121,20 @@ def test_direct_and_proposal_mode_text_is_distinct(runs: list[dict]) -> None:
     assert "Spark leaves are read-only and must not edit files" in proposal
 
 
+def test_v2_prompt_uses_hard_mode_contract_and_public_hooks() -> None:
+    v2_runs = expand_experiment_matrix(load_experiment_config(RULELEDGER_V2_CONFIG_PATH))
+    solo_prompt = render_implementation_prompt(v2_runs[0], REPO_ROOT)
+    spark_prompt = render_implementation_prompt(v2_runs[1], REPO_ROOT)
+
+    assert "RuleLedger V2 Shared Task" in solo_prompt
+    assert "docs/ruleledger_v2_semantics.md" in solo_prompt
+    assert "reduceAccountStateV2" in solo_prompt
+    assert "businessAsOf" in solo_prompt
+    assert "Sort events deterministically by timestamp and then event ID" not in solo_prompt
+    assert "Flat Spark V2 Topology Instructions" in spark_prompt
+    assert "bitemporal view handling" in spark_prompt
+
+
 def test_every_implementation_prompt_has_safety_and_json_contract(runs: list[dict]) -> None:
     for run in runs:
         prompt = render_implementation_prompt(run, REPO_ROOT)
@@ -220,6 +235,12 @@ def test_prompt_and_config_templates_do_not_reference_hidden_case_files() -> Non
         "parse_validation.json",
         "normalization.json",
         "state_reduction.json",
+        "bitemporal_replay.json",
+        "lifecycle_precedence.json",
+        "billing_proration.json",
+        "account_merges.json",
+        "metamorphic_invariants.json",
+        "performance.json",
         "reporting.json",
         "immutability.json",
         "parity.json",

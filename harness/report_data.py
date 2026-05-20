@@ -54,6 +54,10 @@ RESULT_COLUMNS = [
     "implementation_tokens",
     "gpt55_implementation_tokens",
     "judge_tokens",
+    "judge_inclusive_tokens",
+    "gpt55_judge_tokens",
+    "gpt55_judge_inclusive_tokens",
+    "spark_implementation_tokens",
     "quality_per_gpt55_impl_token",
     "quality_per_judge_inclusive_gpt55_token",
     "quality_per_total_impl_token",
@@ -170,6 +174,10 @@ def collect_result_rows(experiment_dir: str | Path, runs: Iterable[Mapping[str, 
                 "implementation_tokens": totals.get("implementation_tokens", 0),
                 "gpt55_implementation_tokens": totals.get("gpt55_implementation_tokens", 0),
                 "judge_tokens": totals.get("judge_tokens", 0),
+                "judge_inclusive_tokens": totals.get("judge_inclusive_tokens", 0),
+                "gpt55_judge_tokens": totals.get("gpt55_judge_tokens", 0),
+                "gpt55_judge_inclusive_tokens": totals.get("gpt55_judge_inclusive_tokens", 0),
+                "spark_implementation_tokens": totals.get("spark_implementation_tokens", ""),
                 "quality_per_gpt55_impl_token": efficiency.get("quality_per_gpt55_impl_token"),
                 "quality_per_judge_inclusive_gpt55_token": efficiency.get(
                     "quality_per_judge_inclusive_gpt55_token"
@@ -289,7 +297,9 @@ def aggregate_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "cross_version": _cross_version_summary(rows),
         "v2": _v2_summary(rows),
         "rankings": {
-            "primary_by_run_group": _rank_groups(by_run_group, "quality_per_gpt55_impl_token_mean"),
+            "primary_by_run_group": []
+            if mixed_versions
+            else _rank_groups(by_run_group, "quality_per_gpt55_impl_token_mean"),
             "quality_by_run_group": _rank_groups(by_run_group, "quality_mean"),
             "hidden_tests_by_run_group": _rank_groups(by_run_group, "hidden_mean"),
             "hidden_correctness_by_run_group": _rank_groups(by_run_group, "hidden_correctness_mean"),
@@ -672,9 +682,10 @@ def _has_mixed_benchmark_versions(rows: Sequence[Mapping[str, Any]]) -> bool:
 
 
 def _best_run(rows: Sequence[Mapping[str, Any]], metric: str) -> dict[str, Any] | None:
-    if not rows:
+    eligible = [row for row in rows if _has_present_number(row.get(metric))]
+    if not eligible:
         return None
-    best = max(rows, key=lambda row: _float(row.get(metric)))
+    best = max(eligible, key=lambda row: _float(row.get(metric)))
     return {
         "run_id": best.get("run_id"),
         "cell_id": best.get("cell_id"),
@@ -688,6 +699,8 @@ def _best_run(rows: Sequence[Mapping[str, Any]], metric: str) -> dict[str, Any] 
 def _rank_groups(groups: Mapping[str, Mapping[str, Any]], metric: str) -> list[dict[str, Any]]:
     ranked: list[dict[str, Any]] = []
     for group_id, bucket in groups.items():
+        if not _has_present_number(bucket.get(metric)):
+            continue
         ranked.append(
             {
                 "rank": 0,
@@ -1065,7 +1078,7 @@ def _direct_proposal_section(aggregate: Mapping[str, Any]) -> str:
 
 
 def _c4_section(group_items: list[dict[str, Any]]) -> str:
-    c4_items = [item for item in group_items if str(item.get("label", "")).startswith("C4")]
+    c4_items = [item for item in group_items if _is_c4_label(str(item.get("label", "")))]
     if not c4_items:
         return ""
 
@@ -1181,6 +1194,10 @@ def _bar_chart(
 
 
 def _ranking_table(aggregate: Mapping[str, Any]) -> str:
+    cross_version = aggregate.get("cross_version", {}) if isinstance(aggregate.get("cross_version"), Mapping) else {}
+    if cross_version.get("mode") == "mixed_versions_labeled":
+        return _benchmark_ranking_tables(aggregate)
+
     rankings = aggregate.get("rankings", {}) if isinstance(aggregate.get("rankings"), Mapping) else {}
     primary = rankings.get("primary_by_run_group", []) if isinstance(rankings, Mapping) else []
     if not isinstance(primary, list) or not primary:
@@ -1205,6 +1222,43 @@ def _ranking_table(aggregate: Mapping[str, Any]) -> str:
   <thead><tr><th>Rank</th><th>Group</th><th>Cell</th><th>Spark Mode</th><th>Quality Per GPT-5.5 Impl Token</th><th>Runs</th></tr></thead>
   <tbody>{body}</tbody>
 </table>"""
+
+
+def _benchmark_ranking_tables(aggregate: Mapping[str, Any]) -> str:
+    rankings_by_benchmark = (
+        aggregate.get("rankings_by_benchmark", {})
+        if isinstance(aggregate.get("rankings_by_benchmark"), Mapping)
+        else {}
+    )
+    sections = []
+    for version, rankings in sorted(rankings_by_benchmark.items()):
+        primary = rankings.get("primary_by_run_group", []) if isinstance(rankings, Mapping) else []
+        if not isinstance(primary, list) or not primary:
+            sections.append(f"<h3>Primary Ranking: {_escape(str(version))}</h3><p>No primary ranking is available.</p>")
+            continue
+        rows = []
+        for item in primary:
+            if not isinstance(item, Mapping):
+                continue
+            rows.append(
+                "<tr>"
+                f"<td>{_escape(str(item.get('rank')))}</td>"
+                f"<td>{_escape(str(item.get('group_id')))}</td>"
+                f"<td>{_escape(str(item.get('cell_name')))}</td>"
+                f"<td>{_escape(str(item.get('spark_mode')))}</td>"
+                f"<td>{_fmt_efficiency(item.get('value'))}</td>"
+                f"<td>{_escape(str(item.get('runs')))}</td>"
+                "</tr>"
+            )
+        body = "\n".join(rows)
+        sections.append(
+            f"""<h3>Primary Ranking: {_escape(str(version))}</h3>
+<table>
+  <thead><tr><th>Rank</th><th>Group</th><th>Cell</th><th>Spark Mode</th><th>Quality Per GPT-5.5 Impl Token</th><th>Runs</th></tr></thead>
+  <tbody>{body}</tbody>
+</table>"""
+        )
+    return "\n".join(sections) or "<h3>Primary Ranking</h3><p>No primary ranking is available.</p>"
 
 
 def _group_chart_items(groups: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -1410,6 +1464,25 @@ def _float(value: Any) -> float:
         except ValueError:
             return 0.0
     return 0.0
+
+
+def _has_present_number(value: Any) -> bool:
+    if value is None or value == "" or isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return True
+    if isinstance(value, str):
+        try:
+            float(value)
+            return True
+        except ValueError:
+            return False
+    return False
+
+
+def _is_c4_label(label: str) -> bool:
+    parts = label.replace("/", " ").split()
+    return any(part == "C4" or part.startswith("C4:") for part in parts)
 
 
 def _safe_int(value: Any) -> int:

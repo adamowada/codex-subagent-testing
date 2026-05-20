@@ -75,14 +75,16 @@ The repository has:
 
 - `configs/ruleledger_v2.yaml`, a one-run v2 starter smoke config.
 - `configs/ruleledger_v2_pilot.yaml`, a two-run v2 calibration pilot.
+- `configs/ruleledger_v2_experiment.yaml`, an 18-run full v2 readiness matrix.
 - `configs/scoring_v2.yaml`, the v2 scoring profile.
 - `benchmark_template_v2/`, the v2 starter.
 - `hidden_tests/cases_v2/`, the v2 hidden suite.
 - Stage 19 report fields for category means, saturated categories,
   performance pass/timeout behavior, gates, and root-reasoning spread.
 
-The repository does not yet have a full v2 matrix config analogous to the
-initial v1 experiment.
+The repository has the full v2 matrix config analogous to the initial v1
+experiment. It should be treated as config-ready. Full measured execution
+remains conditional on real Stage 20 pilot evidence and working Codex access.
 
 ## Pilot Readiness Gate
 

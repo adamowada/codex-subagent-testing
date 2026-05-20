@@ -42,8 +42,10 @@ current business state until their effective time.
 ### BT-006: Single As-Of Compatibility
 
 When an existing public function accepts a single `asOf` argument, v2 treats it
-as both the business cutoff and audit cutoff. Future v2 hidden-runner
-operations may pass separate `business_as_of` and `audit_as_of` values.
+as both the business cutoff and audit cutoff. V2-compatible public hooks may
+receive separate `business_as_of` and `audit_as_of` values, or camelCase
+`businessAsOf` and `auditAsOf` aliases, to evaluate the same ledger from
+different business and audit views.
 
 ### OR-001: Replay Sort Key
 
@@ -221,7 +223,8 @@ their original `accountId` if a future operation exposes raw lineage.
 
 All normalized money is represented as integer minor units. Decimal `amount`
 inputs must have exactly two fractional digits. `amount_cents` inputs must be
-integers.
+integers. Credit and adjustment values may be negative; implementations should
+not reject a negative `amount_cents` solely because of its sign.
 
 ### BL-002: Currency Rules
 

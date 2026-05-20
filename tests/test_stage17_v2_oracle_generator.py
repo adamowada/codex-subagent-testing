@@ -287,6 +287,7 @@ def test_generated_v2_cases_cover_required_categories_and_documented_rules() -> 
         "parse_line",
         "normalize_event",
         "v2_reduce_and_summarize",
+        "v2_reduce_and_evaluate",
         "v2_calculate_proration",
         "v2_export_report",
         "v2_metamorphic",
@@ -295,6 +296,9 @@ def test_generated_v2_cases_cover_required_categories_and_documented_rules() -> 
     }.issubset(operations)
     assert performance_event_counts
     assert min(performance_event_counts) >= 10_000
+    for case in _iter_cases(manifest):
+        if case["category"] == "performance":
+            assert case.get("timeout_seconds") == {"typescript": 60, "python": 60}
 
 
 def test_v2_oracle_reproduces_every_generated_expected_output() -> None:

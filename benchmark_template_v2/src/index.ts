@@ -1,8 +1,15 @@
 export type EventType =
   | "account_opened"
+  | "trial_started"
+  | "trial_ended"
   | "plan_changed"
+  | "account_paused"
+  | "account_resumed"
+  | "account_cancelled"
+  | "account_reactivated"
   | "payment_succeeded"
   | "payment_failed"
+  | "payment_recovered"
   | "coupon_applied"
   | "usage_recorded"
   | "account_closed"
@@ -78,7 +85,7 @@ export interface NormalizedEvent {
 
 export interface AccountState {
   accountId: string;
-  status: "active" | "past_due" | "closed";
+  status: "pending" | "trialing" | "active" | "paused" | "past_due" | "cancelled" | "closed";
   plan: PlanName;
   totalPaidCents: number;
   failedPayments: number;
@@ -106,7 +113,7 @@ export interface EntitlementState {
 
 export interface AccountSummary {
   accountId: string;
-  status: "active" | "past_due" | "closed";
+  status: "pending" | "trialing" | "active" | "paused" | "past_due" | "cancelled" | "closed";
   plan: PlanName;
   features: string[];
   usage: number;
@@ -136,9 +143,16 @@ export type NormalizeResult =
 
 const EVENT_TYPES = new Set<EventType>([
   "account_opened",
+  "trial_started",
+  "trial_ended",
   "plan_changed",
+  "account_paused",
+  "account_resumed",
+  "account_cancelled",
+  "account_reactivated",
   "payment_succeeded",
   "payment_failed",
+  "payment_recovered",
   "coupon_applied",
   "usage_recorded",
   "account_closed",
@@ -213,7 +227,7 @@ export function normalizeEvent(raw: RawEvent): NormalizeResult {
   }
 
   if (raw.amount_cents !== undefined) {
-    const amountCents = readIntegerValue(raw.amount_cents, { min: 0 });
+    const amountCents = readIntegerValue(raw.amount_cents);
     if (amountCents === null) {
       issues.push("invalid_amount_cents");
     } else {
@@ -289,21 +303,52 @@ export function reduceAccountState(events: NormalizedEvent[]): AccountState[] {
 
     const state = getOrCreateState(states, event.accountId);
 
-    if (event.type === "account_opened" || event.type === "plan_changed") {
+    if (event.type === "account_opened") {
       state.plan = event.plan ?? state.plan;
       state.status = state.status === "closed" ? "closed" : "active";
     }
 
-    if (event.type === "payment_succeeded") {
+    if (event.type === "trial_started" && state.status !== "closed") {
+      state.status = "trialing";
+    }
+
+    if (event.type === "trial_ended" && state.status === "trialing") {
+      state.status = "active";
+    }
+
+    if (event.type === "plan_changed") {
+      state.plan = event.plan ?? state.plan;
+      if (state.status === "pending") {
+        state.status = "active";
+      }
+    }
+
+    if (event.type === "account_paused" && state.status !== "closed") {
+      state.status = "paused";
+    }
+
+    if (event.type === "account_resumed" && state.status === "paused") {
+      state.status = "active";
+    }
+
+    if (event.type === "account_cancelled" && state.status !== "closed") {
+      state.status = "cancelled";
+    }
+
+    if (event.type === "account_reactivated" && state.status === "cancelled") {
+      state.status = "active";
+    }
+
+    if (event.type === "payment_succeeded" || event.type === "payment_recovered") {
       state.totalPaidCents += event.amountCents ?? 0;
-      if (state.status !== "closed") {
+      if (state.status === "past_due") {
         state.status = "active";
       }
     }
 
     if (event.type === "payment_failed") {
       state.failedPayments += 1;
-      if (state.status !== "closed") {
+      if (state.status === "active" || state.status === "trialing") {
         state.status = "past_due";
       }
     }
@@ -371,7 +416,7 @@ export function evaluateEntitlements(state: AccountState, asOf?: string): Entitl
   }
 
   return {
-    active: state.status === "active" || state.status === "past_due",
+    active: state.status === "active" || state.status === "trialing" || state.status === "past_due",
     features: [...plan.features],
     usageLimit: plan.usageLimit,
     overLimit: state.usage > plan.usageLimit,
@@ -449,7 +494,66 @@ export function exportLedgerReport(summaries: AccountSummary[]): string {
       summary.lastEventAt ?? ""
     ]);
 
-  return [header, ...rows].map((row) => row.join(",")).join("\n") + "\n";
+  return [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n") + "\n";
+}
+
+export function normalizeEventV2(raw: RawEvent): NormalizeResult {
+  return normalizeEvent(raw);
+}
+
+export function reduceAccountStateV2(events: NormalizedEvent[], view?: Record<string, string | undefined>): AccountState[] {
+  return reduceAccountState(filterEventsForView(events, view));
+}
+
+export function evaluateEntitlementsV2(state: AccountState, view?: Record<string, string | undefined>): EntitlementState {
+  return evaluateEntitlements(state, viewCutoff(view));
+}
+
+export function summarizeAccountV2(state: AccountState, view?: Record<string, string | undefined>): AccountSummary {
+  return summarizeAccount(state, viewCutoff(view));
+}
+
+export function exportLedgerReportV2(summaries: AccountSummary[]): string {
+  return exportLedgerReport(summaries);
+}
+
+export function calculatePlanChangeProrationV2(input: {
+  old_plan: PlanName;
+  new_plan: PlanName;
+  period_start: string;
+  period_end: string;
+  change_effective_at: string;
+  quantity?: number;
+}): Record<string, string | number> {
+  const quantity = input.quantity ?? 1;
+  const periodStart = normalizeRequiredTimestamp(input.period_start);
+  const periodEnd = normalizeRequiredTimestamp(input.period_end);
+  const changeEffectiveAt = normalizeRequiredTimestamp(input.change_effective_at);
+  const startMs = Date.parse(periodStart);
+  const endMs = Date.parse(periodEnd);
+  const changeMs = Date.parse(changeEffectiveAt);
+  if (!(endMs > startMs) || changeMs < startMs || changeMs > endMs || !Number.isInteger(quantity) || quantity < 0) {
+    throw new Error("invalid_proration_input");
+  }
+  const periodMs = endMs - startMs;
+  const remainingMs = endMs - changeMs;
+  const oldCreditCents = -roundHalfAwayFromZero(
+    (PLAN_DEFINITIONS[input.old_plan].priceCents * quantity * remainingMs) / periodMs
+  );
+  const newChargeCents = roundHalfAwayFromZero(
+    (PLAN_DEFINITIONS[input.new_plan].priceCents * quantity * remainingMs) / periodMs
+  );
+  return {
+    oldPlan: input.old_plan,
+    newPlan: input.new_plan,
+    quantity,
+    periodStart,
+    periodEnd,
+    changeEffectiveAt,
+    oldCreditCents,
+    newChargeCents,
+    netAdjustmentCents: oldCreditCents + newChargeCents
+  };
 }
 
 function readRequiredString(raw: RawEvent, field: string, issues: string[]): string | undefined {
@@ -564,12 +668,13 @@ function parseMoneyToCents(value: unknown): number | null {
   }
 
   const trimmed = value.trim();
-  if (!/^\d+\.\d{2}$/.test(trimmed)) {
+  if (!/^-?\d+\.\d{2}$/.test(trimmed)) {
     return null;
   }
 
   const [dollars, cents] = trimmed.split(".");
-  return Number(dollars) * 100 + Number(cents);
+  const sign = dollars.startsWith("-") ? -1 : 1;
+  return Number(dollars) * 100 + sign * Number(cents);
 }
 
 function normalizeCurrency(value: unknown): string | null | undefined {
@@ -612,6 +717,47 @@ function addUnique(values: string[], value: string): void {
   if (!values.includes(value)) {
     values.push(value);
   }
+}
+
+function filterEventsForView(events: NormalizedEvent[], view?: Record<string, string | undefined>): NormalizedEvent[] {
+  if (view === undefined) {
+    return events;
+  }
+  const businessAsOf = view.businessAsOf ?? view.business_as_of ?? view.asOf ?? view.as_of;
+  const auditAsOf = view.auditAsOf ?? view.audit_as_of ?? view.asOf ?? view.as_of;
+  return events.filter((event) => {
+    if (auditAsOf !== undefined && event.recordedAt > auditAsOf) {
+      return false;
+    }
+    if (businessAsOf !== undefined && event.effectiveAt > businessAsOf) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function viewCutoff(view?: Record<string, string | undefined>): string | undefined {
+  return view?.businessAsOf ?? view?.business_as_of ?? view?.asOf ?? view?.as_of;
+}
+
+function normalizeRequiredTimestamp(value: string): string {
+  const issues: string[] = [];
+  const normalized = normalizeTimestamp(value, issues, "invalid_timestamp");
+  if (normalized === null || issues.length > 0) {
+    throw new Error("invalid_timestamp");
+  }
+  return normalized;
+}
+
+function roundHalfAwayFromZero(value: number): number {
+  return Math.sign(value) * Math.floor(Math.abs(value) + 0.5);
+}
+
+function csvEscape(value: string): string {
+  if (!/[",\r\n]/.test(value)) {
+    return value;
+  }
+  return `"${value.replaceAll('"', '""')}"`;
 }
 
 function hasTimezone(value: string): boolean {

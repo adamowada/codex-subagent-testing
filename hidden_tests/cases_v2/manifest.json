@@ -29,9 +29,9 @@
       "sha256": "2055d8e228ff32957104bf453d41dd9bf0ca9dce1a31bce598ecb90b7589563b"
     },
     "lifecycle_precedence.json": {
-      "case_count": 5,
-      "points": 9.5,
-      "sha256": "79f406422a559e78ff65d3e8583aaebdf257280214911691e9b7a0fed0c30edd"
+      "case_count": 6,
+      "points": 11.0,
+      "sha256": "5185c57216a94ff6dd94ceb09581f0419b50d76a50b2a5f2f7d6659c73ccd35a"
     },
     "metamorphic_invariants.json": {
       "case_count": 5,
@@ -56,7 +56,7 @@
     "performance.json": {
       "case_count": 2,
       "points": 6.0,
-      "sha256": "10304378c65e1121984378cf46dcd3b5afdaa6c7f2f58cd18d04ca5b38efa1f2"
+      "sha256": "541a2d085bdee2322e03cc23965a8ba91ae6aa994c904a55edecc3bb6d27dee9"
     },
     "reporting.json": {
       "case_count": 3,

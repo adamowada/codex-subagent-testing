@@ -8,7 +8,7 @@ import subprocess
 import sys
 from typing import Any
 
-from harness.codex_runner import resolve_codex_bin, resolve_npm_bin
+from harness.codex_runner import build_implementation_command, resolve_codex_bin, resolve_npm_bin
 from harness.hidden_runner import load_cases
 from harness.matrix import (
     REPO_ROOT,
@@ -101,6 +101,13 @@ def run_preflight(
                 config_files = render_codex_config(run, root)
                 if "config.toml" not in config_files:
                     raise ValueError("rendered config missing config.toml")
+                command = build_implementation_command("codex", run, "prompt")
+                expected_depth = f"agents.max_depth={int(run['agents']['max_depth'])}"
+                expected_threads = f"agents.max_threads={int(run['agents']['max_threads'])}"
+                if expected_depth not in command:
+                    raise ValueError(f"implementation command missing {expected_depth} for {run['run_id']}")
+                if expected_threads not in command:
+                    raise ValueError(f"implementation command missing {expected_threads} for {run['run_id']}")
         except Exception as exc:
             checks.append(PreflightCheck("prompt_rendering", "failed", str(exc)))
         else:

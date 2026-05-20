@@ -18,6 +18,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - name: Verify protected files
         run: python scripts/check_protected_files.py
 
@@ -26,3 +31,31 @@ jobs:
 
       - name: Run harness tests
         run: python -m pytest
+
+      - name: Install root Node dependencies
+        run: |
+          npm ci
+          npm run install:report-browser
+
+      - name: Render sample report PDF
+        shell: bash
+        run: |
+          cat > /tmp/report.html <<'HTML'
+          <!doctype html><html><body><h1>Report Smoke</h1></body></html>
+          HTML
+          node scripts/render_report_pdf.mjs /tmp/report.html /tmp/report.pdf
+
+      - name: Run PowerShell dry-runs
+        shell: pwsh
+        run: |
+          ./scripts/run_experiment.ps1 -DryRun -NoReport
+          ./scripts/run_pilot.ps1 -Config configs/ruleledger_v2_pilot.yaml -DryRun -NoReport
+
+      - name: Run V2 starter public checks
+        shell: bash
+        working-directory: benchmark_template_v2
+        run: |
+          npm ci
+          npm run typecheck
+          npm run test:public
+          python -m pytest -q tests_public_py

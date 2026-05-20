@@ -2,11 +2,16 @@ import json
 from pathlib import Path
 
 from ruleledger.engine import (
+    calculate_plan_change_proration_v2,
     export_ledger_report,
+    export_ledger_report_v2,
     normalize_event,
+    normalize_event_v2,
     parse_event_line,
     reduce_account_state,
+    reduce_account_state_v2,
     summarize_account,
+    summarize_account_v2,
 )
 
 
@@ -136,6 +141,23 @@ def test_amount_cents_currency_and_default_bitemporal_fields_normalize_visibly()
     assert result["value"]["sequence"] == 0
 
 
+def test_v2_normalization_accepts_documented_lifecycle_and_negative_credit_values():
+    result = normalize_event_v2(
+        {
+            "id": "evt_credit",
+            "account_id": "acct_v2",
+            "type": "payment_recovered",
+            "timestamp": "2026-01-02T00:00:00Z",
+            "amount_cents": -250,
+            "currency": "usd",
+        }
+    )
+
+    assert result["ok"], json.dumps(result, indent=2)
+    assert result["value"]["type"] == "payment_recovered"
+    assert result["value"]["amountCents"] == -250
+
+
 def test_reduce_account_state_replays_tiny_bitemporal_event_set_deterministically():
     raw_events = [
         {
@@ -254,3 +276,60 @@ def test_csv_public_semantics_example_matches_stable_v2_report_contract():
     expected = (FIXTURES_DIR / example["expected_report_fixture"]).read_text(encoding="utf-8")
 
     assert export_ledger_report(example["summaries"]) == expected
+
+
+def test_v2_hooks_expose_separate_view_cutoffs_proration_and_csv_escaping():
+    raw_events = [
+        {
+            "id": "evt_open",
+            "account_id": "acct_hook",
+            "type": "account_opened",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "effective_at": "2026-01-01T00:00:00Z",
+            "recorded_at": "2026-01-01T00:00:00Z",
+            "plan": "starter",
+        },
+        {
+            "id": "evt_future",
+            "account_id": "acct_hook",
+            "type": "plan_changed",
+            "timestamp": "2026-01-02T00:00:00Z",
+            "effective_at": "2026-02-01T00:00:00Z",
+            "recorded_at": "2026-01-02T00:00:00Z",
+            "plan": "pro",
+        },
+    ]
+    events = _normalize_raw_events(raw_events)
+    states = reduce_account_state_v2(
+        events,
+        {
+            "businessAsOf": "2026-01-15T00:00:00.000Z",
+            "auditAsOf": "2026-02-15T00:00:00.000Z",
+        },
+    )
+    summary = summarize_account_v2(states[0], {"businessAsOf": "2026-01-15T00:00:00.000Z"})
+
+    assert summary["plan"] == "starter"
+    escaped = export_ledger_report_v2([{**summary, "couponCode": 'SAVE,"10'}])
+    assert '"SAVE,""10"' in escaped
+
+    assert calculate_plan_change_proration_v2(
+        {
+            "old_plan": "starter",
+            "new_plan": "pro",
+            "period_start": "2026-01-01T00:00:00Z",
+            "period_end": "2026-02-01T00:00:00Z",
+            "change_effective_at": "2026-01-16T12:00:00Z",
+            "quantity": 1,
+        }
+    ) == {
+        "oldPlan": "starter",
+        "newPlan": "pro",
+        "quantity": 1,
+        "periodStart": "2026-01-01T00:00:00.000Z",
+        "periodEnd": "2026-02-01T00:00:00.000Z",
+        "changeEffectiveAt": "2026-01-16T12:00:00.000Z",
+        "oldCreditCents": -600,
+        "newChargeCents": 2450,
+        "netAdjustmentCents": 1850,
+    }

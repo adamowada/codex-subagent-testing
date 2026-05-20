@@ -87,6 +87,15 @@ def test_parser_preserves_total_tokens_only_usage_events(tmp_path: Path) -> None
     assert events[0]["total_tokens"] == 42
 
 
+def test_parser_prefers_split_tokens_when_total_tokens_is_also_present(tmp_path: Path) -> None:
+    path = tmp_path / "events.jsonl"
+    _write_jsonl(path, [{"usage": {"input_tokens": 10, "output_tokens": 5, "total_tokens": 99}}])
+
+    events = parse_usage_events(path)
+
+    assert events[0]["total_tokens"] == 15
+
+
 def test_summary_uses_exact_per_event_model_attribution(runs: list[dict], tmp_path: Path) -> None:
     run = next(candidate for candidate in runs if candidate["run_id"] == "C1_direct_r01")
     impl = tmp_path / "events.jsonl"

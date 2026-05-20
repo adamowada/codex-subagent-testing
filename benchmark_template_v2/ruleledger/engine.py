@@ -6,7 +6,9 @@ implementation in src/index.ts.
 
 from __future__ import annotations
 
+import csv
 from datetime import datetime, timezone
+import io
 import json
 import re
 from typing import Any
@@ -42,9 +44,16 @@ COUPON_DEFINITIONS: dict[str, dict[str, int]] = {
 
 EVENT_TYPES = {
     "account_opened",
+    "trial_started",
+    "trial_ended",
     "plan_changed",
+    "account_paused",
+    "account_resumed",
+    "account_cancelled",
+    "account_reactivated",
     "payment_succeeded",
     "payment_failed",
+    "payment_recovered",
     "coupon_applied",
     "usage_recorded",
     "account_closed",
@@ -111,7 +120,7 @@ def normalize_event(raw: dict[str, Any]) -> dict[str, Any]:
             issues.append("invalid_plan")
 
     if "amount_cents" in raw:
-        amount_cents = _read_integer_value(raw.get("amount_cents"), minimum=0)
+        amount_cents = _read_integer_value(raw.get("amount_cents"))
         if amount_cents is None:
             issues.append("invalid_amount_cents")
         else:
@@ -180,19 +189,42 @@ def reduce_account_state(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         state = _get_or_create_state(states, event["accountId"])
 
-        if event["type"] in {"account_opened", "plan_changed"}:
+        if event["type"] == "account_opened":
             state["plan"] = event.get("plan", state["plan"])
             if state["status"] != "closed":
                 state["status"] = "active"
 
-        if event["type"] == "payment_succeeded":
+        if event["type"] == "trial_started" and state["status"] != "closed":
+            state["status"] = "trialing"
+
+        if event["type"] == "trial_ended" and state["status"] == "trialing":
+            state["status"] = "active"
+
+        if event["type"] == "plan_changed":
+            state["plan"] = event.get("plan", state["plan"])
+            if state["status"] == "pending":
+                state["status"] = "active"
+
+        if event["type"] == "account_paused" and state["status"] != "closed":
+            state["status"] = "paused"
+
+        if event["type"] == "account_resumed" and state["status"] == "paused":
+            state["status"] = "active"
+
+        if event["type"] == "account_cancelled" and state["status"] != "closed":
+            state["status"] = "cancelled"
+
+        if event["type"] == "account_reactivated" and state["status"] == "cancelled":
+            state["status"] = "active"
+
+        if event["type"] in {"payment_succeeded", "payment_recovered"}:
             state["totalPaidCents"] += event.get("amountCents", 0)
-            if state["status"] != "closed":
+            if state["status"] == "past_due":
                 state["status"] = "active"
 
         if event["type"] == "payment_failed":
             state["failedPayments"] += 1
-            if state["status"] != "closed":
+            if state["status"] in {"active", "trialing"}:
                 state["status"] = "past_due"
 
         if event["type"] == "coupon_applied":
@@ -248,7 +280,7 @@ def evaluate_entitlements(state: dict[str, Any], as_of: str | None = None) -> di
         }
 
     return {
-        "active": state["status"] in {"active", "past_due"},
+        "active": state["status"] in {"active", "trialing", "past_due"},
         "features": list(plan["features"]),
         "usageLimit": plan["usage_limit"],
         "overLimit": state["usage"] > plan["usage_limit"],
@@ -328,7 +360,62 @@ def export_ledger_report(summaries: list[dict[str, Any]]) -> str:
             ]
         )
 
-    return "\n".join(",".join(row) for row in rows) + "\n"
+    output = io.StringIO()
+    writer = csv.writer(output, lineterminator="\n")
+    writer.writerows(rows)
+    return output.getvalue()
+
+
+def normalize_event_v2(raw: dict[str, Any]) -> dict[str, Any]:
+    return normalize_event(raw)
+
+
+def reduce_account_state_v2(events: list[dict[str, Any]], view: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    return reduce_account_state(_filter_events_for_view(events, view))
+
+
+def evaluate_entitlements_v2(state: dict[str, Any], view: dict[str, Any] | None = None) -> dict[str, Any]:
+    return evaluate_entitlements(state, _view_cutoff(view))
+
+
+def summarize_account_v2(state: dict[str, Any], view: dict[str, Any] | None = None) -> dict[str, Any]:
+    return summarize_account(state, _view_cutoff(view))
+
+
+def export_ledger_report_v2(summaries: list[dict[str, Any]]) -> str:
+    return export_ledger_report(summaries)
+
+
+def calculate_plan_change_proration_v2(input_payload: dict[str, Any]) -> dict[str, Any]:
+    quantity = input_payload.get("quantity", 1)
+    period_start = _normalize_required_timestamp(input_payload["period_start"])
+    period_end = _normalize_required_timestamp(input_payload["period_end"])
+    change_effective_at = _normalize_required_timestamp(input_payload["change_effective_at"])
+    start_ms = _timestamp_ms(period_start)
+    end_ms = _timestamp_ms(period_end)
+    change_ms = _timestamp_ms(change_effective_at)
+    if end_ms <= start_ms or change_ms < start_ms or change_ms > end_ms:
+        raise ValueError("invalid_proration_input")
+    if not isinstance(quantity, int) or isinstance(quantity, bool) or quantity < 0:
+        raise ValueError("invalid_proration_input")
+
+    period_ms = end_ms - start_ms
+    remaining_ms = end_ms - change_ms
+    old_full = PLAN_DEFINITIONS[input_payload["old_plan"]]["price_cents"]
+    new_full = PLAN_DEFINITIONS[input_payload["new_plan"]]["price_cents"]
+    old_credit = -_round_half_away_from_zero(old_full * quantity * remaining_ms, period_ms)
+    new_charge = _round_half_away_from_zero(new_full * quantity * remaining_ms, period_ms)
+    return {
+        "oldPlan": input_payload["old_plan"],
+        "newPlan": input_payload["new_plan"],
+        "quantity": quantity,
+        "periodStart": period_start,
+        "periodEnd": period_end,
+        "changeEffectiveAt": change_effective_at,
+        "oldCreditCents": old_credit,
+        "newChargeCents": new_charge,
+        "netAdjustmentCents": old_credit + new_charge,
+    }
 
 
 def _read_required_string(raw: dict[str, Any], field: str, issues: list[str]) -> str | None:
@@ -439,11 +526,12 @@ def _parse_money_to_cents(value: Any) -> int | None:
         return None
 
     trimmed = value.strip()
-    if re.fullmatch(r"\d+\.\d{2}", trimmed) is None:
+    if re.fullmatch(r"-?\d+\.\d{2}", trimmed) is None:
         return None
 
     dollars, cents = trimmed.split(".")
-    return int(dollars) * 100 + int(cents)
+    sign = -1 if dollars.startswith("-") else 1
+    return int(dollars) * 100 + sign * int(cents)
 
 
 def _normalize_currency(value: Any) -> str | None:
@@ -479,6 +567,48 @@ def _replay_sort_key(event: dict[str, Any]) -> tuple[str, str, int, str]:
 def _add_unique(values: list[str], value: str) -> None:
     if value not in values:
         values.append(value)
+
+
+def _filter_events_for_view(events: list[dict[str, Any]], view: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if view is None:
+        return events
+    business_as_of = view.get("businessAsOf") or view.get("business_as_of") or view.get("asOf") or view.get("as_of")
+    audit_as_of = view.get("auditAsOf") or view.get("audit_as_of") or view.get("asOf") or view.get("as_of")
+    filtered = []
+    for event in events:
+        if audit_as_of is not None and event["recordedAt"] > audit_as_of:
+            continue
+        if business_as_of is not None and event["effectiveAt"] > business_as_of:
+            continue
+        filtered.append(event)
+    return filtered
+
+
+def _view_cutoff(view: dict[str, Any] | None) -> str | None:
+    if view is None:
+        return None
+    return view.get("businessAsOf") or view.get("business_as_of") or view.get("asOf") or view.get("as_of")
+
+
+def _normalize_required_timestamp(value: str) -> str:
+    issues: list[str] = []
+    normalized = _normalize_timestamp(value, issues, "invalid_timestamp")
+    if normalized is None or issues:
+        raise ValueError("invalid_timestamp")
+    return normalized
+
+
+def _timestamp_ms(value: str) -> int:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return int(parsed.timestamp() * 1000)
+
+
+def _round_half_away_from_zero(numerator: int, denominator: int) -> int:
+    sign = -1 if numerator < 0 else 1
+    quotient, remainder = divmod(abs(numerator), denominator)
+    if remainder * 2 >= denominator:
+        quotient += 1
+    return sign * quotient
 
 
 def _has_timezone(value: str) -> bool:

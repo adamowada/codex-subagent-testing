@@ -10,7 +10,6 @@ from typing import Any, Mapping, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-ALLOWED_INITIAL_MODELS = {"gpt-5.5", "gpt-5.3-codex-spark"}
 VALID_REASONING = {"none", "minimal", "low", "medium", "high", "xhigh"}
 INITIAL_SPARK_MODEL = "gpt-5.3-codex-spark"
 INITIAL_GPT55_MODEL = "gpt-5.5"
@@ -125,10 +124,13 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
     _relative_path(paths.get("codex_config_template"), "paths.codex_config_template", errors)
 
     models = _mapping(config, "models", errors)
-    if models.get("gpt55") != INITIAL_GPT55_MODEL:
-        errors.append("models.gpt55: expected gpt-5.5")
-    if models.get("spark") != INITIAL_SPARK_MODEL:
-        errors.append("models.spark: expected gpt-5.3-codex-spark")
+    _validate_model_identifier(models.get("gpt55"), "models.gpt55", errors)
+    _validate_model_identifier(models.get("spark"), "models.spark", errors)
+    if strict_initial_contract:
+        if models.get("gpt55") != INITIAL_GPT55_MODEL:
+            errors.append("models.gpt55: expected gpt-5.5")
+        if models.get("spark") != INITIAL_SPARK_MODEL:
+            errors.append("models.spark: expected gpt-5.3-codex-spark")
 
     spark_modes = _mapping(config, "spark_modes", errors)
     _validate_spark_mode_definitions(spark_modes, errors)
@@ -137,7 +139,8 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
     _validate_scoring(scoring, errors)
 
     judge = _mapping(config, "judge", errors)
-    if judge.get("model") != INITIAL_GPT55_MODEL:
+    _validate_model_identifier(judge.get("model"), "judge.model", errors)
+    if strict_initial_contract and judge.get("model") != INITIAL_GPT55_MODEL:
         errors.append(f"judge.model: expected {INITIAL_GPT55_MODEL}")
     _validate_reasoning(judge.get("reasoning"), "judge.reasoning", errors)
     if judge.get("reasoning") != "xhigh":
@@ -200,7 +203,8 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             errors.append(f"{path}.spark_modes: {cell_id} must include direct and proposal")
 
         root = _mapping(cell, "root", errors, prefix=path)
-        if root.get("model") != INITIAL_GPT55_MODEL:
+        _validate_model_identifier(root.get("model"), f"{path}.root.model", errors)
+        if strict_initial_contract and root.get("model") != INITIAL_GPT55_MODEL:
             errors.append(f"{path}.root.model: expected {INITIAL_GPT55_MODEL}")
         _validate_reasoning(root.get("reasoning"), f"{path}.root.reasoning", errors)
         if strict_initial_contract:
@@ -219,7 +223,7 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
                 errors.append(f"{path}.agents.max_depth: flat_spark requires max_depth=1")
             leaf = _mapping(cell, "leaf", errors, prefix=path)
             leaf_count = _positive_int(leaf, "count", f"{path}.leaf.count", errors)
-            _validate_leaf(leaf, path, errors)
+            _validate_leaf(leaf, path, errors, strict_initial_contract=strict_initial_contract)
             if leaf_count is not None:
                 breadth += leaf_count
                 if strict_initial_contract and cell_id in {"C1", "C2", "C3"} and leaf_count != 6:
@@ -235,7 +239,7 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
                 f"{path}.subleads.leaves_per_sublead",
                 errors,
             )
-            _validate_model(subleads.get("model"), f"{path}.subleads.model", errors)
+            _validate_model_identifier(subleads.get("model"), f"{path}.subleads.model", errors)
             _validate_reasoning(subleads.get("reasoning"), f"{path}.subleads.reasoning", errors)
             if strict_initial_contract and cell_id == "C4":
                 if subleads.get("model") != INITIAL_GPT55_MODEL:
@@ -247,7 +251,7 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
                 if leaves_per_sublead != 6:
                     errors.append(f"{path}.subleads.leaves_per_sublead: C4 requires exactly 6 leaves")
             leaf = _mapping(cell, "leaf", errors, prefix=path)
-            _validate_leaf(leaf, path, errors)
+            _validate_leaf(leaf, path, errors, strict_initial_contract=strict_initial_contract)
             if sublead_count is not None and leaves_per_sublead is not None:
                 leaf_total = sublead_count * leaves_per_sublead
                 breadth += sublead_count + leaf_total
@@ -617,9 +621,9 @@ def _validate_scoring(scoring: Mapping[str, Any], errors: list[str]) -> None:
         )
 
 
-def _validate_model(value: Any, path: str, errors: list[str]) -> None:
-    if not isinstance(value, str) or value not in ALLOWED_INITIAL_MODELS:
-        errors.append(f"{path}: expected one of {sorted(ALLOWED_INITIAL_MODELS)}")
+def _validate_model_identifier(value: Any, path: str, errors: list[str]) -> None:
+    if not isinstance(value, str) or not value.strip():
+        errors.append(f"{path}: expected non-empty model identifier")
 
 
 def _validate_reasoning(value: Any, path: str, errors: list[str]) -> None:
@@ -654,8 +658,15 @@ def _validate_initial_root_reasoning(
         errors.append(f"{path}.root.reasoning: {cell_id} requires {expected}")
 
 
-def _validate_leaf(leaf: Mapping[str, Any], path: str, errors: list[str]) -> None:
-    if leaf.get("model") != INITIAL_SPARK_MODEL:
+def _validate_leaf(
+    leaf: Mapping[str, Any],
+    path: str,
+    errors: list[str],
+    *,
+    strict_initial_contract: bool,
+) -> None:
+    _validate_model_identifier(leaf.get("model"), f"{path}.leaf.model", errors)
+    if strict_initial_contract and leaf.get("model") != INITIAL_SPARK_MODEL:
         errors.append(f"{path}.leaf.model: expected {INITIAL_SPARK_MODEL}")
 
     reasoning_by_role = leaf.get("reasoning_by_role")
@@ -669,7 +680,7 @@ def _validate_leaf(leaf: Mapping[str, Any], path: str, errors: list[str]) -> Non
     for role, reasoning in reasoning_by_role.items():
         role_path = f"{path}.leaf.reasoning_by_role.{role}"
         _validate_reasoning(reasoning, role_path, errors)
-        if reasoning != INITIAL_SPARK_REASONING:
+        if strict_initial_contract and reasoning != INITIAL_SPARK_REASONING:
             errors.append(f"{role_path}: initial Spark reasoning must be xhigh")
 
 

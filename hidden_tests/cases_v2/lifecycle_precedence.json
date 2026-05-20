@@ -74,6 +74,55 @@
     },
     {
       "category": "lifecycle_precedence",
+      "expected": {
+        "active": true,
+        "couponActive": false,
+        "features": [
+          "dashboard",
+          "exports"
+        ],
+        "overLimit": false,
+        "usageLimit": 1000
+      },
+      "id": "lifecycle.entitlements_after_recovery",
+      "input": {
+        "account_id": "acct_lc_eval",
+        "as_of": "2026-04-04T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_lc_eval",
+            "id": "evt_lc_eval_open",
+            "plan": "starter",
+            "timestamp": "2026-04-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_lc_eval",
+            "id": "evt_lc_eval_fail",
+            "timestamp": "2026-04-02T00:00:00Z",
+            "type": "payment_failed"
+          },
+          {
+            "account_id": "acct_lc_eval",
+            "id": "evt_lc_eval_recover",
+            "timestamp": "2026-04-03T00:00:00Z",
+            "type": "payment_recovered"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_evaluate",
+      "points": 1.5,
+      "rule_ids": [
+        "LC-008",
+        "PY-001"
+      ]
+    },
+    {
+      "category": "lifecycle_precedence",
       "expected": [
         {
           "accountId": "acct_pause",

@@ -5,11 +5,16 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import {
+  calculatePlanChangeProrationV2,
   exportLedgerReport,
+  exportLedgerReportV2,
   normalizeEvent,
+  normalizeEventV2,
   parseEventLine,
   reduceAccountState,
-  summarizeAccount
+  reduceAccountStateV2,
+  summarizeAccount,
+  summarizeAccountV2
 } from "../dist/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -132,6 +137,21 @@ test("amount_cents, currency, and default bitemporal fields normalize visibly", 
   assert.equal(result.value.sequence, 0);
 });
 
+test("v2 normalization accepts documented lifecycle and negative credit values", () => {
+  const result = normalizeEventV2({
+    id: "evt_credit",
+    account_id: "acct_v2",
+    type: "payment_recovered",
+    timestamp: "2026-01-02T00:00:00Z",
+    amount_cents: -250,
+    currency: "usd"
+  });
+
+  assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  assert.equal(result.value.type, "payment_recovered");
+  assert.equal(result.value.amountCents, -250);
+});
+
 test("reduceAccountState replays a tiny bitemporal event set deterministically", () => {
   const rawEvents = [
     {
@@ -252,4 +272,58 @@ test("CSV public semantics example matches stable v2 report contract", () => {
   const expected = readFileSync(join(fixturesDir, example.expected_report_fixture), "utf8");
 
   assert.equal(exportLedgerReport(example.summaries), expected);
+});
+
+test("v2 hooks expose separate view cutoffs, proration, and CSV escaping", () => {
+  const rawEvents = [
+    {
+      id: "evt_open",
+      account_id: "acct_hook",
+      type: "account_opened",
+      timestamp: "2026-01-01T00:00:00Z",
+      effective_at: "2026-01-01T00:00:00Z",
+      recorded_at: "2026-01-01T00:00:00Z",
+      plan: "starter"
+    },
+    {
+      id: "evt_future",
+      account_id: "acct_hook",
+      type: "plan_changed",
+      timestamp: "2026-01-02T00:00:00Z",
+      effective_at: "2026-02-01T00:00:00Z",
+      recorded_at: "2026-01-02T00:00:00Z",
+      plan: "pro"
+    }
+  ];
+  const events = normalizeRawEvents(rawEvents);
+  const states = reduceAccountStateV2(events, {
+    businessAsOf: "2026-01-15T00:00:00.000Z",
+    auditAsOf: "2026-02-15T00:00:00.000Z"
+  });
+  const summary = summarizeAccountV2(states[0], { businessAsOf: "2026-01-15T00:00:00.000Z" });
+
+  assert.equal(summary.plan, "starter");
+  assert.equal(exportLedgerReportV2([{ ...summary, couponCode: 'SAVE,"10' }]).includes('"SAVE,""10"'), true);
+
+  assert.deepEqual(
+    calculatePlanChangeProrationV2({
+      old_plan: "starter",
+      new_plan: "pro",
+      period_start: "2026-01-01T00:00:00Z",
+      period_end: "2026-02-01T00:00:00Z",
+      change_effective_at: "2026-01-16T12:00:00Z",
+      quantity: 1
+    }),
+    {
+      oldPlan: "starter",
+      newPlan: "pro",
+      quantity: 1,
+      periodStart: "2026-01-01T00:00:00.000Z",
+      periodEnd: "2026-02-01T00:00:00.000Z",
+      changeEffectiveAt: "2026-01-16T12:00:00.000Z",
+      oldCreditCents: -600,
+      newChargeCents: 2450,
+      netAdjustmentCents: 1850
+    }
+  );
 });

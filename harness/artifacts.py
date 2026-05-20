@@ -64,7 +64,7 @@ CORE_RUN_ARTIFACTS: tuple[str, ...] = (
     "score.json",
 )
 
-OPTIONAL_RUN_ARTIFACTS: tuple[str, ...] = ("npm-ci.log", "npm-ci.meta.json")
+OPTIONAL_RUN_ARTIFACTS: tuple[str, ...] = ("npm-ci.log", "npm-ci.meta.json", "source_snapshot/manifest.json")
 
 EXPERIMENT_OUTPUT_ARTIFACTS: tuple[str, ...] = (
     "results/results.csv",
@@ -190,12 +190,22 @@ def run_metadata_matches(run_dir: str | Path, run: Mapping[str, Any]) -> bool:
 
 
 def validate_run_metadata(run_dir: str | Path, run: Mapping[str, Any]) -> list[str]:
-    metadata_path = Path(run_dir) / "metadata.json"
+    root = Path(run_dir)
+    metadata_path = root / "metadata.json"
     errors = validate_artifact(metadata_path)
     if errors:
         return errors
+    metadata = read_json(metadata_path)
     if not run_metadata_matches(run_dir, run):
         return [f"metadata does not match resolved run record: {metadata_path}"]
+    worktree_pointer = read_json(root / "worktree.json")
+    if isinstance(metadata, Mapping) and isinstance(worktree_pointer, Mapping):
+        if metadata.get("worktree") != worktree_pointer.get("path"):
+            errors.append(f"metadata worktree path does not match worktree pointer: {metadata_path}")
+        if not isinstance(metadata.get("baseline_commit"), str) or not metadata.get("baseline_commit"):
+            errors.append(f"metadata missing baseline commit: {metadata_path}")
+    if errors:
+        return errors
     return []
 
 

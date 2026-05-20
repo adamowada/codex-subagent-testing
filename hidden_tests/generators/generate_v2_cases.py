@@ -412,6 +412,19 @@ def lifecycle_precedence_cases() -> list[dict[str, Any]]:
             as_of="2026-04-05T00:00:00Z",
             points=2.0,
         ),
+        evaluate_case_entry(
+            "lifecycle.entitlements_after_recovery",
+            "lifecycle_precedence",
+            ["LC-008", "PY-001"],
+            [
+                opened("evt_lc_eval_open", "acct_lc_eval", "starter", "2026-04-01T00:00:00Z"),
+                event("evt_lc_eval_fail", "acct_lc_eval", "payment_failed", "2026-04-02T00:00:00Z"),
+                event("evt_lc_eval_recover", "acct_lc_eval", "payment_recovered", "2026-04-03T00:00:00Z"),
+            ],
+            account_id="acct_lc_eval",
+            as_of="2026-04-04T00:00:00Z",
+            points=1.5,
+        ),
         reduce_case(
             "lifecycle.pause_plan_change_resume",
             "lifecycle_precedence",
@@ -741,6 +754,7 @@ def performance_cases() -> list[dict[str, Any]]:
             {"raw_events": many_accounts, "as_of": "2026-09-01T00:00:00Z"},
             performance_digest(many_accounts, "2026-09-01T00:00:00Z"),
             points=3.0,
+            timeout_seconds={"typescript": 60, "python": 60},
         ),
         case(
             "performance.single_account_long_history_10k_events",
@@ -750,6 +764,7 @@ def performance_cases() -> list[dict[str, Any]]:
             {"raw_events": long_history, "as_of": "2026-10-01T00:00:00Z"},
             performance_digest(long_history, "2026-10-01T00:00:00Z"),
             points=3.0,
+            timeout_seconds={"typescript": 60, "python": 60},
         ),
     ]
 
@@ -906,6 +921,37 @@ def reduce_case(
     )
 
 
+def evaluate_case_entry(
+    case_id: str,
+    category: str,
+    rule_ids: list[str],
+    raw_events: list[dict[str, Any]],
+    *,
+    account_id: str,
+    as_of: str | None = None,
+    business_as_of: str | None = None,
+    audit_as_of: str | None = None,
+    points: float,
+) -> dict[str, Any]:
+    input_payload: dict[str, Any] = {"raw_events": raw_events, "account_id": account_id}
+    if as_of is not None:
+        input_payload["as_of"] = as_of
+    if business_as_of is not None:
+        input_payload["business_as_of"] = business_as_of
+    if audit_as_of is not None:
+        input_payload["audit_as_of"] = audit_as_of
+    metadata_case = {"operation": "v2_reduce_and_evaluate", "input": input_payload}
+    return case(
+        case_id,
+        category,
+        rule_ids,
+        "v2_reduce_and_evaluate",
+        input_payload,
+        evaluate_case(metadata_case),
+        points=points,
+    )
+
+
 def metamorphic_case(
     case_id: str,
     rule_ids: list[str],
@@ -958,6 +1004,7 @@ def case(
     points: float,
     languages: list[str] | None = None,
     match: str | None = None,
+    timeout_seconds: int | float | dict[str, int | float] | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": case_id,
@@ -971,6 +1018,8 @@ def case(
     }
     if match is not None:
         payload["match"] = match
+    if timeout_seconds is not None:
+        payload["timeout_seconds"] = timeout_seconds
     return payload
 
 

@@ -231,11 +231,11 @@ The current initial config uses:
 
 ```text
 quality_score =
-  0.45 * hidden_tests
-+ 0.25 * judge
+  0.50 * hidden_tests
 + 0.15 * public_tests
-+ 0.10 * typecheck
-+ 0.05 * parity
++ 0.15 * typecheck
++ 0.15 * judge
++ 0.05 * minimality
 ```
 
 The scoring implementation should not hard-code either profile. It should use the resolved `scoring.weights` copied into the run record by experiment configuration expansion.

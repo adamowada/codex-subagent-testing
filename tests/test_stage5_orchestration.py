@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.codex_runner import build_implementation_command, build_judge_command
+from harness.codex_runner import ProcessResult, build_implementation_command, build_judge_command
 from harness.jsonl_usage import parse_usage_events, summarize_usage
 from harness.matrix import expand_experiment_matrix, load_experiment_config
 from harness.orchestrator import (
@@ -14,6 +14,7 @@ from harness.orchestrator import (
     configure_worktree_git_excludes,
     initialize_git_baseline,
     prepare_judge_evidence,
+    run_hidden_tests,
     resolve_experiment_dir,
     run_parallel,
     select_runs,
@@ -144,10 +145,10 @@ def test_implementation_command_contains_run_settings(runs: list[dict]) -> None:
     assert command[-1] == "prompt text"
 
 
-def test_solo_command_uses_cli_minimum_agent_depth(runs: list[dict]) -> None:
+def test_solo_command_preserves_configured_zero_agent_depth(runs: list[dict]) -> None:
     command = build_implementation_command("codex", runs[0], "prompt text")
 
-    assert "agents.max_depth=1" in command
+    assert "agents.max_depth=0" in command
 
 
 def test_implementation_command_uses_rendered_agent_config(runs: list[dict], tmp_path: Path) -> None:
@@ -288,3 +289,36 @@ def test_prepare_judge_evidence_copies_sanitized_artifacts(tmp_path: Path) -> No
     assert (evidence / "evidence-manifest.json").exists()
     assert not (evidence / "manifest.json").exists()
     assert not (evidence / "metadata.json").exists()
+
+
+def test_hidden_runner_outer_timeout_uses_implementation_budget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_logged_command(command, *, cwd, log_path, timeout_seconds, env=None):
+        captured["timeout_seconds"] = timeout_seconds
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text("hidden runner log\n", encoding="utf-8")
+        return ProcessResult(
+            command=list(command),
+            command_display=list(command),
+            cwd=str(cwd),
+            started_at="2026-01-01T00:00:00Z",
+            finished_at="2026-01-01T00:00:01Z",
+            elapsed_seconds=1.0,
+            returncode=0,
+            timed_out=False,
+            log_path=str(log_path),
+        )
+
+    monkeypatch.setattr("harness.orchestrator.run_logged_command", fake_run_logged_command)
+    run_hidden_tests(
+        REPO_ROOT,
+        tmp_path / "worktree",
+        tmp_path / "run",
+        {
+            "timeouts": {"implementation_seconds": 1800},
+            "benchmark": {"hidden_cases_path": "hidden_tests/cases_v2"},
+        },
+    )
+
+    assert captured["timeout_seconds"] == 1800

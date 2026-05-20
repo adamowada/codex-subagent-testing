@@ -643,7 +643,8 @@ Done when:
 Implementation:
 
 - Fork the current starter into a v2 template while keeping the existing public
-  API names in TypeScript and Python.
+  API names in TypeScript and Python, and add explicit v2 hook names for
+  business/audit views and billing helpers.
 - Extend raw events with hard-mode fields: `effective_at`, `recorded_at`,
   `sequence`, `currency`, `quantity`, `seat_delta`, `merge_from_account_id`,
   `correction_of`, `voided_event_id`, `invoice_id`, `period_start`, and
@@ -664,6 +665,8 @@ Done when:
 - The starter remains intentionally incomplete against hidden hard-mode behavior.
 - TypeScript and Python expose the same function names and compatible output
   shapes.
+- TypeScript and Python expose the same v2 hook names for separate view cutoffs,
+  report export, and proration.
 - Public docs describe the added event fields, ordering rules, and billing rules
   without revealing hidden cases.
 
@@ -799,6 +802,8 @@ Implementation:
 
 - Add the full v2 matrix only after the v2 pilot confirms the benchmark is hard
   enough and operationally stable.
+- If only static validation and dry-runs are available, keep measured execution
+  readiness conditional on real pilot evidence and working Codex access.
 - Keep v2 cells configurable so future v3 adjustments can reuse the same harness
   path with a different template, hidden cases, or scoring profile.
 - Preserve all raw evidence for v2 exactly as for v1.
@@ -812,6 +817,8 @@ Done when:
   low, medium, high, and xhigh reasoning levels.
 - The repository has a documented command for the full v2 experiment analogous
   to `.\scripts\run_experiment.ps1 -Config <v2-config> -Jobs 3`.
+- If the full v2 config exists before real pilot execution, reports and docs
+  must call it config-ready rather than fully execution-ready.
 
 ## Assumptions
 

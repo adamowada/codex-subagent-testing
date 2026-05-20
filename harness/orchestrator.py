@@ -507,9 +507,17 @@ def prepare_run(
         write_worktree_pointer(run_dir, worktree, repo_root)
         mark_phase(run_dir, "prepared", "completed", {"worktree": str(worktree)})
         _append_log(log_path, f"{run['run_id']} prepared worktree")
+        state = load_state(run_dir)
+        prepared_refreshed = True
+    else:
+        prepared_refreshed = False
 
     metadata_path = run_dir / "metadata.json"
-    if phase_completed(load_state(run_dir), "baseline_committed", phase_artifact_paths(run_dir, "baseline_committed")):
+    if not prepared_refreshed and phase_completed(
+        load_state(run_dir),
+        "baseline_committed",
+        phase_artifact_paths(run_dir, "baseline_committed"),
+    ):
         errors = validate_run_metadata(run_dir, run)
         if errors:
             raise OrchestrationError(_format_artifact_errors("run metadata validation failed", errors))
@@ -543,6 +551,17 @@ def run_implementation_and_tests(
 
     implementation_reran = False
     if should_run_phase(state, "implemented", run_dir / "events.jsonl", rerun_failed):
+        if rerun_failed and _phase_failed(state, "implemented"):
+            archived_worktree = refresh_run_worktree(
+                repo_root=repo_root,
+                run_dir=run_dir,
+                worktree=worktree,
+                run=run,
+                reason="rerun_failed_implementation",
+            )
+            _append_log(log_path, f"{run['run_id']} refreshed worktree for failed implementation rerun")
+            if archived_worktree is not None:
+                _append_log(log_path, f"{run['run_id']} archived previous worktree to {archived_worktree}")
         archived_to = archive_failed_phase_artifacts(
             run_dir,
             "implemented",
@@ -603,6 +622,7 @@ def run_implementation_and_tests(
             else None
         )
         capture_diff(run_dir, worktree)
+        capture_source_snapshot(run_dir, worktree)
         phase_data = {"captured_at": iso_now()}
         if archived_to is not None:
             phase_data["previous_artifacts_archived_to"] = archived_to
@@ -682,6 +702,25 @@ def run_judge(
         for upstream in ("diff_captured", "public_tested", "hidden_tested")
     )
     if not judge_stale and not should_run_phase(state, "judged", run_dir / "judge.events.jsonl", rerun_failed):
+        return
+
+    privacy_errors = _hidden_privacy_errors(state)
+    if privacy_errors:
+        mark_phase(
+            run_dir,
+            "judged",
+            "failed",
+            {
+                "reason": "hidden_artifact_privacy_failed",
+                "privacy_errors": privacy_errors,
+                "skipped_at": iso_now(),
+            },
+        )
+        _append_log(
+            log_path,
+            _format_artifact_errors(f"{run['run_id']} judge skipped after hidden artifact privacy failure", privacy_errors),
+        )
+        status.update_run(str(run["run_id"]), phase="judge_skipped", failure="hidden privacy validation failed")
         return
 
     if judge_stale:
@@ -941,7 +980,7 @@ def run_hidden_tests(repo_root: Path, worktree: Path, run_dir: Path, run: Mappin
         command,
         cwd=Path(tempfile.gettempdir()),
         log_path=run_dir / "hidden-runner.log",
-        timeout_seconds=min(int(run["timeouts"]["implementation_seconds"]), 900),
+        timeout_seconds=int(run["timeouts"]["implementation_seconds"]),
         env=_pythonpath_env(repo_root),
     )
     write_process_result(run_dir / "hidden-runner.meta.json", result)
@@ -980,6 +1019,50 @@ def capture_diff(run_dir: Path, worktree: Path) -> None:
         check=False,
     )
     (run_dir / "diff-numstat.txt").write_text(numstat.stdout, encoding="utf-8", errors="replace")
+
+
+def capture_source_snapshot(run_dir: Path, worktree: Path) -> None:
+    snapshot_dir = run_dir / "source_snapshot"
+    if snapshot_dir.exists():
+        shutil.rmtree(snapshot_dir)
+    copied: list[dict[str, Any]] = []
+
+    def ignore(directory: str, names: list[str]) -> set[str]:
+        ignored = {
+            name
+            for name in names
+            if name
+            in {
+                ".git",
+                "node_modules",
+                "dist",
+                ".pytest_cache",
+                "__pycache__",
+                "judge_evidence",
+            }
+            or name.endswith(".pyc")
+        }
+        return ignored
+
+    shutil.copytree(worktree, snapshot_dir / "files", ignore=ignore)
+    for path in sorted((snapshot_dir / "files").rglob("*")):
+        if path.is_file():
+            copied.append(
+                {
+                    "path": path.relative_to(snapshot_dir / "files").as_posix(),
+                    "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                    "bytes": path.stat().st_size,
+                }
+            )
+    _write_json(
+        snapshot_dir / "manifest.json",
+        {
+            "schema_version": 1,
+            "captured_at": iso_now(),
+            "file_count": len(copied),
+            "files": copied,
+        },
+    )
 
 
 def configure_worktree_git_excludes(worktree: Path) -> None:
@@ -1033,6 +1116,43 @@ def should_run_phase(state: Mapping[str, Any], phase: str, required_artifact: Pa
         if phase_state.get("status") == "failed" and required_artifact.exists() and not rerun_failed:
             return False
     return True
+
+
+def refresh_run_worktree(
+    *,
+    repo_root: Path,
+    run_dir: Path,
+    worktree: Path,
+    run: Mapping[str, Any],
+    reason: str,
+) -> str | None:
+    archived_to = str(_archive_path(worktree)) if worktree.exists() else None
+    copy_benchmark_template(_run_benchmark_path(repo_root, run, "template_path"), worktree)
+    write_worktree_pointer(run_dir, worktree, repo_root)
+    baseline_sha = initialize_git_baseline(worktree)
+    _write_json(run_dir / "metadata.json", run_metadata(run, run_dir, worktree, baseline_sha))
+    mark_phase(run_dir, "prepared", "completed", {"worktree": str(worktree), "refresh_reason": reason})
+    mark_phase(
+        run_dir,
+        "baseline_committed",
+        "completed",
+        {"baseline_sha": baseline_sha, "refresh_reason": reason},
+    )
+    return archived_to
+
+
+def _phase_failed(state: Mapping[str, Any], phase: str) -> bool:
+    phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
+    phase_state = phases.get(phase, {}) if isinstance(phases, Mapping) else {}
+    return isinstance(phase_state, Mapping) and phase_state.get("status") == "failed"
+
+
+def _hidden_privacy_errors(state: Mapping[str, Any]) -> list[str]:
+    phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
+    hidden = phases.get("hidden_tested", {}) if isinstance(phases, Mapping) else {}
+    data = hidden.get("data", {}) if isinstance(hidden, Mapping) else {}
+    errors = data.get("privacy_errors") if isinstance(data, Mapping) else None
+    return [str(error) for error in errors] if isinstance(errors, list) else []
 
 
 def phase_stale_after(state: Mapping[str, Any], phase: str, upstream_phase: str) -> bool:

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import time
 import tomllib
@@ -168,12 +169,13 @@ def run_process_to_files(
                     encoding="utf-8",
                     errors="replace",
                     env=dict(env) if env is not None else None,
+                    **_process_group_kwargs(),
                 )
                 try:
                     returncode = process.wait(timeout=timeout_seconds)
                 except subprocess.TimeoutExpired:
                     timed_out = True
-                    process.kill()
+                    _terminate_process_tree(process)
                     stderr_file.write("\nTIMEOUT\n")
                     try:
                         returncode = process.wait(timeout=KILL_WAIT_SECONDS)
@@ -228,12 +230,13 @@ def run_logged_command(
                 encoding="utf-8",
                 errors="replace",
                 env=dict(env) if env is not None else None,
+                **_process_group_kwargs(),
             )
             try:
                 returncode = process.wait(timeout=timeout_seconds)
             except subprocess.TimeoutExpired:
                 timed_out = True
-                process.kill()
+                _terminate_process_tree(process)
                 log_file.write("\nTIMEOUT\n")
                 try:
                     returncode = process.wait(timeout=KILL_WAIT_SECONDS)
@@ -366,7 +369,37 @@ def _config_override_args(overrides: list[str]) -> list[str]:
 
 
 def _codex_cli_agent_depth(value: Any) -> int:
-    return max(1, int(value))
+    depth = int(value)
+    if depth < 0:
+        raise ValueError("agents.max_depth must be non-negative")
+    return depth
+
+
+def _process_group_kwargs() -> dict[str, Any]:
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _terminate_process_tree(process: subprocess.Popen[Any]) -> None:
+    if process.poll() is not None:
+        return
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            return
+        except OSError:
+            process.kill()
+            return
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except OSError:
+        process.kill()
 
 
 def _toml_value(value: Any) -> str:

@@ -118,6 +118,36 @@ def test_missing_score_rows_remain_visible_with_attribution_warnings(tmp_path: P
     assert "Implementation JSONL did not expose per-model attribution." in html
 
 
+def test_primary_ranking_omits_missing_efficiency_values() -> None:
+    rows = [
+        {
+            "run_id": "missing",
+            "cell_id": "C0",
+            "spark_mode": "none",
+            "benchmark_version": "ruleledger_v1",
+            "quality_score": 0.9,
+            "quality_per_gpt55_impl_token": None,
+            "artifact_status": "complete",
+            "failure_phase": "",
+        },
+        {
+            "run_id": "ranked",
+            "cell_id": "C1",
+            "spark_mode": "direct",
+            "benchmark_version": "ruleledger_v1",
+            "quality_score": 0.1,
+            "quality_per_gpt55_impl_token": 0.001,
+            "artifact_status": "complete",
+            "failure_phase": "",
+        },
+    ]
+
+    aggregate = aggregate_rows(rows)
+
+    assert aggregate["rankings"]["primary_by_run_group"][0]["group_id"] == "C1:direct"
+    assert aggregate["best_run"]["run_id"] == "ranked"
+
+
 def test_failure_rate_counts_preserved_failed_phases() -> None:
     rows = [
         {"run_id": "ok", "status": "partial", "artifact_status": "complete", "failure_phase": ""},
@@ -236,10 +266,18 @@ def test_v2_report_includes_category_performance_and_root_spread(
         csv_columns = next(csv.reader(handle))
     assert "hidden_correctness" in csv_columns
     assert "performance_pass_rate" in csv_columns
+    assert "gpt55_judge_inclusive_tokens" in csv_columns
+    assert "spark_implementation_tokens" in csv_columns
 
     with sqlite3.connect(outputs["results_sqlite"]) as connection:
         sqlite_columns = {row[1] for row in connection.execute("PRAGMA table_info(results)")}
-    assert {"hidden_correctness", "performance_pass_rate", "hidden_category_scores"} <= sqlite_columns
+    assert {
+        "hidden_correctness",
+        "performance_pass_rate",
+        "hidden_category_scores",
+        "gpt55_judge_inclusive_tokens",
+        "spark_implementation_tokens",
+    } <= sqlite_columns
 
 
 def test_mixed_benchmark_reports_are_labeled_instead_of_silent() -> None:
@@ -276,8 +314,49 @@ def test_mixed_benchmark_reports_are_labeled_instead_of_silent() -> None:
     html = render_html_report(rows, aggregate)
 
     assert aggregate["cross_version"]["mode"] == "mixed_versions_labeled"
-    assert aggregate["rankings"]["primary_by_run_group"][0]["group_id"].startswith("ruleledger_v1/")
+    assert aggregate["rankings"]["primary_by_run_group"] == []
+    assert aggregate["rankings_by_benchmark"]["ruleledger_v1"]["primary_by_run_group"][0]["group_id"] == "C0"
+    assert aggregate["rankings_by_benchmark"]["ruleledger_v2"]["primary_by_run_group"][0]["group_id"] == "V2C0"
     assert "Cross-Version Selection" in html
+    assert "Primary Ranking: ruleledger_v1" in html
+    assert "Primary Ranking: ruleledger_v2" in html
+
+
+def test_mixed_benchmark_c4_section_still_detects_prefixed_labels() -> None:
+    rows = [
+        {
+            "run_id": "C4_direct_r01",
+            "cell_id": "C4",
+            "cell_name": "C4_cell",
+            "spark_mode": "direct",
+            "benchmark_version": "ruleledger_v1",
+            "quality_score": 0.5,
+            "hidden_tests": 0.5,
+            "gpt55_implementation_tokens": 100,
+            "quality_per_gpt55_impl_token": 0.005,
+            "implementation_elapsed_seconds": 60.0,
+            "artifact_status": "complete",
+            "failure_phase": "",
+        },
+        {
+            "run_id": "V2C0_r01",
+            "cell_id": "V2C0",
+            "cell_name": "V2C0_cell",
+            "spark_mode": "none",
+            "benchmark_version": "ruleledger_v2",
+            "quality_score": 0.4,
+            "hidden_tests": 0.4,
+            "gpt55_implementation_tokens": 100,
+            "quality_per_gpt55_impl_token": 0.004,
+            "implementation_elapsed_seconds": 60.0,
+            "artifact_status": "complete",
+            "failure_phase": "",
+        },
+    ]
+
+    html = render_html_report(rows, aggregate_rows(rows))
+
+    assert "C4 Stress-Test Analysis" in html
 
 
 def test_pdf_renderer_disables_browser_header_footer() -> None:
@@ -400,7 +479,11 @@ def _write_run_artifacts(experiment_dir: Path, run: dict[str, object]) -> None:
             "totals": {
                 "implementation_tokens": implementation_tokens,
                 "judge_tokens": 100,
+                "judge_inclusive_tokens": implementation_tokens + 100,
                 "gpt55_implementation_tokens": gpt55_tokens,
+                "gpt55_judge_tokens": 100,
+                "gpt55_judge_inclusive_tokens": gpt55_tokens + 100,
+                "spark_implementation_tokens": 0,
             },
             "attribution_method": "per_event_model",
             "warnings": [],

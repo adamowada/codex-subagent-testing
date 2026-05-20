@@ -427,6 +427,7 @@ def _write_run_artifacts(experiment_dir: Path, run: dict, *, quality: float) -> 
             "run": run,
             "benchmark": run.get("benchmark"),
             "worktree": str(worktree),
+            "baseline_commit": "synthetic-baseline",
         },
     )
     _write_json(run_dir / "final_response.json", {"parsed": True, "value": {"status": "success"}})

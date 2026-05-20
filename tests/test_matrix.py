@@ -230,6 +230,19 @@ def test_all_spark_leaf_reasoning_is_xhigh(config: dict) -> None:
         assert set(leaf["reasoning_by_role"].values()) == {"xhigh"}
 
 
+def test_non_initial_configs_can_vary_models_and_leaf_reasoning() -> None:
+    candidate = load_experiment_config(RULELEDGER_V2_PILOT_CONFIG_PATH)
+    candidate["models"]["spark"] = "future-spark-model"
+    candidate["cells"][1]["leaf"]["model"] = "future-spark-model"
+    candidate["cells"][1]["leaf"]["reasoning_by_role"]["tester"] = "high"
+
+    runs = expand_experiment_matrix(candidate)
+
+    spark_run = next(run for run in runs if run["leaf"] is not None)
+    assert spark_run["leaf"]["model"] == "future-spark-model"
+    assert spark_run["leaf"]["reasoning_by_role"]["tester"] == "high"
+
+
 def test_duplicate_cell_ids_fail_validation(config: dict) -> None:
     candidate = copy.deepcopy(config)
     candidate["cells"][1]["id"] = "C0"
