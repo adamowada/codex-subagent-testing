@@ -9,6 +9,18 @@ invoices, and billing periods.
 The starter is intentionally incomplete. Public tests are visible guidance, not
 a complete scoring suite.
 
+## Hard-Mode Semantics
+
+The v2 semantic contract is documented in
+[`docs/ruleledger_v2_semantics.md`](docs/ruleledger_v2_semantics.md). That
+document defines the rule identifiers used by public examples and future hidden
+cases, including bitemporal replay, corrections and voids, lifecycle
+precedence, account merges, billing proration, reporting stability, and
+TypeScript/Python parity.
+
+Public examples for the contract live in
+`fixtures/public_semantics_examples.json`.
+
 ## Setup
 
 Install the pinned TypeScript dependency before running Node-based commands:
@@ -119,4 +131,3 @@ timestamps, a correction or void reference, an account merge reference, seat and
 quantity changes, invoice fields, billing periods, and CSV/report parity.
 Future hidden tests exercise deeper lifecycle, correction, merge, proration,
 performance, and metamorphic behavior.
-

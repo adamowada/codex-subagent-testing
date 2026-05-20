@@ -13,7 +13,7 @@ from harness.codex_runner import (
     resolve_npm_bin,
     run_process_to_files,
 )
-from harness.hidden_runner import run_command as run_hidden_command
+from harness.hidden_runner import build_result_payload, run_command as run_hidden_command, strip_runner_metadata
 from harness.orchestrator import (
     _public_tests_have_launch_errors,
     archive_failed_phase_artifacts,
@@ -101,6 +101,50 @@ def test_hidden_runner_command_decodes_utf8_output_on_windows(tmp_path: Path) ->
 
     assert result["returncode"] == 0
     assert "unicode: \u271d" in result["stdout"]
+
+
+def test_hidden_runner_result_payload_summarizes_error_cases(tmp_path: Path) -> None:
+    payload = build_result_payload(
+        manifest={"seed": 1, "category_weights": {"normalization": 1.0}},
+        worktree=tmp_path,
+        started_at="2026-01-01T00:00:00.000Z",
+        finished_at="2026-01-01T00:00:01.000Z",
+        results=[
+            {
+                "id": "case-000000000001",
+                "category": "normalization",
+                "language": "typescript",
+                "status": "error",
+                "points_earned": 0.0,
+                "points_possible": 1.0,
+                "reason": "typescript_setup_failed",
+            }
+        ],
+        ts_setup={"ok": False, "reason": "typescript_setup_failed"},
+    )
+
+    assert payload["summary"]["errors"] == 1
+    assert payload["categories"]["normalization"]["errors"] == 1
+    assert payload["languages"]["typescript"]["errors"] == 1
+    assert payload["summary"]["score"] == 0.0
+
+
+def test_hidden_runner_strips_rule_ids_from_language_payload() -> None:
+    assert strip_runner_metadata(
+        {
+            "id": "case.private",
+            "category": "normalization",
+            "languages": ["typescript"],
+            "points": 1,
+            "rule_ids": ["BT-001"],
+            "operation": "normalize_event",
+            "input": {"raw_event": {"id": "evt"}},
+            "expected": {"ok": True},
+        }
+    ) == {
+        "operation": "normalize_event",
+        "input": {"raw_event": {"id": "evt"}},
+    }
 
 
 def test_run_process_to_files_records_timeout_and_partial_output(tmp_path: Path) -> None:

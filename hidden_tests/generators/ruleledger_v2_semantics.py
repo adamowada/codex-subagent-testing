@@ -1,0 +1,68 @@
+from __future__ import annotations
+
+
+V2_RULE_IDS: dict[str, tuple[str, ...]] = {
+    "bitemporal": ("BT-001", "BT-002", "BT-003", "BT-004", "BT-005", "BT-006"),
+    "ordering": ("OR-001", "OR-002", "OR-003", "OR-004"),
+    "corrections_voids": ("CV-001", "CV-002", "CV-003", "CV-004", "CV-005", "CV-006"),
+    "lifecycle": (
+        "LC-001",
+        "LC-002",
+        "LC-003",
+        "LC-004",
+        "LC-005",
+        "LC-006",
+        "LC-007",
+        "LC-008",
+        "LC-009",
+        "LC-010",
+        "LC-011",
+    ),
+    "account_merges": ("MG-001", "MG-002", "MG-003", "MG-004", "MG-005"),
+    "billing": ("BL-001", "BL-002", "BL-003", "BL-004", "BL-005", "BL-006", "BL-007"),
+    "reporting": ("RP-001", "RP-002", "RP-003", "RP-004", "RP-005", "RP-006"),
+    "parity": ("PY-001",),
+}
+
+V2_SUMMARY_FIELDS: tuple[str, ...] = (
+    "accountId",
+    "status",
+    "plan",
+    "features",
+    "usage",
+    "usageLimit",
+    "overLimit",
+    "totalPaidCents",
+    "currency",
+    "seats",
+    "couponCode",
+    "couponActive",
+    "invoiceIds",
+    "lastInvoiceId",
+    "lastPeriodStart",
+    "lastPeriodEnd",
+    "mergedFromAccountIds",
+    "closedAt",
+    "lastEventAt",
+)
+
+V2_CSV_HEADER: tuple[str, ...] = (
+    "account_id",
+    "status",
+    "plan",
+    "total_paid_cents",
+    "currency",
+    "seats",
+    "usage",
+    "usage_limit",
+    "over_limit",
+    "coupon_code",
+    "coupon_active",
+    "invoice_ids",
+    "last_invoice_id",
+    "last_period_start",
+    "last_period_end",
+    "merged_from_account_ids",
+    "closed_at",
+    "last_event_at",
+)

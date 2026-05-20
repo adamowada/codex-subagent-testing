@@ -435,7 +435,7 @@ def strip_runner_metadata(case: dict[str, Any]) -> dict[str, Any]:
     return {
         key: copy.deepcopy(value)
         for key, value in case.items()
-        if key not in {"id", "expected", "source_file", "category", "languages", "points"}
+        if key not in {"id", "expected", "source_file", "category", "languages", "points", "rule_ids"}
     }
 
 
@@ -564,7 +564,8 @@ def summarize_by(results: list[dict[str, Any]], key: str) -> dict[str, Any]:
             },
         )
         bucket["total"] += 1
-        bucket[result["status"]] += 1
+        status_key = "errors" if result["status"] == "error" else result["status"]
+        bucket[status_key] += 1
         bucket["points_earned"] += result["points_earned"]
         bucket["points_possible"] += result["points_possible"]
 

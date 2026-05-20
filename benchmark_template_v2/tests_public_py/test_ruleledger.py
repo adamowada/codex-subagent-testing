@@ -10,6 +10,7 @@ from ruleledger.engine import (
 )
 
 
+DOCS_DIR = Path(__file__).resolve().parents[1] / "docs"
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
 
@@ -24,6 +25,45 @@ def _read_fixture_events():
         assert normalized["ok"], json.dumps(normalized, indent=2)
         events.append(normalized["value"])
     return events
+
+
+def _read_semantics_examples():
+    return json.loads((FIXTURES_DIR / "public_semantics_examples.json").read_text(encoding="utf-8"))
+
+
+def _normalize_raw_events(raw_events):
+    events = []
+    for raw_event in raw_events:
+        normalized = normalize_event(raw_event)
+        assert normalized["ok"], json.dumps(normalized, indent=2)
+        events.append(normalized["value"])
+    return events
+
+
+def _replay_order(events):
+    return [
+        event["id"]
+        for event in sorted(
+            events,
+            key=lambda event: (event["effectiveAt"], event["recordedAt"], event["sequence"], event["id"]),
+        )
+    ]
+
+
+def _half_away_from_zero_rational(numerator, denominator):
+    sign = -1 if numerator < 0 else 1
+    quotient, remainder = divmod(abs(numerator), denominator)
+    if remainder * 2 >= denominator:
+        quotient += 1
+    return sign * quotient
+
+
+def _half_away_from_zero_decimal(value):
+    sign = -1 if value.startswith("-") else 1
+    whole, _, fractional = value.lstrip("-").partition(".")
+    denominator = 10 ** len(fractional)
+    numerator = int(whole) * denominator + int(fractional or "0")
+    return sign * _half_away_from_zero_rational(numerator, denominator)
 
 
 def test_parse_event_line_returns_structured_results_without_throwing():
@@ -145,3 +185,72 @@ def test_export_ledger_report_writes_stable_v2_csv_with_trailing_newline():
     expected = (FIXTURES_DIR / "public_expected_report_v2.csv").read_text(encoding="utf-8")
 
     assert export_ledger_report(summaries) == expected
+
+
+def test_public_semantics_examples_reference_documented_hard_mode_rule_ids():
+    semantics = (DOCS_DIR / "ruleledger_v2_semantics.md").read_text(encoding="utf-8")
+    fixture = _read_semantics_examples()
+    concepts = sorted(example["concept"] for example in fixture["examples"])
+
+    assert fixture["semantics_document"] == "docs/ruleledger_v2_semantics.md"
+    assert concepts == ["account_merge", "bitemporal", "correction_void", "csv_parity", "proration"]
+
+    for example in fixture["examples"]:
+        assert example["rule_ids"], example["id"]
+        for rule_id in example["rule_ids"]:
+            assert f"### {rule_id}:" in semantics, f"{example['id']} references missing {rule_id}"
+
+
+def test_bitemporal_public_semantics_example_has_deterministic_replay_and_summary():
+    example = next(
+        candidate for candidate in _read_semantics_examples()["examples"] if candidate["id"] == "public.bitemporal_late_arrival"
+    )
+    events = _normalize_raw_events(example["raw_events"])
+    states = reduce_account_state(events)
+    summaries = [summarize_account(state, example["as_of"]) for state in states]
+
+    assert _replay_order(events) == example["expected_replay_order"]
+    assert summaries == [example["expected_summary"]]
+
+
+def test_correction_void_and_merge_public_semantics_examples_expose_lineage_fields():
+    examples = _read_semantics_examples()["examples"]
+    correction = next(candidate for candidate in examples if candidate["id"] == "public.correction_void_lineage")
+    normalized_by_id = {event["id"]: event for event in _normalize_raw_events(correction["raw_events"])}
+
+    for event_id, expected_fields in correction["expected_normalized_fields"].items():
+        for field, expected_value in expected_fields.items():
+            assert normalized_by_id[event_id][field] == expected_value
+
+    merge = next(candidate for candidate in examples if candidate["id"] == "public.account_merge_lineage")
+    normalized_merge = normalize_event(merge["raw_event"])
+    assert normalized_merge["ok"]
+    for field, expected_value in merge["expected_normalized_fields"].items():
+        assert normalized_merge["value"][field] == expected_value
+
+
+def test_proration_public_semantics_example_documents_half_away_from_zero_rounding():
+    example = next(
+        candidate
+        for candidate in _read_semantics_examples()["examples"]
+        if candidate["id"] == "public.proration_half_away_from_zero"
+    )
+
+    for rounding in example["rounding_examples"]:
+        assert _half_away_from_zero_decimal(rounding["value"]) == rounding["expected"]
+
+    calc = example["calculation"]
+    assert (
+        _half_away_from_zero_rational(
+            calc["full_period_amount_cents"] * calc["active_ms"],
+            calc["period_ms"],
+        )
+        == calc["expected_prorated_amount_cents"]
+    )
+
+
+def test_csv_public_semantics_example_matches_stable_v2_report_contract():
+    example = next(candidate for candidate in _read_semantics_examples()["examples"] if candidate["id"] == "public.csv_parity_contract")
+    expected = (FIXTURES_DIR / example["expected_report_fixture"]).read_text(encoding="utf-8")
+
+    assert export_ledger_report(example["summaries"]) == expected

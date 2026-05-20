@@ -3,6 +3,7 @@
     {
       "id": "v2.placeholder.normalize_new_fields",
       "category": "synthetic_v2",
+      "rule_ids": ["BT-001", "BT-002", "BT-003", "OR-002", "BL-001", "BL-002", "RP-001", "PY-001"],
       "languages": ["typescript", "python"],
       "operation": "normalize_event",
       "input": {
