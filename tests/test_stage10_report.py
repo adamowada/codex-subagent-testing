@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -128,6 +130,156 @@ def test_failure_rate_counts_preserved_failed_phases() -> None:
     assert aggregate["failure_rate"] == pytest.approx(2 / 3)
 
 
+def test_v2_report_includes_category_performance_and_root_spread(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runs = [
+        _run(
+            "V2C0_r01",
+            "V2C0",
+            None,
+            quality=0.65,
+            gpt55_tokens=1000,
+            topology="solo",
+            benchmark_version="ruleledger_v2",
+            scoring_profile="starter_quality_v2",
+            root_reasoning="xhigh",
+            components={
+                "public_tests": 1.0,
+                "hidden_tests": 0.7,
+                "hidden_correctness": 0.6,
+                "hidden_parity": 0.5,
+                "performance": 0.75,
+                "judge": 0.8,
+                "typecheck": 1.0,
+                "parity": 0.5,
+                "minimality": 1.0,
+            },
+            hidden_category_scores={
+                "normalization": 1.0,
+                "bitemporal_replay": 0.2,
+                "parity": 0.5,
+                "performance": 0.75,
+            },
+            hidden_results={
+                "schema_version": 1,
+                "cases": [
+                    {"category": "performance", "status": "passed", "reason": "ok"},
+                    {"category": "performance", "status": "failed", "reason": "timeout"},
+                ],
+            },
+        ),
+        _run(
+            "V2C1_r01",
+            "V2C1",
+            None,
+            quality=0.45,
+            gpt55_tokens=900,
+            topology="solo",
+            benchmark_version="ruleledger_v2",
+            scoring_profile="starter_quality_v2",
+            root_reasoning="medium",
+            components={
+                "public_tests": 1.0,
+                "hidden_tests": 0.5,
+                "hidden_correctness": 0.4,
+                "hidden_parity": 0.5,
+                "performance": 0.5,
+                "judge": 0.6,
+                "typecheck": 0.0,
+                "parity": 0.5,
+                "minimality": 1.0,
+            },
+            hidden_category_scores={
+                "normalization": 1.0,
+                "bitemporal_replay": 0.6,
+                "parity": 0.5,
+                "performance": 0.5,
+            },
+            hidden_results={
+                "schema_version": 1,
+                "cases": [
+                    {"category": "performance", "status": "passed", "reason": "ok"},
+                    {"category": "performance", "status": "passed", "reason": "ok"},
+                ],
+            },
+        ),
+    ]
+    for run in runs:
+        _write_run_artifacts(tmp_path, run)
+
+    rows = collect_result_rows(tmp_path, runs)
+    assert rows[0]["performance_pass_rate"] == 0.5
+    assert rows[0]["performance_timeout_rate"] == 0.5
+    assert rows[0]["category_saturation"]["saturated"] == ["normalization"]
+
+    monkeypatch.setenv("CODEX_REPORT_PDF_RENDERER", "minimal")
+    outputs = write_results_outputs(tmp_path, runs)
+    aggregate = json.loads(Path(outputs["aggregate_json"]).read_text(encoding="utf-8"))
+    html = Path(outputs["report_html"]).read_text(encoding="utf-8")
+
+    assert aggregate["v2"]["runs"] == 2
+    assert aggregate["v2"]["category_means"]["normalization"] == 1.0
+    assert aggregate["v2"]["category_saturation"]["saturated"] == ["normalization"]
+    assert aggregate["v2"]["performance"]["score_mean"] == pytest.approx(0.625)
+    assert aggregate["v2"]["performance"]["pass_rate_mean"] == pytest.approx(0.75)
+    assert aggregate["v2"]["performance"]["timeout_rate_mean"] == pytest.approx(0.25)
+    assert aggregate["v2"]["spread_by_root_reasoning"]["xhigh"]["hidden_correctness_mean"] == 0.6
+    assert "V2 Scoring Profile" in html
+    assert "Hidden Category Calibration" in html
+    assert "Performance And Timeout Behavior" in html
+    assert "public_tests_gate" in html
+    assert "typecheck_gate" in html
+
+    with Path(outputs["results_csv"]).open(encoding="utf-8", newline="") as handle:
+        csv_columns = next(csv.reader(handle))
+    assert "hidden_correctness" in csv_columns
+    assert "performance_pass_rate" in csv_columns
+
+    with sqlite3.connect(outputs["results_sqlite"]) as connection:
+        sqlite_columns = {row[1] for row in connection.execute("PRAGMA table_info(results)")}
+    assert {"hidden_correctness", "performance_pass_rate", "hidden_category_scores"} <= sqlite_columns
+
+
+def test_mixed_benchmark_reports_are_labeled_instead_of_silent() -> None:
+    rows = [
+        {
+            "run_id": "C0_r01",
+            "cell_id": "C0",
+            "spark_mode": "none",
+            "benchmark_version": "ruleledger_v1",
+            "quality_score": 0.8,
+            "hidden_tests": 0.8,
+            "gpt55_implementation_tokens": 100,
+            "quality_per_gpt55_impl_token": 0.008,
+            "artifact_status": "complete",
+            "failure_phase": "",
+        },
+        {
+            "run_id": "V2C0_r01",
+            "cell_id": "V2C0",
+            "spark_mode": "none",
+            "benchmark_version": "ruleledger_v2",
+            "quality_score": 0.7,
+            "hidden_tests": 0.7,
+            "hidden_correctness": 0.6,
+            "performance": 0.5,
+            "gpt55_implementation_tokens": 100,
+            "quality_per_gpt55_impl_token": 0.007,
+            "artifact_status": "complete",
+            "failure_phase": "",
+        },
+    ]
+
+    aggregate = aggregate_rows(rows)
+    html = render_html_report(rows, aggregate)
+
+    assert aggregate["cross_version"]["mode"] == "mixed_versions_labeled"
+    assert aggregate["rankings"]["primary_by_run_group"][0]["group_id"].startswith("ruleledger_v1/")
+    assert "Cross-Version Selection" in html
+
+
 def test_pdf_renderer_disables_browser_header_footer() -> None:
     renderer = Path(__file__).resolve().parents[1] / "scripts" / "render_report_pdf.mjs"
 
@@ -142,6 +294,12 @@ def _run(
     quality: float,
     gpt55_tokens: int,
     topology: str = "flat_spark",
+    benchmark_version: str = "ruleledger_v1",
+    scoring_profile: str = "initial_quality_v1",
+    root_reasoning: str | None = None,
+    components: dict[str, float] | None = None,
+    hidden_category_scores: dict[str, float] | None = None,
+    hidden_results: dict[str, object] | None = None,
 ) -> dict[str, object]:
     run: dict[str, object] = {
         "run_id": run_id,
@@ -150,10 +308,20 @@ def _run(
         "repeat_index": 1,
         "topology": topology,
         "spark_mode": spark_mode,
-        "root": {"model": "gpt-5.5", "reasoning": "xhigh" if cell_id in {"C0", "C4"} else "medium"},
+        "root": {"model": "gpt-5.5", "reasoning": root_reasoning or ("xhigh" if cell_id in {"C0", "C4"} else "medium")},
         "agents": {"max_depth": 0 if topology == "solo" else 1, "max_threads": 1 if topology == "solo" else 8},
+        "benchmark": {
+            "version": benchmark_version,
+            "template_path": "benchmark_template_v2" if benchmark_version == "ruleledger_v2" else "benchmark_template",
+            "hidden_cases_path": "hidden_tests/cases_v2" if benchmark_version == "ruleledger_v2" else "hidden_tests/cases",
+            "scoring_path": "configs/scoring_v2.yaml" if benchmark_version == "ruleledger_v2" else "configs/scoring.yaml",
+            "scoring_profile": scoring_profile,
+        },
         "quality": quality,
         "gpt55_tokens": gpt55_tokens,
+        "components": components or {},
+        "hidden_category_scores": hidden_category_scores or {},
+        "hidden_results": hidden_results or {},
     }
     if topology != "solo":
         run["leaf"] = {
@@ -170,19 +338,38 @@ def _write_run_artifacts(experiment_dir: Path, run: dict[str, object]) -> None:
     quality = float(run["quality"])
     gpt55_tokens = int(run["gpt55_tokens"])
     implementation_tokens = max(gpt55_tokens, 1)
+    components = run.get("components") if isinstance(run.get("components"), dict) else {}
+    if not components:
+        components = {
+            "public_tests": quality,
+            "hidden_tests": quality,
+            "judge": quality,
+            "typecheck": 1.0,
+            "parity": quality,
+            "minimality": 0.0,
+        }
+    hidden_category_scores = run.get("hidden_category_scores") if isinstance(run.get("hidden_category_scores"), dict) else {}
+    hidden_results = run.get("hidden_results") if isinstance(run.get("hidden_results"), dict) else {}
     _write_json(
         run_dir / "score.json",
         {
             "schema_version": 1,
             "status": "partial",
             "quality_score": quality,
-            "component_scores": {
-                "public_tests": quality,
-                "hidden_tests": quality,
-                "judge": quality,
-                "typecheck": 1.0,
-                "parity": quality,
-                "minimality": 0.0,
+            "component_scores": components,
+            "hidden_category_scores": hidden_category_scores,
+            "performance_summary": {
+                "category": "performance",
+                "total": 0,
+                "passed": 0,
+                "failed": 0,
+                "errors": 0,
+                "pass_rate": None,
+                "timeout_rate": None,
+            },
+            "gate_scores": {
+                "public_tests": components.get("public_tests", 0.0),
+                "typecheck": components.get("typecheck", 0.0),
             },
             "efficiency": {
                 "quality_per_gpt55_impl_token": round(quality / implementation_tokens, 12),
@@ -202,6 +389,8 @@ def _write_run_artifacts(experiment_dir: Path, run: dict[str, object]) -> None:
             "warnings": [],
         },
     )
+    if hidden_results:
+        _write_json(run_dir / "hidden-results.json", hidden_results)
     _write_json(
         run_dir / "usage.json",
         {

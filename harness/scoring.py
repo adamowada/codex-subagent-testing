@@ -5,7 +5,18 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
-KNOWN_COMPONENTS = {"public_tests", "hidden_tests", "judge", "typecheck", "parity", "minimality"}
+KNOWN_COMPONENTS = {
+    "public_tests",
+    "hidden_tests",
+    "hidden_correctness",
+    "hidden_parity",
+    "performance",
+    "judge",
+    "typecheck",
+    "parity",
+    "minimality",
+}
+HIDDEN_CORRECTNESS_EXCLUDED_CATEGORIES = {"parity", "performance"}
 DEFAULT_MINIMALITY_TARGET_PRODUCTION_LOC = 500
 DEFAULT_MINIMALITY_PENALTY_WINDOW = 1000
 
@@ -38,7 +49,24 @@ def compute_run_score(run_dir: str | Path, run: Mapping[str, Any]) -> dict[str, 
     public_test_score = (public_ts_score + public_py_score) / 2.0
     hidden_results = _read_json(run_path / "hidden-results.json", warnings, "hidden results")
     hidden_score = _hidden_score(hidden_results, warnings)
+    hidden_category_scores = _hidden_category_scores(hidden_results)
+    hidden_correctness_score = _hidden_correctness_score(hidden_results, hidden_score, weights, warnings)
     parity_score = _hidden_category_score(hidden_results, "parity")
+    performance_summary = _hidden_case_summary(hidden_results, "performance")
+    hidden_parity_score = _required_hidden_category_score(
+        hidden_results,
+        "parity",
+        "hidden_parity",
+        weights,
+        warnings,
+    )
+    performance_score = _required_hidden_category_score(
+        hidden_results,
+        "performance",
+        "performance",
+        weights,
+        warnings,
+    )
     judge_score = _judge_score(_read_json(run_path / "judge.json", warnings, "judge output"), warnings)
     usage = _read_json(run_path / "usage.json", warnings, "usage summary")
     diff_stats = _diff_stats(run_path / "diff-numstat.txt", warnings)
@@ -47,6 +75,9 @@ def compute_run_score(run_dir: str | Path, run: Mapping[str, Any]) -> dict[str, 
     component_scores = {
         "public_tests": round(public_test_score, 6),
         "hidden_tests": round(hidden_score, 6),
+        "hidden_correctness": round(hidden_correctness_score, 6),
+        "hidden_parity": round(hidden_parity_score, 6),
+        "performance": round(performance_score, 6),
         "judge": round(judge_score, 6),
         "typecheck": round(typecheck_score, 6),
         "parity": round(parity_score, 6),
@@ -72,9 +103,16 @@ def compute_run_score(run_dir: str | Path, run: Mapping[str, Any]) -> dict[str, 
         "run_id": run.get("run_id"),
         "cell_id": run.get("cell_id"),
         "spark_mode": run.get("spark_mode"),
+        "benchmark": _benchmark(run),
         "component_scores": component_scores,
         "weights": weights,
         "quality_score": quality_score,
+        "hidden_category_scores": hidden_category_scores,
+        "performance_summary": performance_summary,
+        "gate_scores": {
+            "public_tests": round(public_test_score, 6),
+            "typecheck": round(typecheck_score, 6),
+        },
         "efficiency": {
             "quality_per_gpt55_impl_token": _ratio(quality_score, gpt55_impl_tokens),
             "quality_per_judge_inclusive_gpt55_token": _ratio(quality_score, gpt55_judge_inclusive_tokens),
@@ -83,7 +121,13 @@ def compute_run_score(run_dir: str | Path, run: Mapping[str, Any]) -> dict[str, 
         },
         "diff_stats": diff_stats,
         "wall_time": wall_time,
-        "status": _status(run_path, component_scores, weights, warnings),
+        "status": _status(
+            run_path,
+            component_scores,
+            weights,
+            warnings,
+            gate_components={"public_tests", "typecheck"},
+        ),
         "warnings": warnings,
     }
 
@@ -135,6 +179,98 @@ def _hidden_category_score(payload: Mapping[str, Any], category: str) -> float:
     categories = payload.get("categories", {}) if isinstance(payload, Mapping) else {}
     bucket = categories.get(category, {}) if isinstance(categories, Mapping) else {}
     return _normalized_score(bucket.get("score", 0.0)) if isinstance(bucket, Mapping) else 0.0
+
+
+def _hidden_category_scores(payload: Mapping[str, Any]) -> dict[str, float]:
+    categories = payload.get("categories", {}) if isinstance(payload, Mapping) else {}
+    if not isinstance(categories, Mapping):
+        return {}
+    scores: dict[str, float] = {}
+    for category, bucket in categories.items():
+        if isinstance(bucket, Mapping):
+            scores[str(category)] = round(_normalized_score(bucket.get("score", 0.0)), 6)
+    return dict(sorted(scores.items()))
+
+
+def _hidden_correctness_score(
+    payload: Mapping[str, Any],
+    fallback_score: float,
+    weights: Mapping[str, float],
+    warnings: list[str],
+) -> float:
+    categories = payload.get("categories", {}) if isinstance(payload, Mapping) else {}
+    should_warn = "hidden_correctness" in weights
+    if not isinstance(categories, Mapping) or not categories:
+        if payload and should_warn:
+            warnings.append("hidden_correctness fell back to hidden_tests because category details are missing")
+        return fallback_score
+
+    earned = 0.0
+    possible = 0.0
+    for category, bucket in categories.items():
+        if str(category) in HIDDEN_CORRECTNESS_EXCLUDED_CATEGORIES or not isinstance(bucket, Mapping):
+            continue
+        bucket_possible = _safe_float(bucket.get("points_possible"))
+        if bucket_possible <= 0:
+            continue
+        earned += _safe_float(bucket.get("points_earned"))
+        possible += bucket_possible
+
+    if possible <= 0:
+        if should_warn:
+            warnings.append("hidden_correctness fell back to hidden_tests because no eligible point totals were present")
+        return fallback_score
+    return _normalized_score(earned / possible)
+
+
+def _required_hidden_category_score(
+    payload: Mapping[str, Any],
+    category: str,
+    component_name: str,
+    weights: Mapping[str, float],
+    warnings: list[str],
+) -> float:
+    categories = payload.get("categories", {}) if isinstance(payload, Mapping) else {}
+    if (
+        component_name in weights
+        and payload
+        and (not isinstance(categories, Mapping) or category not in categories)
+    ):
+        warnings.append(f"weighted scoring component {component_name!r} could not find hidden category {category!r}")
+    return _hidden_category_score(payload, category)
+
+
+def _hidden_case_summary(payload: Mapping[str, Any], category: str) -> dict[str, Any]:
+    cases = payload.get("cases", []) if isinstance(payload, Mapping) else []
+    if not isinstance(cases, list):
+        return {
+            "category": category,
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+            "errors": 0,
+            "pass_rate": None,
+            "timeout_rate": None,
+        }
+    matching_cases = [
+        case
+        for case in cases
+        if isinstance(case, Mapping) and str(case.get("category") or "") == category
+    ]
+    total = len(matching_cases)
+    passed = sum(1 for case in matching_cases if case.get("status") == "passed")
+    failed = sum(1 for case in matching_cases if case.get("status") == "failed")
+    errors = sum(1 for case in matching_cases if case.get("status") == "error")
+    timeouts = sum(1 for case in matching_cases if "timeout" in str(case.get("reason") or ""))
+    return {
+        "category": category,
+        "total": total,
+        "passed": passed,
+        "failed": failed,
+        "errors": errors,
+        "pass_rate": round(passed / total, 6) if total else None,
+        "timeout_rate": round(timeouts / total, 6) if total else None,
+    }
 
 
 def _judge_score(payload: Mapping[str, Any], warnings: list[str]) -> float:
@@ -213,6 +349,8 @@ def _status(
     component_scores: Mapping[str, float],
     weights: Mapping[str, float],
     warnings: list[str],
+    *,
+    gate_components: set[str] | None = None,
 ) -> str:
     state = _read_json(run_path / "state.json", warnings, "run state")
     phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
@@ -227,6 +365,9 @@ def _status(
         if failed:
             return "partial"
     weighted_components = [name for name in weights if name in KNOWN_COMPONENTS]
+    gates = gate_components or set()
+    if any(component_scores.get(name, 0.0) < 1.0 for name in gates):
+        return "partial"
     if weighted_components and all(component_scores.get(name, 0.0) >= 1.0 for name in weighted_components):
         return "passed"
     return "partial"
@@ -346,3 +487,8 @@ def _positive_float(value: Any, default: float) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return default
     return float(value) if value > 0 else default
+
+
+def _benchmark(run: Mapping[str, Any]) -> dict[str, Any]:
+    benchmark = run.get("benchmark")
+    return dict(benchmark) if isinstance(benchmark, Mapping) else {}

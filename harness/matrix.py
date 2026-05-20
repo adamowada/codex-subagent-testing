@@ -18,7 +18,17 @@ INITIAL_SPARK_REASONING = "xhigh"
 DEFAULT_BENCHMARK_VERSION = "ruleledger_v1"
 DEFAULT_BENCHMARK_TEMPLATE_PATH = "benchmark_template"
 DEFAULT_HIDDEN_CASES_PATH = "hidden_tests/cases"
-SCORING_COMPONENTS = {"public_tests", "hidden_tests", "judge", "typecheck", "parity", "minimality"}
+SCORING_COMPONENTS = {
+    "public_tests",
+    "hidden_tests",
+    "hidden_correctness",
+    "hidden_parity",
+    "performance",
+    "judge",
+    "typecheck",
+    "parity",
+    "minimality",
+}
 REQUIRED_PROMPT_TEMPLATE_KEYS = {
     "common",
     "solo",

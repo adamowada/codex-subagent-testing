@@ -130,13 +130,112 @@ def test_minimality_component_uses_configured_loc_threshold(tmp_path: Path) -> N
     assert score["quality_score"] == 0.5
 
 
-def _run(weights: dict[str, float], *, scoring_minimality: dict[str, float] | None = None) -> dict[str, object]:
+def test_v2_score_splits_hidden_correctness_parity_and_performance(tmp_path: Path) -> None:
+    run = _run(
+        {
+            "hidden_correctness": 0.55,
+            "hidden_parity": 0.15,
+            "performance": 0.10,
+            "judge": 0.15,
+            "minimality": 0.05,
+        },
+        benchmark={"version": "ruleledger_v2", "scoring_profile": "starter_quality_v2"},
+    )
+    for name in ("typecheck.meta.json", "public_ts.meta.json", "public_py.meta.json"):
+        _write_json(tmp_path / name, {"returncode": 0, "timed_out": False})
+    _write_json(
+        tmp_path / "hidden-results.json",
+        {
+            "summary": {"score": 0.99, "point_score": 0.64},
+            "categories": {
+                "normalization": {"score": 1.0, "points_earned": 10.0, "points_possible": 10.0},
+                "bitemporal_replay": {"score": 0.2, "points_earned": 2.0, "points_possible": 10.0},
+                "parity": {"score": 0.5, "points_earned": 1.0, "points_possible": 2.0},
+                "performance": {"score": 0.75, "points_earned": 3.0, "points_possible": 4.0},
+            },
+            "cases": [
+                {"category": "performance", "status": "passed", "reason": "ok"},
+                {"category": "performance", "status": "failed", "reason": "timeout"},
+            ],
+        },
+    )
+    _write_json(tmp_path / "judge.json", {"parsed": True, "value": {"overall_score": 0.8}})
+    _write_json(tmp_path / "usage.json", {"totals": {"implementation_tokens": 100, "gpt55_implementation_tokens": 100}})
+    _write_json(tmp_path / "wall_time.json", {"elapsed_seconds": 60})
+    _write_json(tmp_path / "judge.wall_time.json", {"elapsed_seconds": 15})
+    _write_json(tmp_path / "state.json", {"phases": {}})
+    (tmp_path / "diff-numstat.txt").write_text("25\t0\tsrc/index.ts\n", encoding="utf-8")
+
+    score = compute_run_score(tmp_path, run)
+
+    assert score["benchmark"]["version"] == "ruleledger_v2"
+    assert score["component_scores"]["hidden_tests"] == 0.99
+    assert score["component_scores"]["hidden_correctness"] == 0.6
+    assert score["component_scores"]["hidden_parity"] == 0.5
+    assert score["component_scores"]["performance"] == 0.75
+    assert score["hidden_category_scores"] == {
+        "bitemporal_replay": 0.2,
+        "normalization": 1.0,
+        "parity": 0.5,
+        "performance": 0.75,
+    }
+    assert score["gate_scores"] == {"public_tests": 1.0, "typecheck": 1.0}
+    assert score["performance_summary"]["pass_rate"] == 0.5
+    assert score["performance_summary"]["timeout_rate"] == 0.5
+    assert score["quality_score"] == 0.65
+
+
+def test_unweighted_gate_failures_keep_v2_status_partial(tmp_path: Path) -> None:
+    run = _run(
+        {
+            "hidden_correctness": 0.55,
+            "hidden_parity": 0.15,
+            "performance": 0.10,
+            "judge": 0.15,
+            "minimality": 0.05,
+        }
+    )
+    _write_json(tmp_path / "typecheck.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "public_ts.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "public_py.meta.json", {"returncode": 1, "timed_out": False})
+    _write_json(
+        tmp_path / "hidden-results.json",
+        {
+            "summary": {"score": 1.0},
+            "categories": {
+                "normalization": {"score": 1.0, "points_earned": 1.0, "points_possible": 1.0},
+                "parity": {"score": 1.0, "points_earned": 1.0, "points_possible": 1.0},
+                "performance": {"score": 1.0, "points_earned": 1.0, "points_possible": 1.0},
+            },
+        },
+    )
+    _write_json(tmp_path / "judge.json", {"parsed": True, "value": {"overall_score": 1.0}})
+    _write_json(tmp_path / "usage.json", {"totals": {"implementation_tokens": 100, "gpt55_implementation_tokens": 100}})
+    _write_json(tmp_path / "wall_time.json", {"elapsed_seconds": 60})
+    _write_json(tmp_path / "judge.wall_time.json", {"elapsed_seconds": 15})
+    _write_json(tmp_path / "state.json", {"phases": {}})
+    (tmp_path / "diff-numstat.txt").write_text("25\t0\tsrc/index.ts\n", encoding="utf-8")
+
+    score = compute_run_score(tmp_path, run)
+
+    assert score["quality_score"] == 1.0
+    assert score["gate_scores"]["public_tests"] == 0.5
+    assert score["status"] == "partial"
+
+
+def _run(
+    weights: dict[str, float],
+    *,
+    scoring_minimality: dict[str, float] | None = None,
+    benchmark: dict[str, str] | None = None,
+) -> dict[str, object]:
     return {
         "run_id": "R1",
         "cell_id": "C1",
         "spark_mode": "direct",
         "scoring_weights": weights,
         "scoring_minimality": scoring_minimality or {},
+        "benchmark": benchmark or {},
     }
 
 

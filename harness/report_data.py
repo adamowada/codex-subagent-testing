@@ -38,6 +38,15 @@ RESULT_COLUMNS = [
     "quality_score",
     "public_tests",
     "hidden_tests",
+    "hidden_correctness",
+    "hidden_parity",
+    "performance",
+    "performance_pass_rate",
+    "performance_timeout_rate",
+    "hidden_category_scores",
+    "category_saturation",
+    "public_tests_gate",
+    "typecheck_gate",
     "judge",
     "typecheck",
     "parity",
@@ -83,6 +92,12 @@ APPENDIX_COLUMNS = [
     "status",
     "quality_score",
     "hidden_tests",
+    "hidden_correctness",
+    "hidden_parity",
+    "performance",
+    "performance_pass_rate",
+    "public_tests_gate",
+    "typecheck_gate",
     "judge",
     "typecheck",
     "parity",
@@ -106,11 +121,15 @@ def collect_result_rows(experiment_dir: str | Path, runs: Iterable[Mapping[str, 
         score = _read_json(score_path)
         usage = _read_json(usage_path)
         state = _read_json(run_dir / "state.json")
+        hidden_results = _read_json(run_dir / "hidden-results.json")
         totals = usage.get("totals", {}) if isinstance(usage.get("totals"), Mapping) else {}
         components = score.get("component_scores", {}) if isinstance(score.get("component_scores"), Mapping) else {}
         efficiency = score.get("efficiency", {}) if isinstance(score.get("efficiency"), Mapping) else {}
         diff_stats = score.get("diff_stats", {}) if isinstance(score.get("diff_stats"), Mapping) else {}
         wall_time = score.get("wall_time", {}) if isinstance(score.get("wall_time"), Mapping) else {}
+        hidden_category_scores = _hidden_category_scores(score, hidden_results)
+        performance_rates = _performance_rates(score, hidden_results)
+        gate_scores = score.get("gate_scores", {}) if isinstance(score.get("gate_scores"), Mapping) else {}
         root_config = run.get("root") if isinstance(run.get("root"), Mapping) else {}
         leaf_config = run.get("leaf") if isinstance(run.get("leaf"), Mapping) else {}
         sublead_config = run.get("subleads") if isinstance(run.get("subleads"), Mapping) else {}
@@ -135,6 +154,15 @@ def collect_result_rows(experiment_dir: str | Path, runs: Iterable[Mapping[str, 
                 "quality_score": score.get("quality_score", 0.0),
                 "public_tests": components.get("public_tests", 0.0),
                 "hidden_tests": components.get("hidden_tests", 0.0),
+                "hidden_correctness": components.get("hidden_correctness", 0.0),
+                "hidden_parity": components.get("hidden_parity", components.get("parity", 0.0)),
+                "performance": components.get("performance", 0.0),
+                "performance_pass_rate": performance_rates["pass_rate"],
+                "performance_timeout_rate": performance_rates["timeout_rate"],
+                "hidden_category_scores": hidden_category_scores,
+                "category_saturation": _category_saturation(hidden_category_scores),
+                "public_tests_gate": gate_scores.get("public_tests", components.get("public_tests", 0.0)),
+                "typecheck_gate": gate_scores.get("typecheck", components.get("typecheck", 0.0)),
                 "judge": components.get("judge", 0.0),
                 "typecheck": components.get("typecheck", 0.0),
                 "parity": components.get("parity", 0.0),
@@ -239,7 +267,11 @@ def write_results_sqlite(path: str | Path, rows: list[Mapping[str, Any]]) -> Non
 def aggregate_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
     by_cell = _aggregate_groups(rows, lambda row: str(row.get("cell_id") or "unknown"))
     by_spark_mode = _aggregate_groups(rows, lambda row: str(row.get("spark_mode") or "none"))
-    by_run_group = _aggregate_groups(rows, _run_group_id)
+    mixed_versions = _has_mixed_benchmark_versions(rows)
+    by_run_group = _aggregate_groups(
+        rows,
+        lambda row: _run_group_id(row, include_benchmark=mixed_versions),
+    )
     direct_proposal = _direct_proposal_deltas(rows)
 
     return {
@@ -254,11 +286,16 @@ def aggregate_rows(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "direct_proposal_deltas": direct_proposal,
         "failure_rate": _failure_rate(rows),
         "best_run": _best_run(rows, PRIMARY_METRIC),
+        "cross_version": _cross_version_summary(rows),
+        "v2": _v2_summary(rows),
         "rankings": {
             "primary_by_run_group": _rank_groups(by_run_group, "quality_per_gpt55_impl_token_mean"),
             "quality_by_run_group": _rank_groups(by_run_group, "quality_mean"),
             "hidden_tests_by_run_group": _rank_groups(by_run_group, "hidden_mean"),
+            "hidden_correctness_by_run_group": _rank_groups(by_run_group, "hidden_correctness_mean"),
+            "performance_by_run_group": _rank_groups(by_run_group, "performance_mean"),
         },
+        "rankings_by_benchmark": _rankings_by_benchmark(rows),
         "token_attribution": _token_attribution_summary(rows),
     }
 
@@ -337,6 +374,8 @@ def render_html_report(rows: list[Mapping[str, Any]], aggregate: Mapping[str, An
         _benchmark_task_section(),
         _experiment_matrix_section(group_items),
         _results_section(group_items, aggregate),
+        _cross_version_section(aggregate),
+        _v2_scoring_section(aggregate),
         _direct_proposal_section(aggregate),
         c4_section,
         _token_attribution_section(token_attribution),
@@ -422,6 +461,13 @@ def _aggregate_bucket(rows: list[Mapping[str, Any]]) -> dict[str, Any]:
         "quality_stdev": _stdev_metric(rows, "quality_score"),
         "public_mean": _mean_metric(rows, "public_tests"),
         "hidden_mean": _mean_metric(rows, "hidden_tests"),
+        "hidden_correctness_mean": _mean_metric(rows, "hidden_correctness"),
+        "hidden_parity_mean": _mean_metric(rows, "hidden_parity"),
+        "performance_mean": _mean_metric(rows, "performance"),
+        "performance_pass_rate_mean": _mean_present_metric(rows, "performance_pass_rate"),
+        "performance_timeout_rate_mean": _mean_present_metric(rows, "performance_timeout_rate"),
+        "public_tests_gate_mean": _mean_metric(rows, "public_tests_gate"),
+        "typecheck_gate_mean": _mean_metric(rows, "typecheck_gate"),
         "judge_mean": _mean_metric(rows, "judge"),
         "typecheck_mean": _mean_metric(rows, "typecheck"),
         "parity_mean": _mean_metric(rows, "parity"),
@@ -465,6 +511,166 @@ def _row_has_measured_failure(row: Mapping[str, Any]) -> bool:
     return artifact_status not in {"", "complete"}
 
 
+def _hidden_category_scores(score: Mapping[str, Any], hidden_results: Mapping[str, Any]) -> dict[str, float]:
+    score_scores = _score_map(score.get("hidden_category_scores") if isinstance(score, Mapping) else {})
+    if score_scores:
+        return score_scores
+
+    categories = hidden_results.get("categories", {}) if isinstance(hidden_results, Mapping) else {}
+    if not isinstance(categories, Mapping):
+        return {}
+    scores: dict[str, float] = {}
+    for category, bucket in categories.items():
+        if isinstance(bucket, Mapping):
+            scores[str(category)] = round(_float(bucket.get("score")), 6)
+    return dict(sorted(scores.items()))
+
+
+def _performance_rates(score: Mapping[str, Any], hidden_results: Mapping[str, Any]) -> dict[str, float | None]:
+    performance_summary = score.get("performance_summary") if isinstance(score, Mapping) else {}
+    if isinstance(performance_summary, Mapping):
+        pass_rate = performance_summary.get("pass_rate")
+        timeout_rate = performance_summary.get("timeout_rate")
+        if pass_rate is not None or timeout_rate is not None:
+            return {
+                "pass_rate": _float(pass_rate) if pass_rate is not None else None,
+                "timeout_rate": _float(timeout_rate) if timeout_rate is not None else None,
+            }
+
+    cases = hidden_results.get("cases", []) if isinstance(hidden_results, Mapping) else []
+    if not isinstance(cases, list):
+        return {"pass_rate": None, "timeout_rate": None}
+    performance_cases = [
+        case
+        for case in cases
+        if isinstance(case, Mapping) and str(case.get("category") or "") == "performance"
+    ]
+    if not performance_cases:
+        return {"pass_rate": None, "timeout_rate": None}
+    total = len(performance_cases)
+    passed = sum(1 for case in performance_cases if case.get("status") == "passed")
+    timeouts = sum(1 for case in performance_cases if "timeout" in str(case.get("reason") or ""))
+    return {
+        "pass_rate": round(passed / total, 6),
+        "timeout_rate": round(timeouts / total, 6),
+    }
+
+
+def _category_saturation(scores: Mapping[str, Any], threshold: float = 0.95) -> dict[str, Any]:
+    numeric_scores = _score_map(scores)
+    saturated = sorted(category for category, score in numeric_scores.items() if score >= threshold)
+    return {
+        "threshold": threshold,
+        "saturated": saturated,
+        "saturated_count": len(saturated),
+        "total_categories": len(numeric_scores),
+    }
+
+
+def _v2_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    v2_rows = [row for row in rows if str(row.get("benchmark_version") or "") == "ruleledger_v2"]
+    category_means = _category_means(v2_rows)
+    return {
+        "runs": len(v2_rows),
+        "scoring_profiles": dict(
+            sorted(Counter(str(row.get("scoring_profile") or "unknown") for row in v2_rows).items())
+        ),
+        "category_means": category_means,
+        "category_saturation": _category_saturation(category_means),
+        "performance": {
+            "score_mean": _mean_metric(v2_rows, "performance"),
+            "pass_rate_mean": _mean_present_metric(v2_rows, "performance_pass_rate"),
+            "timeout_rate_mean": _mean_present_metric(v2_rows, "performance_timeout_rate"),
+        },
+        "gates": {
+            "public_tests_gate_mean": _mean_metric(v2_rows, "public_tests_gate"),
+            "typecheck_gate_mean": _mean_metric(v2_rows, "typecheck_gate"),
+        },
+        "spread_by_root_reasoning": _spread_by_root_reasoning(v2_rows),
+    }
+
+
+def _category_means(rows: Sequence[Mapping[str, Any]]) -> dict[str, float]:
+    by_category: dict[str, list[float]] = {}
+    for row in rows:
+        for category, score in _score_map(row.get("hidden_category_scores")).items():
+            by_category.setdefault(category, []).append(score)
+    return {
+        category: round(mean(values), 6)
+        for category, values in sorted(by_category.items())
+        if values
+    }
+
+
+def _spread_by_root_reasoning(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(str(row.get("root_reasoning") or "unknown"), []).append(row)
+    return {
+        reasoning: {
+            "runs": len(reasoning_rows),
+            "quality_mean": _mean_metric(reasoning_rows, "quality_score"),
+            "hidden_correctness_mean": _mean_metric(reasoning_rows, "hidden_correctness"),
+            "performance_mean": _mean_metric(reasoning_rows, "performance"),
+            "public_tests_gate_mean": _mean_metric(reasoning_rows, "public_tests_gate"),
+            "typecheck_gate_mean": _mean_metric(reasoning_rows, "typecheck_gate"),
+        }
+        for reasoning, reasoning_rows in sorted(grouped.items())
+    }
+
+
+def _cross_version_summary(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    versions = Counter(str(row.get("benchmark_version") or "unknown") for row in rows)
+    mixed = len(versions) > 1
+    summary = {
+        "mode": "mixed_versions_labeled" if mixed else "single_version",
+        "versions": dict(sorted(versions.items())),
+        "warning": "",
+    }
+    if mixed:
+        summary["warning"] = (
+            "This selection contains multiple benchmark versions. Run-group identifiers and report sections "
+            "label the versions so v1 and v2 results are not silently blended."
+        )
+    return summary
+
+
+def _rankings_by_benchmark(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(str(row.get("benchmark_version") or "unknown"), []).append(row)
+
+    rankings: dict[str, Any] = {}
+    for version, version_rows in sorted(grouped.items()):
+        by_run_group = _aggregate_groups(
+            list(version_rows),
+            lambda row: _run_group_id(row, include_benchmark=False),
+        )
+        rankings[version] = {
+            "primary_by_run_group": _rank_groups(by_run_group, "quality_per_gpt55_impl_token_mean"),
+            "quality_by_run_group": _rank_groups(by_run_group, "quality_mean"),
+            "hidden_tests_by_run_group": _rank_groups(by_run_group, "hidden_mean"),
+            "hidden_correctness_by_run_group": _rank_groups(by_run_group, "hidden_correctness_mean"),
+            "performance_by_run_group": _rank_groups(by_run_group, "performance_mean"),
+        }
+    return rankings
+
+
+def _score_map(value: Any) -> dict[str, float]:
+    if isinstance(value, str) and value.strip():
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return {}
+    if not isinstance(value, Mapping):
+        return {}
+    return dict(sorted((str(key), round(_float(score), 6)) for key, score in value.items()))
+
+
+def _has_mixed_benchmark_versions(rows: Sequence[Mapping[str, Any]]) -> bool:
+    return len({str(row.get("benchmark_version") or "unknown") for row in rows}) > 1
+
+
 def _best_run(rows: Sequence[Mapping[str, Any]], metric: str) -> dict[str, Any] | None:
     if not rows:
         return None
@@ -501,23 +707,26 @@ def _rank_groups(groups: Mapping[str, Mapping[str, Any]], metric: str) -> list[d
 
 
 def _direct_proposal_deltas(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    by_cell_mode: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
+    mixed_versions = _has_mixed_benchmark_versions(rows)
+    by_cell_mode: dict[tuple[str, str, str], list[Mapping[str, Any]]] = {}
     for row in rows:
+        version = str(row.get("benchmark_version") or "unknown")
         cell_id = str(row.get("cell_id") or "unknown")
         mode = str(row.get("spark_mode") or "none")
         if mode in {"direct", "proposal"}:
-            by_cell_mode.setdefault((cell_id, mode), []).append(row)
+            by_cell_mode.setdefault((version, cell_id, mode), []).append(row)
 
     deltas: dict[str, Any] = {}
-    cell_ids = sorted({cell for cell, mode in by_cell_mode if mode in {"direct", "proposal"}})
-    for cell_id in cell_ids:
-        direct_rows = by_cell_mode.get((cell_id, "direct"), [])
-        proposal_rows = by_cell_mode.get((cell_id, "proposal"), [])
+    cells = sorted({(version, cell) for version, cell, mode in by_cell_mode if mode in {"direct", "proposal"}})
+    for version, cell_id in cells:
+        direct_rows = by_cell_mode.get((version, cell_id, "direct"), [])
+        proposal_rows = by_cell_mode.get((version, cell_id, "proposal"), [])
         if not direct_rows or not proposal_rows:
             continue
+        output_id = f"{version}/{cell_id}" if mixed_versions else cell_id
         direct = _aggregate_bucket(direct_rows)
         proposal = _aggregate_bucket(proposal_rows)
-        deltas[cell_id] = {
+        deltas[output_id] = {
             "direct": direct,
             "proposal": proposal,
             "direct_minus_proposal": {
@@ -732,6 +941,89 @@ def _results_section(group_items: list[dict[str, Any]], aggregate: Mapping[str, 
     {_bar_chart("Mean Quality Score By Cell", group_items, "quality_mean", _fmt_score, "green")}
   </div>
   {_ranking_table(aggregate)}
+</section>"""
+
+
+def _cross_version_section(aggregate: Mapping[str, Any]) -> str:
+    cross_version = aggregate.get("cross_version", {})
+    if not isinstance(cross_version, Mapping) or cross_version.get("mode") != "mixed_versions_labeled":
+        return ""
+
+    versions = cross_version.get("versions", {})
+    if isinstance(versions, Mapping):
+        version_rows = "\n".join(
+            f"<tr><td>{_escape(str(version))}</td><td>{_escape(str(count))}</td></tr>"
+            for version, count in sorted(versions.items())
+        )
+    else:
+        version_rows = ""
+    version_rows = version_rows or '<tr><td colspan="2">No benchmark-version counts available.</td></tr>'
+
+    return f"""<section>
+  <h2>Cross-Version Selection</h2>
+  <p class="warning">{_escape(str(cross_version.get('warning') or 'Multiple benchmark versions are present.'))}</p>
+  <table>
+    <thead><tr><th>Benchmark Version</th><th>Runs</th></tr></thead>
+    <tbody>{version_rows}</tbody>
+  </table>
+</section>"""
+
+
+def _v2_scoring_section(aggregate: Mapping[str, Any]) -> str:
+    v2 = aggregate.get("v2", {})
+    if not isinstance(v2, Mapping) or _safe_int(v2.get("runs")) <= 0:
+        return ""
+
+    category_means = _score_map(v2.get("category_means"))
+    saturation = v2.get("category_saturation", {})
+    saturated = set(saturation.get("saturated", [])) if isinstance(saturation, Mapping) else set()
+    category_rows = "\n".join(
+        "<tr>"
+        f"<td>{_escape(category)}</td>"
+        f"<td>{_fmt_score(score)}</td>"
+        f"<td>{'yes' if category in saturated else 'no'}</td>"
+        "</tr>"
+        for category, score in category_means.items()
+    )
+    category_rows = category_rows or '<tr><td colspan="3">No v2 hidden category scores are available.</td></tr>'
+
+    performance = v2.get("performance", {}) if isinstance(v2.get("performance"), Mapping) else {}
+    gates = v2.get("gates", {}) if isinstance(v2.get("gates"), Mapping) else {}
+    spread = v2.get("spread_by_root_reasoning", {})
+    spread_rows = ""
+    if isinstance(spread, Mapping):
+        spread_rows = "\n".join(
+            "<tr>"
+            f"<td>{_escape(str(reasoning))}</td>"
+            f"<td>{_escape(str(payload.get('runs', 0)))}</td>"
+            f"<td>{_fmt_score(payload.get('quality_mean'))}</td>"
+            f"<td>{_fmt_score(payload.get('hidden_correctness_mean'))}</td>"
+            f"<td>{_fmt_score(payload.get('performance_mean'))}</td>"
+            "</tr>"
+            for reasoning, payload in sorted(spread.items())
+            if isinstance(payload, Mapping)
+        )
+    spread_rows = spread_rows or '<tr><td colspan="5">No root-reasoning spread is available.</td></tr>'
+
+    return f"""<section>
+  <h2>V2 Scoring Profile</h2>
+  <p>RuleLedger v2 quality separates hidden correctness, cross-language parity, performance, judge review, and minimality. Public tests and typecheck are shown here as gates, so passing visible checks cannot compensate for weak hidden correctness.</p>
+  <p><span class="pill">V2 runs: {_escape(str(v2.get('runs', 0)))}</span> <span class="pill">Public gate: {_fmt_score(gates.get('public_tests_gate_mean'))}</span> <span class="pill">Typecheck gate: {_fmt_score(gates.get('typecheck_gate_mean'))}</span></p>
+  <h3>Hidden Category Calibration</h3>
+  <table>
+    <thead><tr><th>Category</th><th>Mean Score</th><th>Saturated</th></tr></thead>
+    <tbody>{category_rows}</tbody>
+  </table>
+  <h3>Performance And Timeout Behavior</h3>
+  <table>
+    <thead><tr><th>Performance Score</th><th>Performance Pass Rate</th><th>Timeout Rate</th></tr></thead>
+    <tbody><tr><td>{_fmt_score(performance.get('score_mean'))}</td><td>{_fmt_percent(performance.get('pass_rate_mean'))}</td><td>{_fmt_percent(performance.get('timeout_rate_mean'))}</td></tr></tbody>
+  </table>
+  <h3>Calibration Spread By Root Reasoning</h3>
+  <table>
+    <thead><tr><th>Root Reasoning</th><th>Runs</th><th>Quality</th><th>Hidden Correctness</th><th>Performance</th></tr></thead>
+    <tbody>{spread_rows}</tbody>
+  </table>
 </section>"""
 
 
@@ -998,19 +1290,23 @@ def _delta(left: Mapping[str, Any], right: Mapping[str, Any], key: str) -> float
     return round(_float(left_value) - _float(right_value), 12)
 
 
-def _run_group_id(row: Mapping[str, Any]) -> str:
+def _run_group_id(row: Mapping[str, Any], *, include_benchmark: bool = False) -> str:
     cell_id = str(row.get("cell_id") or "unknown")
     mode = str(row.get("spark_mode") or "none")
+    prefix = f"{str(row.get('benchmark_version') or 'unknown')}/" if include_benchmark else ""
     if mode == "none":
-        return cell_id
-    return f"{cell_id}:{mode}"
+        return f"{prefix}{cell_id}"
+    return f"{prefix}{cell_id}:{mode}"
 
 
 def _group_label(group_id: str, bucket: Mapping[str, Any]) -> str:
     mode = bucket.get("spark_mode")
+    version_prefix = ""
+    if "/" in group_id:
+        version_prefix = f"{group_id.split('/', 1)[0]} "
     if mode and mode != "none":
-        return f"{bucket.get('cell_id') or group_id} {mode}"
-    return str(bucket.get("cell_id") or group_id)
+        return f"{version_prefix}{bucket.get('cell_id') or group_id} {mode}"
+    return f"{version_prefix}{bucket.get('cell_id') or group_id}"
 
 
 def _row_sort_key(row: Mapping[str, Any]) -> tuple[Any, ...]:
@@ -1027,7 +1323,10 @@ def _group_sort_key(group_id: str) -> tuple[Any, ...]:
         cell, mode = group_id.split(":", 1)
     else:
         cell, mode = group_id, "none"
-    return (_cell_sort_value(cell), _mode_sort_value(mode), group_id)
+    version = ""
+    if "/" in cell:
+        version, cell = cell.split("/", 1)
+    return (version, _cell_sort_value(cell), _mode_sort_value(mode), group_id)
 
 
 def _cell_sort_value(value: str) -> tuple[int, str]:
@@ -1194,8 +1493,22 @@ def _pdf_lines(rows: list[Mapping[str, Any]], aggregate: Mapping[str, Any]) -> l
         f"Failure rate: {aggregate.get('failure_rate', 0.0)}",
         f"Primary metric: {PRIMARY_METRIC}",
         "",
-        "Cell summaries:",
     ]
+    cross_version = aggregate.get("cross_version", {})
+    if isinstance(cross_version, Mapping) and cross_version.get("warning"):
+        lines.append(f"Cross-version warning: {cross_version.get('warning')}")
+    v2 = aggregate.get("v2", {})
+    if isinstance(v2, Mapping) and _safe_int(v2.get("runs")) > 0:
+        performance = v2.get("performance", {}) if isinstance(v2.get("performance"), Mapping) else {}
+        lines.extend(
+            [
+                "V2 scoring:",
+                f"V2 runs: {v2.get('runs')}",
+                f"Performance score mean: {performance.get('score_mean')}",
+                f"Performance pass rate: {performance.get('pass_rate_mean')}",
+            ]
+        )
+    lines.extend(["", "Cell summaries:"])
     by_run_group = aggregate.get("by_run_group", {})
     if isinstance(by_run_group, Mapping):
         for group_id, bucket in by_run_group.items():

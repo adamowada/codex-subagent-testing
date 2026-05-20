@@ -2,7 +2,10 @@
   "schema_version": 1,
   "profile": "starter_quality_v2",
   "weights": {
-    "hidden_tests": 0.95,
+    "hidden_correctness": 0.55,
+    "hidden_parity": 0.15,
+    "performance": 0.10,
+    "judge": 0.15,
     "minimality": 0.05
   },
   "minimality": {

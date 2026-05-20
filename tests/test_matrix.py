@@ -109,6 +109,13 @@ def test_ruleledger_v2_config_selects_real_v2_starter_assets() -> None:
         "scoring_path": "configs/scoring_v2.yaml",
         "scoring_profile": "starter_quality_v2",
     }
+    assert runs[0]["scoring_weights"] == {
+        "hidden_correctness": 0.55,
+        "hidden_parity": 0.15,
+        "performance": 0.10,
+        "judge": 0.15,
+        "minimality": 0.05,
+    }
     assert summary["by_benchmark_version"] == {"ruleledger_v2": 1}
     assert summary["benchmark_assets"]["template_path"] == "benchmark_template_v2"
 
