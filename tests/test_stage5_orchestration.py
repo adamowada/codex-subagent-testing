@@ -15,6 +15,7 @@ from harness.orchestrator import (
     initialize_git_baseline,
     prepare_judge_evidence,
     resolve_experiment_dir,
+    run_parallel,
     select_runs,
     validate_resume_target,
 )
@@ -46,6 +47,34 @@ def test_run_id_selection_preserves_matrix_order(runs: list[dict]) -> None:
     selected = select_runs(runs, run_ids=["C2_proposal_r03", "C0_r02"])
 
     assert [run["run_id"] for run in selected] == ["C0_r02", "C2_proposal_r03"]
+
+
+def test_run_parallel_prints_incremental_progress(capsys: pytest.CaptureFixture[str]) -> None:
+    runs = [{"run_id": "R1"}, {"run_id": "R2"}]
+
+    failures = run_parallel(runs, max_workers=1, label="implementation", worker=lambda run: None)
+
+    output = capsys.readouterr().out
+    assert failures == []
+    assert "implementation started: R1" in output
+    assert "implementation 1/2 completed: R1" in output
+    assert "implementation started: R2" in output
+    assert "implementation 2/2 completed: R2" in output
+
+
+def test_run_parallel_prints_failure_progress(capsys: pytest.CaptureFixture[str]) -> None:
+    runs = [{"run_id": "R1"}]
+
+    def fail(_: dict) -> None:
+        raise RuntimeError("boom")
+
+    failures = run_parallel(runs, max_workers=1, label="judge", worker=fail)
+
+    output = capsys.readouterr().out
+    assert failures == [{"run_id": "R1", "phase": "judge", "error": "boom"}]
+    assert "judge started: R1" in output
+    assert "judge 1/1 failed: R1" in output
+    assert "boom" in output
 
 
 def test_experiment_directory_name_is_safe_and_unique(config: dict, tmp_path: Path) -> None:

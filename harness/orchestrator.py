@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from typing import Any, Iterable, Mapping
 
 from harness.artifacts import (
@@ -117,6 +118,17 @@ class StatusWriter:
         self.path.write_text(json.dumps(self.payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _print_progress(message: str) -> None:
+    print(f"[{iso_now()}] {message}", flush=True)
+
+
+def _format_elapsed(started: float) -> str:
+    elapsed = max(time.monotonic() - started, 0.0)
+    minutes = int(elapsed // 60)
+    seconds = int(elapsed % 60)
+    return f"{minutes}m{seconds:02d}s"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     try:
@@ -182,6 +194,7 @@ def run(args: argparse.Namespace) -> int:
     print(f"Experiment directory: {experiment_dir}")
     print(f"Selected runs: {len(selected_runs)}")
     print(json.dumps(summarize_matrix(selected_runs), indent=2, sort_keys=True))
+    _print_progress(f"Preflight {preflight['status']}; status file: {status.path}")
 
     if args.dry_run:
         status.update(status="completed", finished_at=iso_now(), dry_run=True)
@@ -191,8 +204,10 @@ def run(args: argparse.Namespace) -> int:
     codex_bin = resolve_codex_bin()
     if codex_bin is None:
         raise OrchestrationError('Codex executable not found. Set $env:CODEX_BIN = "path\\to\\working\\codex".')
+    _print_progress(f"Using Codex executable: {codex_bin}")
 
-    for run_record in selected_runs:
+    _print_progress(f"Preparing {len(selected_runs)} run worktree(s)...")
+    for index, run_record in enumerate(selected_runs, start=1):
         prepare_run(
             repo_root=repo_root,
             experiment_dir=experiment_dir,
@@ -202,7 +217,9 @@ def run(args: argparse.Namespace) -> int:
             status=status,
             log_path=log_path,
         )
+        _print_progress(f"prepared {index}/{len(selected_runs)}: {run_record['run_id']}")
 
+    _print_progress(f"Starting implementation phase with {args.jobs} worker(s).")
     implementation_failures = run_parallel(
         selected_runs,
         max_workers=args.jobs,
@@ -217,7 +234,12 @@ def run(args: argparse.Namespace) -> int:
             log_path=log_path,
         ),
     )
+    _print_progress(
+        f"Implementation phase complete: {len(selected_runs) - len(implementation_failures)}/{len(selected_runs)} ok, "
+        f"{len(implementation_failures)} failed."
+    )
 
+    _print_progress(f"Starting judge phase with {args.judge_jobs} worker(s).")
     judge_failures = run_parallel(
         selected_runs,
         max_workers=args.judge_jobs,
@@ -231,8 +253,13 @@ def run(args: argparse.Namespace) -> int:
             log_path=log_path,
         ),
     )
+    _print_progress(
+        f"Judge phase complete: {len(selected_runs) - len(judge_failures)}/{len(selected_runs)} ok, "
+        f"{len(judge_failures)} failed."
+    )
 
-    for run_record in selected_runs:
+    _print_progress("Parsing usage and scoring runs...")
+    for index, run_record in enumerate(selected_runs, start=1):
         parse_usage_and_score(
             experiment_dir,
             run_record,
@@ -240,9 +267,14 @@ def run(args: argparse.Namespace) -> int:
             log_path,
             rerun_failed=args.rerun_failed,
         )
+        score = _read_json(run_directory(experiment_dir, run_record) / "score.json")
+        quality = score.get("quality_score")
+        suffix = f" quality={quality}" if quality is not None else ""
+        _print_progress(f"scored {index}/{len(selected_runs)}: {run_record['run_id']}{suffix}")
 
     outputs = {}
     if not args.no_report:
+        _print_progress("Writing aggregate results and report outputs...")
         outputs = write_results_outputs(experiment_dir, selected_runs)
         output_errors = validate_experiment_outputs(experiment_dir)
         if output_errors:
@@ -250,6 +282,7 @@ def run(args: argparse.Namespace) -> int:
             raise OrchestrationError(_format_artifact_errors("experiment output validation failed", output_errors))
         status.update(report_outputs=outputs)
 
+    _print_progress("Running final validation checks...")
     validation = validate_stage11(
         config_path=config_path,
         repo_root=repo_root,
@@ -269,6 +302,7 @@ def run(args: argparse.Namespace) -> int:
         ]
         raise OrchestrationError(_format_artifact_errors("stage 11 validation failed", validation_errors))
     status.update(stage11_validation=validation["status"])
+    _print_progress(f"Final validation {validation['status']}.")
 
     status.update(
         status="completed",
@@ -761,14 +795,28 @@ def run_parallel(
     worker: Any,
 ) -> list[dict[str, str]]:
     failures: list[dict[str, str]] = []
+    total = len(runs)
+    started = time.monotonic()
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_run = {executor.submit(worker, run): run for run in runs}
+        def run_worker(run: dict[str, Any]) -> Any:
+            _print_progress(f"{label} started: {run['run_id']}")
+            return worker(run)
+
+        future_to_run = {executor.submit(run_worker, run): run for run in runs}
+        completed = 0
         for future in as_completed(future_to_run):
             run = future_to_run[future]
+            completed += 1
+            run_id = str(run["run_id"])
             try:
                 future.result()
             except Exception as exc:
-                failures.append({"run_id": str(run["run_id"]), "phase": label, "error": str(exc)})
+                failures.append({"run_id": run_id, "phase": label, "error": str(exc)})
+                _print_progress(
+                    f"{label} {completed}/{total} failed: {run_id} after {_format_elapsed(started)}; {exc}"
+                )
+            else:
+                _print_progress(f"{label} {completed}/{total} completed: {run_id} after {_format_elapsed(started)}")
     return failures
 
 
