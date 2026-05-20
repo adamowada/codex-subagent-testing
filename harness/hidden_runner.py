@@ -20,9 +20,11 @@ DEFAULT_CASES_DIR = REPO_ROOT / "hidden_tests" / "cases"
 TS_TIMEOUT_SECONDS = 20
 PY_TIMEOUT_SECONDS = 20
 NPM_TIMEOUT_SECONDS = 120
+SAFE_ACTUAL_ERROR_REASONS = {"missing_account", "normalization_failed", "unsupported_operation"}
 
 
 JS_CASE_RUNNER = r"""
+import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
@@ -31,37 +33,263 @@ function deepClone(value) {
 }
 
 function stableJson(value) {
-  return JSON.stringify(value);
+  return stableStringify(value);
+}
+
+function stableStringify(value) {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+}
+
+function sha256Text(value) {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+function pickFunction(mod, names) {
+  for (const name of names) {
+    if (typeof mod[name] === "function") {
+      return { name, fn: mod[name] };
+    }
+  }
+  return null;
+}
+
+function viewFromInput(input) {
+  const asOf = input.as_of;
+  const businessAsOf = input.business_as_of ?? input.as_of;
+  const auditAsOf = input.audit_as_of ?? input.as_of;
+  return {
+    asOf,
+    businessAsOf,
+    auditAsOf,
+    as_of: asOf,
+    business_as_of: businessAsOf,
+    audit_as_of: auditAsOf
+  };
+}
+
+function focusSummaries(summaries, accountId) {
+  if (accountId === undefined || accountId === null) {
+    return summaries;
+  }
+  return summaries.filter((summary) => summary.accountId === accountId);
+}
+
+function normalizeOne(mod, rawEvent, preferV2 = false) {
+  const names = preferV2 ? ["normalizeEventV2", "normalizeEvent"] : ["normalizeEvent", "normalizeEventV2"];
+  const normalizer = pickFunction(mod, names);
+  if (normalizer === null) {
+    return { ok: false, error: "unsupported_operation", operation: "normalize_event" };
+  }
+  return normalizer.fn(rawEvent);
+}
+
+function normalizeMany(mod, rawEvents, preferV2 = false) {
+  const events = [];
+  for (const rawEvent of rawEvents) {
+    const normalized = normalizeOne(mod, rawEvent, preferV2);
+    if (!normalized || normalized.ok !== true) {
+      return { ok: false, error: "normalization_failed", result: normalized };
+    }
+    events.push(normalized.value);
+  }
+  return { ok: true, value: events };
 }
 
 function pipeline(mod, rawEvents, asOf) {
-  const events = [];
-  for (const rawEvent of rawEvents) {
-    const normalized = mod.normalizeEvent(rawEvent);
-    if (!normalized || normalized.ok !== true) {
-      return { ok: false, error: "normalization_failed", result: normalized };
-    }
-    events.push(normalized.value);
+  const events = normalizeMany(mod, rawEvents);
+  if (!events.ok) {
+    return events;
   }
-  const states = mod.reduceAccountState(events);
-  return { ok: true, value: states.map((state) => mod.summarizeAccount(state, asOf)) };
+  const reducer = pickFunction(mod, ["reduceAccountState"]);
+  const summarizer = pickFunction(mod, ["summarizeAccount"]);
+  if (reducer === null || summarizer === null) {
+    return { ok: false, error: "unsupported_operation", operation: "reduce_and_summarize" };
+  }
+  const states = reducer.fn(events.value);
+  return { ok: true, value: states.map((state) => summarizer.fn(state, asOf)) };
 }
 
 function evaluatePipeline(mod, rawEvents, accountId, asOf) {
-  const events = [];
-  for (const rawEvent of rawEvents) {
-    const normalized = mod.normalizeEvent(rawEvent);
-    if (!normalized || normalized.ok !== true) {
-      return { ok: false, error: "normalization_failed", result: normalized };
-    }
-    events.push(normalized.value);
+  const events = normalizeMany(mod, rawEvents);
+  if (!events.ok) {
+    return events;
   }
-  const states = mod.reduceAccountState(events);
+  const reducer = pickFunction(mod, ["reduceAccountState"]);
+  const evaluator = pickFunction(mod, ["evaluateEntitlements"]);
+  if (reducer === null || evaluator === null) {
+    return { ok: false, error: "unsupported_operation", operation: "reduce_and_evaluate" };
+  }
+  const states = reducer.fn(events.value);
   const state = states.find((candidate) => candidate.accountId === accountId);
   if (state === undefined) {
     return { ok: false, error: "missing_account" };
   }
-  return { ok: true, value: mod.evaluateEntitlements(state, asOf) };
+  return { ok: true, value: evaluator.fn(state, asOf) };
+}
+
+function reduceV2States(mod, events, input) {
+  const reducer = pickFunction(mod, ["reduceAccountStateV2", "reduceAccountState"]);
+  if (reducer === null) {
+    return { ok: false, error: "unsupported_operation", operation: "v2_reduce_and_summarize" };
+  }
+  const view = viewFromInput(input);
+  const states = reducer.name.endsWith("V2") ? reducer.fn(events, view) : reducer.fn(events);
+  return { ok: true, value: states };
+}
+
+function summarizeV2State(mod, state, input) {
+  const summarizer = pickFunction(mod, ["summarizeAccountV2", "summarizeAccount"]);
+  if (summarizer === null) {
+    return { ok: false, error: "unsupported_operation", operation: "v2_summarize_account" };
+  }
+  const view = viewFromInput(input);
+  const value = summarizer.name.endsWith("V2")
+    ? summarizer.fn(state, view)
+    : summarizer.fn(state, view.businessAsOf ?? view.asOf);
+  return { ok: true, value };
+}
+
+function evaluateV2State(mod, state, input) {
+  const evaluator = pickFunction(mod, ["evaluateEntitlementsV2", "evaluateEntitlements"]);
+  if (evaluator === null) {
+    return { ok: false, error: "unsupported_operation", operation: "v2_evaluate_entitlements" };
+  }
+  const view = viewFromInput(input);
+  const value = evaluator.name.endsWith("V2")
+    ? evaluator.fn(state, view)
+    : evaluator.fn(state, view.businessAsOf ?? view.asOf);
+  return { ok: true, value };
+}
+
+function v2SummaryPipeline(mod, input) {
+  const events = normalizeMany(mod, input.raw_events, true);
+  if (!events.ok) {
+    return events;
+  }
+  const states = reduceV2States(mod, events.value, input);
+  if (!states.ok) {
+    return states;
+  }
+  const summaries = [];
+  for (const state of states.value) {
+    const summary = summarizeV2State(mod, state, input);
+    if (!summary.ok) {
+      return summary;
+    }
+    summaries.push(summary.value);
+  }
+  return { ok: true, value: summaries };
+}
+
+function v2EvaluatePipeline(mod, input) {
+  const events = normalizeMany(mod, input.raw_events, true);
+  if (!events.ok) {
+    return events;
+  }
+  const states = reduceV2States(mod, events.value, input);
+  if (!states.ok) {
+    return states;
+  }
+  const state = states.value.find((candidate) => candidate.accountId === input.account_id);
+  if (state === undefined) {
+    return { ok: false, error: "missing_account" };
+  }
+  return evaluateV2State(mod, state, input);
+}
+
+function exportV2Report(mod, summaries) {
+  const reporter = pickFunction(mod, ["exportLedgerReportV2", "exportLedgerReport"]);
+  if (reporter === null) {
+    return { ok: false, error: "unsupported_operation", operation: "v2_export_report" };
+  }
+  return { ok: true, value: reporter.fn(summaries) };
+}
+
+function calculateV2Proration(mod, input) {
+  const calculator = pickFunction(mod, ["calculatePlanChangeProrationV2", "calculatePlanChangeProration"]);
+  if (calculator === null) {
+    return { ok: false, error: "unsupported_operation", operation: "v2_calculate_proration" };
+  }
+  if (calculator.fn.length >= 5) {
+    return {
+      ok: true,
+      value: calculator.fn(
+        input.old_plan,
+        input.new_plan,
+        input.period_start,
+        input.period_end,
+        input.change_effective_at,
+        input.quantity ?? 1
+      )
+    };
+  }
+  return { ok: true, value: calculator.fn(input) };
+}
+
+function v2Metamorphic(mod, input) {
+  const baseline = v2SummaryPipeline(mod, { ...input, raw_events: input.baseline });
+  if (!baseline.ok) {
+    return baseline;
+  }
+  const baselineFocus = focusSummaries(baseline.value, input.target_account_id);
+  const variants = [];
+  for (const variant of input.variants) {
+    const result = v2SummaryPipeline(mod, { ...input, raw_events: variant.raw_events });
+    if (!result.ok) {
+      variants.push({ name: variant.name, value: result, equivalent: false });
+      continue;
+    }
+    const focus = focusSummaries(result.value, input.target_account_id);
+    variants.push({
+      name: variant.name,
+      value: focus,
+      equivalent: stableJson(focus) === stableJson(baselineFocus)
+    });
+  }
+  return { ok: true, value: { baseline: baselineFocus, variants } };
+}
+
+function v2PerformanceDigest(mod, input) {
+  const summaries = v2SummaryPipeline(mod, input);
+  if (!summaries.ok) {
+    return summaries;
+  }
+  const report = exportV2Report(mod, summaries.value);
+  if (!report.ok) {
+    return report;
+  }
+  return {
+    ok: true,
+    value: {
+      eventCount: input.raw_events.length,
+      summaryCount: summaries.value.length,
+      firstAccountId: summaries.value.length > 0 ? summaries.value[0].accountId : null,
+      lastAccountId: summaries.value.length > 0 ? summaries.value[summaries.value.length - 1].accountId : null,
+      totalUsage: summaries.value.reduce((total, summary) => total + summary.usage, 0),
+      totalPaidCents: summaries.value.reduce((total, summary) => total + summary.totalPaidCents, 0),
+      summarySha256: sha256Text(stableJson(summaries.value)),
+      reportSha256: sha256Text(report.value)
+    }
+  };
+}
+
+function v2ParityPayload(mod, input) {
+  const summaries = v2SummaryPipeline(mod, input);
+  if (!summaries.ok) {
+    return summaries;
+  }
+  const report = exportV2Report(mod, summaries.value);
+  if (!report.ok) {
+    return report;
+  }
+  return { ok: true, value: { summaries: summaries.value, report: report.value } };
 }
 
 async function main() {
@@ -79,7 +307,7 @@ async function main() {
     return mod.parseEventLine(input.line);
   }
   if (operation === "normalize_event") {
-    return mod.normalizeEvent(input.raw_event);
+    return normalizeOne(mod, input.raw_event);
   }
   if (operation === "reduce_and_summarize") {
     const result = pipeline(mod, input.raw_events, input.as_of);
@@ -104,6 +332,34 @@ async function main() {
       inputUnchanged: before === after
     };
   }
+  if (operation === "v2_reduce_and_summarize") {
+    const result = v2SummaryPipeline(mod, input);
+    return result.ok ? result.value : result;
+  }
+  if (operation === "v2_reduce_and_evaluate") {
+    const result = v2EvaluatePipeline(mod, input);
+    return result.ok ? result.value : result;
+  }
+  if (operation === "v2_export_report") {
+    const result = exportV2Report(mod, input.summaries);
+    return result.ok ? result.value : result;
+  }
+  if (operation === "v2_calculate_proration") {
+    const result = calculateV2Proration(mod, input);
+    return result.ok ? result.value : result;
+  }
+  if (operation === "v2_metamorphic") {
+    const result = v2Metamorphic(mod, input);
+    return result.ok ? result.value : result;
+  }
+  if (operation === "v2_performance_digest") {
+    const result = v2PerformanceDigest(mod, input);
+    return result.ok ? result.value : result;
+  }
+  if (operation === "v2_parity") {
+    const result = v2ParityPayload(mod, input);
+    return result.ok ? result.value : result;
+  }
   return { ok: false, error: "unsupported_operation", operation };
 }
 
@@ -124,7 +380,9 @@ PY_CASE_RUNNER = r"""
 from __future__ import annotations
 
 import copy
+import hashlib
 import importlib
+import inspect
 import json
 import sys
 
@@ -137,6 +395,10 @@ def stable_json(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
+def sha256_text(value):
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
 def load_module(worktree):
     sys.path.insert(0, worktree)
     for name in list(sys.modules):
@@ -145,29 +407,248 @@ def load_module(worktree):
     return importlib.import_module("ruleledger.engine")
 
 
-def pipeline(mod, raw_events, as_of):
+def pick_function(mod, names):
+    for name in names:
+        value = getattr(mod, name, None)
+        if callable(value):
+            return name, value
+    return None, None
+
+
+def accepts_positional(function, count):
+    try:
+        signature = inspect.signature(function)
+    except (TypeError, ValueError):
+        return True
+    positional = 0
+    for parameter in signature.parameters.values():
+        if parameter.kind == inspect.Parameter.VAR_POSITIONAL:
+            return True
+        if parameter.kind in (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD):
+            positional += 1
+    return positional >= count
+
+
+def view_from_input(input_payload):
+    as_of = input_payload.get("as_of")
+    requested_business_as_of = input_payload.get("business_as_of")
+    requested_audit_as_of = input_payload.get("audit_as_of")
+    business_as_of = requested_business_as_of if requested_business_as_of is not None else as_of
+    audit_as_of = requested_audit_as_of if requested_audit_as_of is not None else as_of
+    return {
+        "asOf": as_of,
+        "businessAsOf": business_as_of,
+        "auditAsOf": audit_as_of,
+        "as_of": as_of,
+        "business_as_of": business_as_of,
+        "audit_as_of": audit_as_of,
+    }
+
+
+def focus_summaries(summaries, account_id):
+    if account_id is None:
+        return summaries
+    return [summary for summary in summaries if summary.get("accountId") == account_id]
+
+
+def normalize_one(mod, raw_event, prefer_v2=False):
+    names = ("normalize_event_v2", "normalize_event") if prefer_v2 else ("normalize_event", "normalize_event_v2")
+    _, normalizer = pick_function(mod, names)
+    if normalizer is None:
+        return {"ok": False, "error": "unsupported_operation", "operation": "normalize_event"}
+    return normalizer(raw_event)
+
+
+def normalize_many(mod, raw_events, prefer_v2=False):
     events = []
     for raw_event in raw_events:
-        normalized = mod.normalize_event(raw_event)
+        normalized = normalize_one(mod, raw_event, prefer_v2)
         if not normalized or normalized.get("ok") is not True:
             return {"ok": False, "error": "normalization_failed", "result": normalized}
         events.append(normalized["value"])
-    states = mod.reduce_account_state(events)
-    return {"ok": True, "value": [mod.summarize_account(state, as_of) for state in states]}
+    return {"ok": True, "value": events}
+
+
+def pipeline(mod, raw_events, as_of):
+    events = normalize_many(mod, raw_events)
+    if not events.get("ok"):
+        return events
+    _, reducer = pick_function(mod, ("reduce_account_state",))
+    _, summarizer = pick_function(mod, ("summarize_account",))
+    if reducer is None or summarizer is None:
+        return {"ok": False, "error": "unsupported_operation", "operation": "reduce_and_summarize"}
+    states = reducer(events["value"])
+    return {"ok": True, "value": [summarizer(state, as_of) for state in states]}
 
 
 def evaluate_pipeline(mod, raw_events, account_id, as_of):
-    events = []
-    for raw_event in raw_events:
-        normalized = mod.normalize_event(raw_event)
-        if not normalized or normalized.get("ok") is not True:
-            return {"ok": False, "error": "normalization_failed", "result": normalized}
-        events.append(normalized["value"])
-    states = mod.reduce_account_state(events)
+    events = normalize_many(mod, raw_events)
+    if not events.get("ok"):
+        return events
+    _, reducer = pick_function(mod, ("reduce_account_state",))
+    _, evaluator = pick_function(mod, ("evaluate_entitlements",))
+    if reducer is None or evaluator is None:
+        return {"ok": False, "error": "unsupported_operation", "operation": "reduce_and_evaluate"}
+    states = reducer(events["value"])
     for state in states:
         if state.get("accountId") == account_id:
-            return {"ok": True, "value": mod.evaluate_entitlements(state, as_of)}
+            return {"ok": True, "value": evaluator(state, as_of)}
     return {"ok": False, "error": "missing_account"}
+
+
+def reduce_v2_states(mod, events, input_payload):
+    name, reducer = pick_function(mod, ("reduce_account_state_v2", "reduce_account_state"))
+    if reducer is None:
+        return {"ok": False, "error": "unsupported_operation", "operation": "v2_reduce_and_summarize"}
+    view = view_from_input(input_payload)
+    states = reducer(events, view) if name.endswith("_v2") and accepts_positional(reducer, 2) else reducer(events)
+    return {"ok": True, "value": states}
+
+
+def summarize_v2_state(mod, state, input_payload):
+    name, summarizer = pick_function(mod, ("summarize_account_v2", "summarize_account"))
+    if summarizer is None:
+        return {"ok": False, "error": "unsupported_operation", "operation": "v2_summarize_account"}
+    view = view_from_input(input_payload)
+    value = (
+        summarizer(state, view)
+        if name.endswith("_v2") and accepts_positional(summarizer, 2)
+        else summarizer(state, view["businessAsOf"] if view["businessAsOf"] is not None else view["asOf"])
+    )
+    return {"ok": True, "value": value}
+
+
+def evaluate_v2_state(mod, state, input_payload):
+    name, evaluator = pick_function(mod, ("evaluate_entitlements_v2", "evaluate_entitlements"))
+    if evaluator is None:
+        return {"ok": False, "error": "unsupported_operation", "operation": "v2_evaluate_entitlements"}
+    view = view_from_input(input_payload)
+    value = (
+        evaluator(state, view)
+        if name.endswith("_v2") and accepts_positional(evaluator, 2)
+        else evaluator(state, view["businessAsOf"] if view["businessAsOf"] is not None else view["asOf"])
+    )
+    return {"ok": True, "value": value}
+
+
+def v2_summary_pipeline(mod, input_payload):
+    events = normalize_many(mod, input_payload["raw_events"], prefer_v2=True)
+    if not events.get("ok"):
+        return events
+    states = reduce_v2_states(mod, events["value"], input_payload)
+    if not states.get("ok"):
+        return states
+    summaries = []
+    for state in states["value"]:
+        summary = summarize_v2_state(mod, state, input_payload)
+        if not summary.get("ok"):
+            return summary
+        summaries.append(summary["value"])
+    return {"ok": True, "value": summaries}
+
+
+def v2_evaluate_pipeline(mod, input_payload):
+    events = normalize_many(mod, input_payload["raw_events"], prefer_v2=True)
+    if not events.get("ok"):
+        return events
+    states = reduce_v2_states(mod, events["value"], input_payload)
+    if not states.get("ok"):
+        return states
+    for state in states["value"]:
+        if state.get("accountId") == input_payload["account_id"]:
+            return evaluate_v2_state(mod, state, input_payload)
+    return {"ok": False, "error": "missing_account"}
+
+
+def export_v2_report(mod, summaries):
+    _, reporter = pick_function(mod, ("export_ledger_report_v2", "export_ledger_report"))
+    if reporter is None:
+        return {"ok": False, "error": "unsupported_operation", "operation": "v2_export_report"}
+    return {"ok": True, "value": reporter(summaries)}
+
+
+def calculate_v2_proration(mod, input_payload):
+    _, calculator = pick_function(mod, ("calculate_plan_change_proration_v2", "calculate_plan_change_proration"))
+    if calculator is None:
+        return {"ok": False, "error": "unsupported_operation", "operation": "v2_calculate_proration"}
+    if accepts_positional(calculator, 6):
+        return {
+            "ok": True,
+            "value": calculator(
+                input_payload["old_plan"],
+                input_payload["new_plan"],
+                input_payload["period_start"],
+                input_payload["period_end"],
+                input_payload["change_effective_at"],
+                input_payload.get("quantity", 1),
+            ),
+        }
+    if accepts_positional(calculator, 5):
+        return {
+            "ok": True,
+            "value": calculator(
+                input_payload["old_plan"],
+                input_payload["new_plan"],
+                input_payload["period_start"],
+                input_payload["period_end"],
+                input_payload["change_effective_at"],
+            ),
+        }
+    return {"ok": True, "value": calculator(input_payload)}
+
+
+def v2_metamorphic(mod, input_payload):
+    baseline = v2_summary_pipeline(mod, {**input_payload, "raw_events": input_payload["baseline"]})
+    if not baseline.get("ok"):
+        return baseline
+    baseline_focus = focus_summaries(baseline["value"], input_payload.get("target_account_id"))
+    variants = []
+    for variant in input_payload["variants"]:
+        result = v2_summary_pipeline(mod, {**input_payload, "raw_events": variant["raw_events"]})
+        if not result.get("ok"):
+            variants.append({"name": variant["name"], "value": result, "equivalent": False})
+            continue
+        focus = focus_summaries(result["value"], input_payload.get("target_account_id"))
+        variants.append(
+            {
+                "name": variant["name"],
+                "value": focus,
+                "equivalent": stable_json(focus) == stable_json(baseline_focus),
+            }
+        )
+    return {"ok": True, "value": {"baseline": baseline_focus, "variants": variants}}
+
+
+def v2_performance_digest(mod, input_payload):
+    summaries = v2_summary_pipeline(mod, input_payload)
+    if not summaries.get("ok"):
+        return summaries
+    report = export_v2_report(mod, summaries["value"])
+    if not report.get("ok"):
+        return report
+    return {
+        "ok": True,
+        "value": {
+            "eventCount": len(input_payload["raw_events"]),
+            "summaryCount": len(summaries["value"]),
+            "firstAccountId": summaries["value"][0]["accountId"] if summaries["value"] else None,
+            "lastAccountId": summaries["value"][-1]["accountId"] if summaries["value"] else None,
+            "totalUsage": sum(summary["usage"] for summary in summaries["value"]),
+            "totalPaidCents": sum(summary["totalPaidCents"] for summary in summaries["value"]),
+            "summarySha256": sha256_text(stable_json(summaries["value"])),
+            "reportSha256": sha256_text(report["value"]),
+        },
+    }
+
+
+def v2_parity_payload(mod, input_payload):
+    summaries = v2_summary_pipeline(mod, input_payload)
+    if not summaries.get("ok"):
+        return summaries
+    report = export_v2_report(mod, summaries["value"])
+    if not report.get("ok"):
+        return report
+    return {"ok": True, "value": {"summaries": summaries["value"], "report": report["value"]}}
 
 
 def main():
@@ -180,7 +661,7 @@ def main():
     if operation == "parse_line":
         return mod.parse_event_line(input_payload["line"])
     if operation == "normalize_event":
-        return mod.normalize_event(input_payload["raw_event"])
+        return normalize_one(mod, input_payload["raw_event"])
     if operation == "reduce_and_summarize":
         result = pipeline(mod, input_payload["raw_events"], input_payload.get("as_of"))
         return result["value"] if result.get("ok") else result
@@ -205,6 +686,27 @@ def main():
             "repeatable": stable_json(first) == stable_json(second),
             "inputUnchanged": before == after,
         }
+    if operation == "v2_reduce_and_summarize":
+        result = v2_summary_pipeline(mod, input_payload)
+        return result["value"] if result.get("ok") else result
+    if operation == "v2_reduce_and_evaluate":
+        result = v2_evaluate_pipeline(mod, input_payload)
+        return result["value"] if result.get("ok") else result
+    if operation == "v2_export_report":
+        result = export_v2_report(mod, input_payload["summaries"])
+        return result["value"] if result.get("ok") else result
+    if operation == "v2_calculate_proration":
+        result = calculate_v2_proration(mod, input_payload)
+        return result["value"] if result.get("ok") else result
+    if operation == "v2_metamorphic":
+        result = v2_metamorphic(mod, input_payload)
+        return result["value"] if result.get("ok") else result
+    if operation == "v2_performance_digest":
+        result = v2_performance_digest(mod, input_payload)
+        return result["value"] if result.get("ok") else result
+    if operation == "v2_parity":
+        result = v2_parity_payload(mod, input_payload)
+        return result["value"] if result.get("ok") else result
     return {"ok": False, "error": "unsupported_operation", "operation": operation}
 
 
@@ -369,7 +871,9 @@ def run_language_case(
 
     actual = execute_case(language, case, worktree, runner)
     if not actual.get("ok"):
-        return case_result(case, language, "error", 0.0, points, actual.get("error", "execution_failed"))
+        reason = actual.get("error", "execution_failed")
+        status = "failed" if reason == "timeout" else "error"
+        return case_result(case, language, status, 0.0, points, reason)
 
     passed, reason = compare_case(case, actual.get("value"))
     return case_result(case, language, "passed" if passed else "failed", points if passed else 0.0, points, reason)
@@ -389,19 +893,31 @@ def run_parity_case(
     ts_actual = execute_case("typescript", case, worktree, js_runner)
     py_actual = execute_case("python", case, worktree, py_runner)
     if not ts_actual.get("ok"):
-        return case_result(case, "parity", "error", 0.0, points, "typescript_execution_failed")
+        reason = "typescript_timeout" if ts_actual.get("error") == "timeout" else "typescript_execution_failed"
+        status = "failed" if ts_actual.get("error") == "timeout" else "error"
+        return case_result(case, "parity", status, 0.0, points, reason)
     if not py_actual.get("ok"):
-        return case_result(case, "parity", "error", 0.0, points, "python_execution_failed")
+        reason = "python_timeout" if py_actual.get("error") == "timeout" else "python_execution_failed"
+        status = "failed" if py_actual.get("error") == "timeout" else "error"
+        return case_result(case, "parity", status, 0.0, points, reason)
 
-    if canonical(ts_actual.get("value")) == canonical(py_actual.get("value")):
-        return case_result(case, "parity", "passed", points, points, "ok")
+    if canonical(ts_actual.get("value")) != canonical(py_actual.get("value")):
+        return case_result(case, "parity", "failed", 0.0, points, "parity_mismatch")
 
-    return case_result(case, "parity", "failed", 0.0, points, "parity_mismatch")
+    if "expected" in case:
+        passed, reason = compare_case(case, ts_actual.get("value"))
+        return case_result(case, "parity", "passed" if passed else "failed", points if passed else 0.0, points, reason)
+
+    error_reason = sanitized_actual_error_reason(ts_actual.get("value"))
+    if error_reason is not None:
+        return case_result(case, "parity", "failed", 0.0, points, error_reason)
+
+    return case_result(case, "parity", "passed", points, points, "ok")
 
 
 def execute_case(language: str, case: dict[str, Any], worktree: Path, runner: Path) -> dict[str, Any]:
     command = ["node", str(runner)] if language == "typescript" else [sys.executable, str(runner)]
-    timeout = TS_TIMEOUT_SECONDS if language == "typescript" else PY_TIMEOUT_SECONDS
+    timeout = resolve_case_timeout(case, language)
     payload = json.dumps({"worktree": str(worktree), "case": strip_runner_metadata(case)}, separators=(",", ":"))
 
     try:
@@ -435,8 +951,31 @@ def strip_runner_metadata(case: dict[str, Any]) -> dict[str, Any]:
     return {
         key: copy.deepcopy(value)
         for key, value in case.items()
-        if key not in {"id", "expected", "source_file", "category", "languages", "points", "rule_ids"}
+        if key
+        not in {
+            "id",
+            "expected",
+            "source_file",
+            "category",
+            "languages",
+            "points",
+            "rule_ids",
+            "timeout_seconds",
+            "match",
+        }
     }
+
+
+def resolve_case_timeout(case: dict[str, Any], language: str) -> int | float:
+    default = TS_TIMEOUT_SECONDS if language == "typescript" else PY_TIMEOUT_SECONDS
+    metadata = case.get("timeout_seconds")
+    if isinstance(metadata, (int, float)) and not isinstance(metadata, bool) and metadata > 0:
+        return metadata
+    if isinstance(metadata, dict):
+        value = metadata.get(language)
+        if isinstance(value, (int, float)) and not isinstance(value, bool) and value > 0:
+            return value
+    return default
 
 
 def compare_case(case: dict[str, Any], actual: Any) -> tuple[bool, str]:
@@ -459,7 +998,18 @@ def compare_case(case: dict[str, Any], actual: Any) -> tuple[bool, str]:
     if canonical(actual) == canonical(expected):
         return True, "ok"
 
+    error_reason = sanitized_actual_error_reason(actual)
+    if error_reason is not None:
+        return False, error_reason
+
     return False, "output_mismatch"
+
+
+def sanitized_actual_error_reason(actual: Any) -> str | None:
+    if not isinstance(actual, dict) or actual.get("ok") is not False or not isinstance(actual.get("error"), str):
+        return None
+    reason = actual["error"]
+    return reason if reason in SAFE_ACTUAL_ERROR_REASONS else "operation_failed"
 
 
 def case_result(
