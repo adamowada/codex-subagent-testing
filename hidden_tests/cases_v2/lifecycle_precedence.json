@@ -1,0 +1,364 @@
+{
+  "benchmark": "ruleledger_v2",
+  "cases": [
+    {
+      "category": "lifecycle_precedence",
+      "expected": [
+        {
+          "accountId": "acct_lc",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-04-04T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "starter",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "lifecycle.trial_payment_failure_recovery",
+      "input": {
+        "as_of": "2026-04-05T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_lc",
+            "id": "evt_lc_open",
+            "plan": "starter",
+            "timestamp": "2026-04-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_lc",
+            "id": "evt_lc_trial",
+            "timestamp": "2026-04-02T00:00:00Z",
+            "type": "trial_started"
+          },
+          {
+            "account_id": "acct_lc",
+            "id": "evt_lc_fail",
+            "timestamp": "2026-04-03T00:00:00Z",
+            "type": "payment_failed"
+          },
+          {
+            "account_id": "acct_lc",
+            "id": "evt_lc_recover",
+            "timestamp": "2026-04-04T00:00:00Z",
+            "type": "payment_recovered"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "LC-003",
+        "LC-008",
+        "PY-001"
+      ]
+    },
+    {
+      "category": "lifecycle_precedence",
+      "expected": [
+        {
+          "accountId": "acct_pause",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "audit_log",
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules",
+            "sso"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-04-04T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "enterprise",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 100000
+        }
+      ],
+      "id": "lifecycle.pause_plan_change_resume",
+      "input": {
+        "as_of": "2026-04-05T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_pause",
+            "id": "evt_lc_pause_open",
+            "plan": "starter",
+            "timestamp": "2026-04-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_pause",
+            "id": "evt_lc_pause",
+            "timestamp": "2026-04-02T00:00:00Z",
+            "type": "account_paused"
+          },
+          {
+            "account_id": "acct_pause",
+            "id": "evt_lc_pause_plan",
+            "plan": "enterprise",
+            "timestamp": "2026-04-03T00:00:00Z",
+            "type": "plan_changed"
+          },
+          {
+            "account_id": "acct_pause",
+            "id": "evt_lc_resume",
+            "timestamp": "2026-04-04T00:00:00Z",
+            "type": "account_resumed"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "LC-004",
+        "LC-005"
+      ]
+    },
+    {
+      "category": "lifecycle_precedence",
+      "expected": [
+        {
+          "accountId": "acct_cancel",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-04-03T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "lifecycle.cancel_reactivate",
+      "input": {
+        "as_of": "2026-04-04T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_cancel",
+            "id": "evt_lc_cancel_open",
+            "plan": "pro",
+            "timestamp": "2026-04-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_cancel",
+            "id": "evt_lc_cancel",
+            "timestamp": "2026-04-02T00:00:00Z",
+            "type": "account_cancelled"
+          },
+          {
+            "account_id": "acct_cancel",
+            "id": "evt_lc_reactivate",
+            "timestamp": "2026-04-03T00:00:00Z",
+            "type": "account_reactivated"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 1.5,
+      "rule_ids": [
+        "LC-006"
+      ]
+    },
+    {
+      "category": "lifecycle_precedence",
+      "expected": [
+        {
+          "accountId": "acct_closed",
+          "closedAt": "2026-04-02T00:00:00.000Z",
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [],
+          "invoiceIds": [],
+          "lastEventAt": "2026-04-04T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "starter",
+          "seats": 1,
+          "status": "closed",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 0
+        }
+      ],
+      "id": "lifecycle.close_is_terminal",
+      "input": {
+        "as_of": "2026-04-05T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_closed",
+            "id": "evt_lc_close_open",
+            "plan": "starter",
+            "timestamp": "2026-04-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_closed",
+            "id": "evt_lc_close",
+            "timestamp": "2026-04-02T00:00:00Z",
+            "type": "account_closed"
+          },
+          {
+            "account_id": "acct_closed",
+            "id": "evt_lc_reopen_attempt",
+            "timestamp": "2026-04-03T00:00:00Z",
+            "type": "account_reactivated"
+          },
+          {
+            "account_id": "acct_closed",
+            "id": "evt_lc_closed_plan",
+            "plan": "enterprise",
+            "timestamp": "2026-04-04T00:00:00Z",
+            "type": "plan_changed"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "LC-007"
+      ]
+    },
+    {
+      "category": "lifecycle_precedence",
+      "expected": [
+        {
+          "accountId": "acct_seats",
+          "closedAt": null,
+          "couponActive": true,
+          "couponCode": "SAVE10",
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-04-04T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 2,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 120,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "lifecycle.usage_coupon_and_seats",
+      "input": {
+        "as_of": "2026-04-10T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_seats",
+            "id": "evt_lc_seat_open",
+            "plan": "pro",
+            "quantity": 3,
+            "timestamp": "2026-04-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_seats",
+            "coupon": "save10",
+            "expires_at": "2026-04-30T00:00:00Z",
+            "id": "evt_lc_coupon",
+            "timestamp": "2026-04-02T00:00:00Z",
+            "type": "coupon_applied"
+          },
+          {
+            "account_id": "acct_seats",
+            "id": "evt_lc_usage",
+            "timestamp": "2026-04-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 120
+          },
+          {
+            "account_id": "acct_seats",
+            "id": "evt_lc_seat_delta",
+            "seat_delta": -1,
+            "timestamp": "2026-04-04T00:00:00Z",
+            "type": "seat_delta_recorded"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "LC-009",
+        "LC-010",
+        "LC-011"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

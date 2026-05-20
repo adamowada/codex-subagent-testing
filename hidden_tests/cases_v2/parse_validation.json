@@ -1,0 +1,273 @@
+{
+  "benchmark": "ruleledger_v2",
+  "cases": [
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "empty_line",
+        "line": "  ",
+        "ok": false
+      },
+      "id": "parse.empty_line",
+      "input": {
+        "line": "  "
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "parse_line",
+      "points": 1.0,
+      "rule_ids": [
+        "BT-001"
+      ]
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_json",
+        "line": "{not-json",
+        "ok": false
+      },
+      "id": "parse.invalid_json",
+      "input": {
+        "line": "{not-json"
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "parse_line",
+      "points": 1.0,
+      "rule_ids": [
+        "BT-001"
+      ]
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "non_object_json",
+        "line": "[\"evt\"]",
+        "ok": false
+      },
+      "id": "parse.non_object_array",
+      "input": {
+        "line": "[\"evt\"]"
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "parse_line",
+      "points": 1.0,
+      "rule_ids": [
+        "BT-001"
+      ]
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "non_object_json",
+        "line": "null",
+        "ok": false
+      },
+      "id": "parse.non_object_null",
+      "input": {
+        "line": "null"
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "parse_line",
+      "points": 1.0,
+      "rule_ids": [
+        "BT-001"
+      ]
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "missing_timestamp"
+        ],
+        "ok": false
+      },
+      "id": "normalize.missing_recorded_timestamp",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_parse",
+          "id": "evt_v2_missing_timestamp",
+          "type": "account_opened"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "BT-001"
+      ]
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_sequence"
+        ],
+        "ok": false
+      },
+      "id": "normalize.invalid_sequence",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_parse",
+          "id": "evt_v2_bad_sequence",
+          "sequence": -1,
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "account_opened"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "OR-002"
+      ]
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_currency"
+        ],
+        "ok": false
+      },
+      "id": "normalize.invalid_currency",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_parse",
+          "amount": "10.00",
+          "currency": "US",
+          "id": "evt_v2_bad_currency",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "payment_succeeded"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "BL-002"
+      ]
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_period_bounds"
+        ],
+        "ok": false
+      },
+      "id": "normalize.invalid_period_bounds",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_parse",
+          "id": "evt_v2_bad_period",
+          "period_end": "2026-01-01T00:00:00Z",
+          "period_start": "2026-02-01T00:00:00Z",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "invoice_issued"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "BL-003"
+      ]
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_merge_from_account_id"
+        ],
+        "ok": false
+      },
+      "id": "normalize.blank_merge_source",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_parse",
+          "id": "evt_v2_blank_merge",
+          "merge_from_account_id": " ",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "account_merged"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "MG-001"
+      ]
+    },
+    {
+      "category": "parse_validation",
+      "expected": {
+        "error": "invalid_event",
+        "issues": [
+          "invalid_quantity"
+        ],
+        "ok": false
+      },
+      "id": "normalize.invalid_quantity",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_parse",
+          "id": "evt_v2_bad_quantity",
+          "quantity": -5,
+          "timestamp": "2026-01-01T00:00:00Z",
+          "type": "usage_recorded"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "match": "normalize_error",
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "BL-007",
+        "LC-010"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

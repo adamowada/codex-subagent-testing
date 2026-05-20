@@ -1,0 +1,335 @@
+{
+  "benchmark": "ruleledger_v2",
+  "cases": [
+    {
+      "category": "account_merges",
+      "expected": [
+        {
+          "accountId": "acct_dst",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-06-03T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [
+            "acct_src"
+          ],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 2,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 40,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "merge.simple_source_suppressed",
+      "input": {
+        "as_of": "2026-06-04T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_src",
+            "id": "evt_merge_src_open",
+            "plan": "starter",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_src",
+            "id": "evt_merge_src_usage",
+            "timestamp": "2026-06-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 40
+          },
+          {
+            "account_id": "acct_dst",
+            "id": "evt_merge_dst_open",
+            "plan": "pro",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_dst",
+            "id": "evt_merge",
+            "merge_from_account_id": "acct_src",
+            "timestamp": "2026-06-03T00:00:00Z",
+            "type": "account_merged"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "MG-001",
+        "MG-002",
+        "MG-003",
+        "MG-004"
+      ]
+    },
+    {
+      "category": "account_merges",
+      "expected": [
+        {
+          "accountId": "acct_dst_post",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-06-03T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [
+            "acct_src_post"
+          ],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 2,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 33,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "merge.post_merge_source_event_redirected",
+      "input": {
+        "as_of": "2026-06-04T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_src_post",
+            "id": "evt_merge_post_src_open",
+            "plan": "starter",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_dst_post",
+            "id": "evt_merge_post_dst_open",
+            "plan": "pro",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_dst_post",
+            "id": "evt_merge_post",
+            "merge_from_account_id": "acct_src_post",
+            "timestamp": "2026-06-02T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_src_post",
+            "id": "evt_merge_post_usage",
+            "timestamp": "2026-06-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 33
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "MG-005",
+        "LC-010"
+      ]
+    },
+    {
+      "category": "account_merges",
+      "expected": [
+        {
+          "accountId": "acct_c",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "audit_log",
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules",
+            "sso"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-06-03T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [
+            "acct_a",
+            "acct_b"
+          ],
+          "overLimit": false,
+          "plan": "enterprise",
+          "seats": 3,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 100000
+        }
+      ],
+      "id": "merge.multi_hop_lineage",
+      "input": {
+        "as_of": "2026-06-04T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_a",
+            "id": "evt_merge_a_open",
+            "plan": "starter",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_b",
+            "id": "evt_merge_b_open",
+            "plan": "pro",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_c",
+            "id": "evt_merge_c_open",
+            "plan": "enterprise",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_b",
+            "id": "evt_merge_ab",
+            "merge_from_account_id": "acct_a",
+            "timestamp": "2026-06-02T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_c",
+            "id": "evt_merge_bc",
+            "merge_from_account_id": "acct_b",
+            "timestamp": "2026-06-03T00:00:00Z",
+            "type": "account_merged"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "MG-002",
+        "MG-004"
+      ]
+    },
+    {
+      "category": "account_merges",
+      "expected": [
+        {
+          "accountId": "acct_dup_dst",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-06-03T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [
+            "acct_dup_src"
+          ],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 2,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 10,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "merge.duplicate_event_ids_across_lineage",
+      "input": {
+        "as_of": "2026-06-04T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_dup_src",
+            "id": "evt_merge_dup_src_open",
+            "plan": "starter",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_dup_src",
+            "id": "evt_shared_dup",
+            "timestamp": "2026-06-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 10
+          },
+          {
+            "account_id": "acct_dup_dst",
+            "id": "evt_merge_dup_dst_open",
+            "plan": "pro",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_dup_dst",
+            "id": "evt_shared_dup",
+            "timestamp": "2026-06-02T01:00:00Z",
+            "type": "usage_recorded",
+            "usage": 100
+          },
+          {
+            "account_id": "acct_dup_dst",
+            "id": "evt_merge_dup",
+            "merge_from_account_id": "acct_dup_src",
+            "timestamp": "2026-06-03T00:00:00Z",
+            "type": "account_merged"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "OR-003",
+        "MG-002"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

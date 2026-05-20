@@ -1,0 +1,674 @@
+{
+  "benchmark": "ruleledger_v2",
+  "cases": [
+    {
+      "category": "metamorphic_invariants",
+      "expected": {
+        "baseline": [
+          {
+            "accountId": "acct_meta",
+            "closedAt": null,
+            "couponActive": false,
+            "couponCode": null,
+            "currency": "USD",
+            "features": [
+              "dashboard",
+              "exports"
+            ],
+            "invoiceIds": [],
+            "lastEventAt": "2026-07-04T00:00:00.000Z",
+            "lastInvoiceId": null,
+            "lastPeriodEnd": null,
+            "lastPeriodStart": null,
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "starter",
+            "seats": 1,
+            "status": "active",
+            "totalPaidCents": 1200,
+            "usage": 100,
+            "usageLimit": 1000
+          }
+        ],
+        "variants": [
+          {
+            "equivalent": true,
+            "name": "shuffled",
+            "value": [
+              {
+                "accountId": "acct_meta",
+                "closedAt": null,
+                "couponActive": false,
+                "couponCode": null,
+                "currency": "USD",
+                "features": [
+                  "dashboard",
+                  "exports"
+                ],
+                "invoiceIds": [],
+                "lastEventAt": "2026-07-04T00:00:00.000Z",
+                "lastInvoiceId": null,
+                "lastPeriodEnd": null,
+                "lastPeriodStart": null,
+                "mergedFromAccountIds": [],
+                "overLimit": false,
+                "plan": "starter",
+                "seats": 1,
+                "status": "active",
+                "totalPaidCents": 1200,
+                "usage": 100,
+                "usageLimit": 1000
+              }
+            ]
+          }
+        ]
+      },
+      "id": "metamorphic.shuffled_equivalent_input",
+      "input": {
+        "baseline": [
+          {
+            "account_id": "acct_meta",
+            "id": "evt_meta_open",
+            "plan": "starter",
+            "timestamp": "2026-07-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_meta",
+            "id": "evt_meta_usage_a",
+            "timestamp": "2026-07-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 40
+          },
+          {
+            "account_id": "acct_meta",
+            "id": "evt_meta_usage_b",
+            "timestamp": "2026-07-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 60
+          },
+          {
+            "account_id": "acct_meta",
+            "amount_cents": 1200,
+            "currency": "usd",
+            "id": "evt_meta_pay",
+            "timestamp": "2026-07-04T00:00:00Z",
+            "type": "payment_succeeded"
+          }
+        ],
+        "target_account_id": "acct_meta",
+        "variants": [
+          {
+            "name": "shuffled",
+            "raw_events": [
+              {
+                "account_id": "acct_meta",
+                "id": "evt_meta_usage_b",
+                "timestamp": "2026-07-03T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 60
+              },
+              {
+                "account_id": "acct_meta",
+                "id": "evt_meta_open",
+                "plan": "starter",
+                "timestamp": "2026-07-01T00:00:00Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_meta",
+                "amount_cents": 1200,
+                "currency": "usd",
+                "id": "evt_meta_pay",
+                "timestamp": "2026-07-04T00:00:00Z",
+                "type": "payment_succeeded"
+              },
+              {
+                "account_id": "acct_meta",
+                "id": "evt_meta_usage_a",
+                "timestamp": "2026-07-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 40
+              }
+            ]
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_metamorphic",
+      "points": 2.0,
+      "rule_ids": [
+        "OR-001",
+        "PY-001"
+      ]
+    },
+    {
+      "category": "metamorphic_invariants",
+      "expected": {
+        "baseline": [
+          {
+            "accountId": "acct_meta",
+            "closedAt": null,
+            "couponActive": false,
+            "couponCode": null,
+            "currency": "USD",
+            "features": [
+              "dashboard",
+              "exports"
+            ],
+            "invoiceIds": [],
+            "lastEventAt": "2026-07-04T00:00:00.000Z",
+            "lastInvoiceId": null,
+            "lastPeriodEnd": null,
+            "lastPeriodStart": null,
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "starter",
+            "seats": 1,
+            "status": "active",
+            "totalPaidCents": 1200,
+            "usage": 100,
+            "usageLimit": 1000
+          }
+        ],
+        "variants": [
+          {
+            "equivalent": true,
+            "name": "with_unrelated",
+            "value": [
+              {
+                "accountId": "acct_meta",
+                "closedAt": null,
+                "couponActive": false,
+                "couponCode": null,
+                "currency": "USD",
+                "features": [
+                  "dashboard",
+                  "exports"
+                ],
+                "invoiceIds": [],
+                "lastEventAt": "2026-07-04T00:00:00.000Z",
+                "lastInvoiceId": null,
+                "lastPeriodEnd": null,
+                "lastPeriodStart": null,
+                "mergedFromAccountIds": [],
+                "overLimit": false,
+                "plan": "starter",
+                "seats": 1,
+                "status": "active",
+                "totalPaidCents": 1200,
+                "usage": 100,
+                "usageLimit": 1000
+              }
+            ]
+          }
+        ]
+      },
+      "id": "metamorphic.unrelated_account_injection",
+      "input": {
+        "baseline": [
+          {
+            "account_id": "acct_meta",
+            "id": "evt_meta_open",
+            "plan": "starter",
+            "timestamp": "2026-07-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_meta",
+            "id": "evt_meta_usage_a",
+            "timestamp": "2026-07-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 40
+          },
+          {
+            "account_id": "acct_meta",
+            "id": "evt_meta_usage_b",
+            "timestamp": "2026-07-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 60
+          },
+          {
+            "account_id": "acct_meta",
+            "amount_cents": 1200,
+            "currency": "usd",
+            "id": "evt_meta_pay",
+            "timestamp": "2026-07-04T00:00:00Z",
+            "type": "payment_succeeded"
+          }
+        ],
+        "target_account_id": "acct_meta",
+        "variants": [
+          {
+            "name": "with_unrelated",
+            "raw_events": [
+              {
+                "account_id": "acct_meta",
+                "id": "evt_meta_open",
+                "plan": "starter",
+                "timestamp": "2026-07-01T00:00:00Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_meta",
+                "id": "evt_meta_usage_a",
+                "timestamp": "2026-07-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 40
+              },
+              {
+                "account_id": "acct_meta",
+                "id": "evt_meta_usage_b",
+                "timestamp": "2026-07-03T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 60
+              },
+              {
+                "account_id": "acct_meta",
+                "amount_cents": 1200,
+                "currency": "usd",
+                "id": "evt_meta_pay",
+                "timestamp": "2026-07-04T00:00:00Z",
+                "type": "payment_succeeded"
+              },
+              {
+                "account_id": "acct_other",
+                "id": "evt_meta_other_open",
+                "plan": "enterprise",
+                "timestamp": "2026-07-01T00:00:00Z",
+                "type": "account_opened"
+              }
+            ]
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_metamorphic",
+      "points": 2.0,
+      "rule_ids": [
+        "LC-010"
+      ]
+    },
+    {
+      "category": "metamorphic_invariants",
+      "expected": {
+        "baseline": [
+          {
+            "accountId": "acct_meta",
+            "closedAt": null,
+            "couponActive": false,
+            "couponCode": null,
+            "currency": "USD",
+            "features": [
+              "dashboard",
+              "exports"
+            ],
+            "invoiceIds": [],
+            "lastEventAt": "2026-07-04T00:00:00.000Z",
+            "lastInvoiceId": null,
+            "lastPeriodEnd": null,
+            "lastPeriodStart": null,
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "starter",
+            "seats": 1,
+            "status": "active",
+            "totalPaidCents": 1200,
+            "usage": 100,
+            "usageLimit": 1000
+          }
+        ],
+        "variants": [
+          {
+            "equivalent": true,
+            "name": "duplicated_payment",
+            "value": [
+              {
+                "accountId": "acct_meta",
+                "closedAt": null,
+                "couponActive": false,
+                "couponCode": null,
+                "currency": "USD",
+                "features": [
+                  "dashboard",
+                  "exports"
+                ],
+                "invoiceIds": [],
+                "lastEventAt": "2026-07-04T00:00:00.000Z",
+                "lastInvoiceId": null,
+                "lastPeriodEnd": null,
+                "lastPeriodStart": null,
+                "mergedFromAccountIds": [],
+                "overLimit": false,
+                "plan": "starter",
+                "seats": 1,
+                "status": "active",
+                "totalPaidCents": 1200,
+                "usage": 100,
+                "usageLimit": 1000
+              }
+            ]
+          }
+        ]
+      },
+      "id": "metamorphic.duplicate_idempotent_event",
+      "input": {
+        "baseline": [
+          {
+            "account_id": "acct_meta",
+            "id": "evt_meta_open",
+            "plan": "starter",
+            "timestamp": "2026-07-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_meta",
+            "id": "evt_meta_usage_a",
+            "timestamp": "2026-07-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 40
+          },
+          {
+            "account_id": "acct_meta",
+            "id": "evt_meta_usage_b",
+            "timestamp": "2026-07-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 60
+          },
+          {
+            "account_id": "acct_meta",
+            "amount_cents": 1200,
+            "currency": "usd",
+            "id": "evt_meta_pay",
+            "timestamp": "2026-07-04T00:00:00Z",
+            "type": "payment_succeeded"
+          }
+        ],
+        "target_account_id": "acct_meta",
+        "variants": [
+          {
+            "name": "duplicated_payment",
+            "raw_events": [
+              {
+                "account_id": "acct_meta",
+                "id": "evt_meta_open",
+                "plan": "starter",
+                "timestamp": "2026-07-01T00:00:00Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_meta",
+                "id": "evt_meta_usage_a",
+                "timestamp": "2026-07-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 40
+              },
+              {
+                "account_id": "acct_meta",
+                "id": "evt_meta_usage_b",
+                "timestamp": "2026-07-03T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 60
+              },
+              {
+                "account_id": "acct_meta",
+                "amount_cents": 1200,
+                "currency": "usd",
+                "id": "evt_meta_pay",
+                "timestamp": "2026-07-04T00:00:00Z",
+                "type": "payment_succeeded"
+              },
+              {
+                "account_id": "acct_meta",
+                "amount_cents": 1200,
+                "currency": "usd",
+                "id": "evt_meta_pay",
+                "timestamp": "2026-07-04T00:00:00Z",
+                "type": "payment_succeeded"
+              }
+            ]
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_metamorphic",
+      "points": 2.0,
+      "rule_ids": [
+        "OR-003"
+      ]
+    },
+    {
+      "category": "metamorphic_invariants",
+      "expected": {
+        "baseline": [
+          {
+            "accountId": "acct_split",
+            "closedAt": null,
+            "couponActive": false,
+            "couponCode": null,
+            "currency": null,
+            "features": [
+              "dashboard",
+              "exports"
+            ],
+            "invoiceIds": [],
+            "lastEventAt": "2026-07-02T00:00:00.000Z",
+            "lastInvoiceId": null,
+            "lastPeriodEnd": null,
+            "lastPeriodStart": null,
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "starter",
+            "seats": 1,
+            "status": "active",
+            "totalPaidCents": 0,
+            "usage": 100,
+            "usageLimit": 1000
+          }
+        ],
+        "variants": [
+          {
+            "equivalent": false,
+            "name": "split",
+            "value": [
+              {
+                "accountId": "acct_split",
+                "closedAt": null,
+                "couponActive": false,
+                "couponCode": null,
+                "currency": null,
+                "features": [
+                  "dashboard",
+                  "exports"
+                ],
+                "invoiceIds": [],
+                "lastEventAt": "2026-07-02T01:00:00.000Z",
+                "lastInvoiceId": null,
+                "lastPeriodEnd": null,
+                "lastPeriodStart": null,
+                "mergedFromAccountIds": [],
+                "overLimit": false,
+                "plan": "starter",
+                "seats": 1,
+                "status": "active",
+                "totalPaidCents": 0,
+                "usage": 100,
+                "usageLimit": 1000
+              }
+            ]
+          }
+        ]
+      },
+      "id": "metamorphic.split_usage_batches",
+      "input": {
+        "baseline": [
+          {
+            "account_id": "acct_split",
+            "id": "evt_meta_split_open",
+            "plan": "starter",
+            "timestamp": "2026-07-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_split",
+            "id": "evt_meta_split_usage",
+            "timestamp": "2026-07-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 100
+          }
+        ],
+        "target_account_id": "acct_split",
+        "variants": [
+          {
+            "name": "split",
+            "raw_events": [
+              {
+                "account_id": "acct_split",
+                "id": "evt_meta_split_open",
+                "plan": "starter",
+                "timestamp": "2026-07-01T00:00:00Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_split",
+                "id": "evt_meta_split_usage_a",
+                "timestamp": "2026-07-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 40
+              },
+              {
+                "account_id": "acct_split",
+                "id": "evt_meta_split_usage_b",
+                "timestamp": "2026-07-02T01:00:00Z",
+                "type": "usage_recorded",
+                "usage": 60
+              }
+            ]
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_metamorphic",
+      "points": 2.0,
+      "rule_ids": [
+        "LC-010"
+      ]
+    },
+    {
+      "category": "metamorphic_invariants",
+      "expected": {
+        "baseline": [
+          {
+            "accountId": "acct_norm_stable",
+            "closedAt": null,
+            "couponActive": false,
+            "couponCode": null,
+            "currency": null,
+            "features": [
+              "dashboard",
+              "exports"
+            ],
+            "invoiceIds": [],
+            "lastEventAt": "2026-07-01T10:00:00.000Z",
+            "lastInvoiceId": null,
+            "lastPeriodEnd": null,
+            "lastPeriodStart": null,
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "starter",
+            "seats": 1,
+            "status": "active",
+            "totalPaidCents": 0,
+            "usage": 0,
+            "usageLimit": 1000
+          }
+        ],
+        "variants": [
+          {
+            "equivalent": true,
+            "name": "canonical",
+            "value": [
+              {
+                "accountId": "acct_norm_stable",
+                "closedAt": null,
+                "couponActive": false,
+                "couponCode": null,
+                "currency": null,
+                "features": [
+                  "dashboard",
+                  "exports"
+                ],
+                "invoiceIds": [],
+                "lastEventAt": "2026-07-01T10:00:00.000Z",
+                "lastInvoiceId": null,
+                "lastPeriodEnd": null,
+                "lastPeriodStart": null,
+                "mergedFromAccountIds": [],
+                "overLimit": false,
+                "plan": "starter",
+                "seats": 1,
+                "status": "active",
+                "totalPaidCents": 0,
+                "usage": 0,
+                "usageLimit": 1000
+              }
+            ]
+          }
+        ]
+      },
+      "id": "metamorphic.normalization_stability",
+      "input": {
+        "baseline": [
+          {
+            "account_id": " acct_norm_stable ",
+            "id": " evt_meta_norm_open ",
+            "plan": "starter",
+            "timestamp": "2026-07-01T05:00:00-05:00",
+            "type": "account_opened"
+          }
+        ],
+        "target_account_id": "acct_norm_stable",
+        "variants": [
+          {
+            "name": "canonical",
+            "raw_events": [
+              {
+                "account_id": "acct_norm_stable",
+                "id": "evt_meta_norm_open",
+                "plan": "starter",
+                "timestamp": "2026-07-01T10:00:00.000Z",
+                "type": "account_opened"
+              }
+            ]
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_metamorphic",
+      "points": 2.0,
+      "rule_ids": [
+        "BT-001",
+        "BT-002",
+        "BT-003"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

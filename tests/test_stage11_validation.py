@@ -85,7 +85,7 @@ def test_stage11_static_contract_accepts_real_ruleledger_v2_config() -> None:
     assert payload["benchmark"] == {
         "version": "ruleledger_v2",
         "template_path": "benchmark_template_v2",
-        "hidden_cases_path": "hidden_tests/cases_v2_placeholder",
+        "hidden_cases_path": "hidden_tests/cases_v2",
         "scoring_path": "configs/scoring_v2.yaml",
         "scoring_profile": "starter_quality_v2",
         "versions": {"ruleledger_v2": 1},
@@ -268,7 +268,7 @@ def test_preflight_loads_real_ruleledger_v2_assets(monkeypatch: pytest.MonkeyPat
     assert checks["benchmark_template"]["status"] == "passed"
     assert checks["hidden_cases"]["status"] == "passed"
     assert checks["hidden_cases"]["data"]["benchmark"]["template_path"] == "benchmark_template_v2"
-    assert checks["hidden_cases"]["data"]["benchmark"]["hidden_cases_path"].endswith("cases_v2_placeholder")
+    assert checks["hidden_cases"]["data"]["benchmark"]["hidden_cases_path"].endswith("cases_v2")
 
 
 def test_stage11_flags_preflight_benchmark_mismatch() -> None:

@@ -1,0 +1,208 @@
+{
+  "benchmark": "ruleledger_v2",
+  "cases": [
+    {
+      "category": "reporting",
+      "expected": "account_id,status,plan,total_paid_cents,currency,seats,usage,usage_limit,over_limit,coupon_code,coupon_active,invoice_ids,last_invoice_id,last_period_start,last_period_end,merged_from_account_ids,closed_at,last_event_at\nacct_report_a,active,enterprise,19900,USD,4,5,100000,false,SAVE10,true,inv_report_1|inv_report_2,inv_report_2,2026-10-01T00:00:00.000Z,2026-11-01T00:00:00.000Z,acct_old_a|acct_old_b,,2026-10-02T00:00:00.000Z\nacct_report_z,closed,free,0,,0,0,0,false,,false,,,,,,2026-10-01T00:00:00.000Z,2026-10-01T00:00:00.000Z\n",
+      "id": "reporting.header_row_order_and_nulls",
+      "input": {
+        "summaries": [
+          {
+            "accountId": "acct_report_z",
+            "closedAt": "2026-10-01T00:00:00.000Z",
+            "couponActive": false,
+            "couponCode": null,
+            "currency": null,
+            "features": [],
+            "invoiceIds": [],
+            "lastEventAt": "2026-10-01T00:00:00.000Z",
+            "lastInvoiceId": null,
+            "lastPeriodEnd": null,
+            "lastPeriodStart": null,
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "free",
+            "seats": 0,
+            "status": "closed",
+            "totalPaidCents": 0,
+            "usage": 0,
+            "usageLimit": 0
+          },
+          {
+            "accountId": "acct_report_a",
+            "closedAt": null,
+            "couponActive": true,
+            "couponCode": "SAVE10",
+            "currency": "USD",
+            "features": [
+              "audit_log",
+              "dashboard",
+              "exports",
+              "priority_support",
+              "rules",
+              "sso"
+            ],
+            "invoiceIds": [
+              "inv_report_1",
+              "inv_report_2"
+            ],
+            "lastEventAt": "2026-10-02T00:00:00.000Z",
+            "lastInvoiceId": "inv_report_2",
+            "lastPeriodEnd": "2026-11-01T00:00:00.000Z",
+            "lastPeriodStart": "2026-10-01T00:00:00.000Z",
+            "mergedFromAccountIds": [
+              "acct_old_a",
+              "acct_old_b"
+            ],
+            "overLimit": false,
+            "plan": "enterprise",
+            "seats": 4,
+            "status": "active",
+            "totalPaidCents": 19900,
+            "usage": 5,
+            "usageLimit": 100000
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_export_report",
+      "points": 2.0,
+      "rule_ids": [
+        "RP-001",
+        "RP-002",
+        "RP-003",
+        "RP-004",
+        "RP-005"
+      ]
+    },
+    {
+      "category": "reporting",
+      "expected": "account_id,status,plan,total_paid_cents,currency,seats,usage,usage_limit,over_limit,coupon_code,coupon_active,invoice_ids,last_invoice_id,last_period_start,last_period_end,merged_from_account_ids,closed_at,last_event_at\nacct_report_quote,active,enterprise,19900,USD,4,5,100000,false,\"SAVE,\"\"10\"\"\",true,\"inv,comma|inv\"\"quote\",inv_report_2,2026-10-01T00:00:00.000Z,2026-11-01T00:00:00.000Z,\"acct\nline\",,2026-10-02T00:00:00.000Z\n",
+      "id": "reporting.csv_escaping",
+      "input": {
+        "summaries": [
+          {
+            "accountId": "acct_report_quote",
+            "closedAt": null,
+            "couponActive": true,
+            "couponCode": "SAVE,\"10\"",
+            "currency": "USD",
+            "features": [
+              "audit_log",
+              "dashboard",
+              "exports",
+              "priority_support",
+              "rules",
+              "sso"
+            ],
+            "invoiceIds": [
+              "inv,comma",
+              "inv\"quote"
+            ],
+            "lastEventAt": "2026-10-02T00:00:00.000Z",
+            "lastInvoiceId": "inv_report_2",
+            "lastPeriodEnd": "2026-11-01T00:00:00.000Z",
+            "lastPeriodStart": "2026-10-01T00:00:00.000Z",
+            "mergedFromAccountIds": [
+              "acct\nline"
+            ],
+            "overLimit": false,
+            "plan": "enterprise",
+            "seats": 4,
+            "status": "active",
+            "totalPaidCents": 19900,
+            "usage": 5,
+            "usageLimit": 100000
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_export_report",
+      "points": 2.0,
+      "rule_ids": [
+        "RP-006"
+      ]
+    },
+    {
+      "category": "reporting",
+      "expected": [
+        {
+          "accountId": "acct_report_pipeline",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": "USD",
+          "features": [
+            "audit_log",
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules",
+            "sso"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-10-03T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "enterprise",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 19900,
+          "usage": 7,
+          "usageLimit": 100000
+        }
+      ],
+      "id": "reporting.summary_to_csv_contract",
+      "input": {
+        "as_of": "2026-10-04T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_report_pipeline",
+            "id": "evt_report_open",
+            "plan": "enterprise",
+            "timestamp": "2026-10-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_report_pipeline",
+            "amount_cents": 19900,
+            "currency": "usd",
+            "id": "evt_report_pay",
+            "timestamp": "2026-10-02T00:00:00Z",
+            "type": "payment_succeeded"
+          },
+          {
+            "account_id": "acct_report_pipeline",
+            "id": "evt_report_usage",
+            "timestamp": "2026-10-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 7
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 1.0,
+      "rule_ids": [
+        "RP-001",
+        "RP-002",
+        "PY-001"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

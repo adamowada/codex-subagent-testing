@@ -1,0 +1,361 @@
+{
+  "benchmark": "ruleledger_v2",
+  "cases": [
+    {
+      "category": "bitemporal_replay",
+      "expected": [
+        {
+          "accountId": "acct_bt",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-03-01T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "starter",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "bitemporal.late_arrival_before_recorded_at",
+      "input": {
+        "as_of": "2026-03-05T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_bt",
+            "id": "evt_bt_open",
+            "plan": "starter",
+            "timestamp": "2026-03-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_bt",
+            "effective_at": "2026-03-02T00:00:00Z",
+            "id": "evt_bt_late_plan",
+            "plan": "pro",
+            "recorded_at": "2026-03-10T00:00:00Z",
+            "timestamp": "2026-03-10T00:00:00Z",
+            "type": "plan_changed"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "BT-004",
+        "BT-005",
+        "BT-006"
+      ]
+    },
+    {
+      "category": "bitemporal_replay",
+      "expected": [
+        {
+          "accountId": "acct_bt",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-03-02T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "bitemporal.late_arrival_after_recorded_at",
+      "input": {
+        "as_of": "2026-03-11T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_bt",
+            "id": "evt_bt_open",
+            "plan": "starter",
+            "timestamp": "2026-03-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_bt",
+            "effective_at": "2026-03-02T00:00:00Z",
+            "id": "evt_bt_late_plan",
+            "plan": "pro",
+            "recorded_at": "2026-03-10T00:00:00Z",
+            "timestamp": "2026-03-10T00:00:00Z",
+            "type": "plan_changed"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "BT-004",
+        "BT-005",
+        "OR-001"
+      ]
+    },
+    {
+      "category": "bitemporal_replay",
+      "expected": [
+        {
+          "accountId": "acct_bt",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-03-02T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "bitemporal.separate_business_and_audit_cutoffs",
+      "input": {
+        "audit_as_of": "2026-03-11T00:00:00Z",
+        "business_as_of": "2026-03-03T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_bt",
+            "id": "evt_bt_open",
+            "plan": "starter",
+            "timestamp": "2026-03-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_bt",
+            "effective_at": "2026-03-02T00:00:00Z",
+            "id": "evt_bt_late_plan",
+            "plan": "pro",
+            "recorded_at": "2026-03-10T00:00:00Z",
+            "timestamp": "2026-03-10T00:00:00Z",
+            "type": "plan_changed"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "BT-004",
+        "BT-005"
+      ]
+    },
+    {
+      "category": "bitemporal_replay",
+      "expected": [
+        {
+          "accountId": "acct_bt_corr",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-03-02T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "starter",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 25,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "bitemporal.correction_then_void_visibility",
+      "input": {
+        "as_of": "2026-03-05T12:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_bt_corr",
+            "id": "evt_bt_corr_open",
+            "plan": "starter",
+            "timestamp": "2026-03-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_bt_corr",
+            "id": "evt_bt_usage",
+            "timestamp": "2026-03-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 10
+          },
+          {
+            "account_id": "acct_bt_corr",
+            "correction_of": "evt_bt_usage",
+            "effective_at": "2026-03-02T00:00:00Z",
+            "id": "evt_bt_usage_corrected",
+            "recorded_at": "2026-03-05T00:00:00Z",
+            "timestamp": "2026-03-05T00:00:00Z",
+            "type": "event_corrected",
+            "usage": 25
+          },
+          {
+            "account_id": "acct_bt_corr",
+            "effective_at": "2026-03-02T00:00:00Z",
+            "id": "evt_bt_usage_voided",
+            "recorded_at": "2026-03-06T00:00:00Z",
+            "timestamp": "2026-03-06T00:00:00Z",
+            "type": "event_voided",
+            "voided_event_id": "evt_bt_usage"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "CV-002",
+        "CV-005",
+        "CV-006"
+      ]
+    },
+    {
+      "category": "bitemporal_replay",
+      "expected": [
+        {
+          "accountId": "acct_bt_dup",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-03-04T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "starter",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 15,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "bitemporal.duplicate_and_sequence_order",
+      "input": {
+        "as_of": "2026-03-10T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_bt_dup",
+            "id": "evt_bt_dup_open",
+            "plan": "starter",
+            "timestamp": "2026-03-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_bt_dup",
+            "id": "evt_same",
+            "timestamp": "2026-03-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 5
+          },
+          {
+            "account_id": "acct_bt_dup",
+            "id": "evt_same",
+            "timestamp": "2026-03-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 50
+          },
+          {
+            "account_id": "acct_bt_dup",
+            "id": "evt_tie_b",
+            "sequence": 2,
+            "timestamp": "2026-03-04T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 7
+          },
+          {
+            "account_id": "acct_bt_dup",
+            "id": "evt_tie_a",
+            "sequence": 1,
+            "timestamp": "2026-03-04T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 3
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "OR-001",
+        "OR-002",
+        "OR-003",
+        "OR-004"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

@@ -1,0 +1,240 @@
+{
+  "benchmark": "ruleledger_v2",
+  "cases": [
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "effectiveAt": "2026-02-01T10:00:00.000Z",
+          "id": "evt_v2_defaults",
+          "plan": "starter",
+          "quantity": 2,
+          "recordedAt": "2026-02-01T10:00:00.000Z",
+          "sequence": 0,
+          "timestamp": "2026-02-01T10:00:00.000Z",
+          "type": "account_opened"
+        }
+      },
+      "id": "normalization.defaults_effective_recorded",
+      "input": {
+        "raw_event": {
+          "account_id": " acct_norm ",
+          "id": " evt_v2_defaults ",
+          "plan": " starter ",
+          "quantity": 2,
+          "timestamp": "2026-02-01T05:00:00-05:00",
+          "type": "account_opened"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "BT-001",
+        "BT-002",
+        "BT-003",
+        "OR-002",
+        "LC-002"
+      ]
+    },
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "amountCents": 105,
+          "currency": "USD",
+          "effectiveAt": "2026-02-02T00:00:00.000Z",
+          "id": "evt_v2_money",
+          "invoiceId": "inv_norm",
+          "recordedAt": "2026-02-02T00:00:00.000Z",
+          "sequence": 0,
+          "timestamp": "2026-02-02T00:00:00.000Z",
+          "type": "payment_succeeded"
+        }
+      },
+      "id": "normalization.money_currency_invoice",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_norm",
+          "amount": "001.05",
+          "currency": "usd",
+          "id": "evt_v2_money",
+          "invoice_id": " inv_norm ",
+          "timestamp": "2026-02-02T00:00:00Z",
+          "type": "payment_succeeded"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "BL-001",
+        "BL-002"
+      ]
+    },
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "amountCents": -125,
+          "currency": "EUR",
+          "effectiveAt": "2026-02-03T00:00:00.000Z",
+          "id": "evt_v2_credit",
+          "recordedAt": "2026-02-03T00:00:00.000Z",
+          "sequence": 0,
+          "timestamp": "2026-02-03T00:00:00.000Z",
+          "type": "invoice_issued"
+        }
+      },
+      "id": "normalization.amount_cents_negative_adjustment",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_norm",
+          "amount_cents": -125,
+          "currency": "eur",
+          "id": "evt_v2_credit",
+          "timestamp": "2026-02-03T00:00:00Z",
+          "type": "invoice_issued"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "BL-001",
+        "BL-005"
+      ]
+    },
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "effectiveAt": "2026-02-04T00:00:00.000Z",
+          "id": "evt_v2_period",
+          "periodEnd": "2026-03-01T00:00:00.000Z",
+          "periodStart": "2026-02-01T00:00:00.000Z",
+          "recordedAt": "2026-02-04T00:00:00.000Z",
+          "sequence": 0,
+          "timestamp": "2026-02-04T00:00:00.000Z",
+          "type": "invoice_issued"
+        }
+      },
+      "id": "normalization.period_fields",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_norm",
+          "id": "evt_v2_period",
+          "period_end": "2026-03-01T00:00:00Z",
+          "period_start": "2026-02-01T00:00:00Z",
+          "timestamp": "2026-02-04T00:00:00Z",
+          "type": "invoice_issued"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "BL-003"
+      ]
+    },
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_norm",
+          "correctionOf": "evt_target",
+          "effectiveAt": "2026-02-01T00:00:00.000Z",
+          "id": "evt_v2_correction",
+          "quantity": 11,
+          "recordedAt": "2026-02-05T00:00:00.000Z",
+          "sequence": 3,
+          "timestamp": "2026-02-05T00:00:00.000Z",
+          "type": "event_corrected"
+        }
+      },
+      "id": "normalization_correction_void_refs",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_norm",
+          "correction_of": "evt_target",
+          "effective_at": "2026-02-01T00:00:00Z",
+          "id": "evt_v2_correction",
+          "quantity": 11,
+          "recorded_at": "2026-02-05T00:00:00Z",
+          "sequence": 3,
+          "timestamp": "2026-02-05T00:00:00Z",
+          "type": "event_corrected"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "CV-001",
+        "CV-003"
+      ]
+    },
+    {
+      "category": "normalization",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_dest",
+          "effectiveAt": "2026-02-06T00:00:00.000Z",
+          "id": "evt_v2_merge",
+          "mergeFromAccountId": "acct_source",
+          "recordedAt": "2026-02-06T00:00:00.000Z",
+          "sequence": 0,
+          "timestamp": "2026-02-06T00:00:00.000Z",
+          "type": "account_merged"
+        }
+      },
+      "id": "normalization_merge_source",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_dest",
+          "id": "evt_v2_merge",
+          "merge_from_account_id": "acct_source",
+          "timestamp": "2026-02-06T00:00:00Z",
+          "type": "account_merged"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "MG-001"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

@@ -1,0 +1,70 @@
+{
+  "benchmark": "ruleledger_v2",
+  "category_weights": {
+    "account_merges": 0.11,
+    "billing_proration": 0.13,
+    "bitemporal_replay": 0.14,
+    "lifecycle_precedence": 0.13,
+    "metamorphic_invariants": 0.13,
+    "normalization": 0.1,
+    "parity": 0.05,
+    "parse_validation": 0.08,
+    "performance": 0.08,
+    "reporting": 0.05
+  },
+  "files": {
+    "account_merges.json": {
+      "case_count": 4,
+      "points": 8.0,
+      "sha256": "27ee82aba611d2ec3b82277fffcf51c2803b564a514f839cf85165e6ccbc3f00"
+    },
+    "billing_proration.json": {
+      "case_count": 4,
+      "points": 8.0,
+      "sha256": "e185d0196f66cc3b25319ecb609ae0bb4a2ea8c34aea7d22a1849e5a87399076"
+    },
+    "bitemporal_replay.json": {
+      "case_count": 5,
+      "points": 10.0,
+      "sha256": "2055d8e228ff32957104bf453d41dd9bf0ca9dce1a31bce598ecb90b7589563b"
+    },
+    "lifecycle_precedence.json": {
+      "case_count": 5,
+      "points": 9.5,
+      "sha256": "79f406422a559e78ff65d3e8583aaebdf257280214911691e9b7a0fed0c30edd"
+    },
+    "metamorphic_invariants.json": {
+      "case_count": 5,
+      "points": 10.0,
+      "sha256": "7508716847c2689058540a692520eec8684aa584e0dd3b842021324078c1c145"
+    },
+    "normalization.json": {
+      "case_count": 6,
+      "points": 6.0,
+      "sha256": "b44ef77d139f2e0b7cb23e66b21e3936e27a6363d00ed0624e8ca365aebe09f3"
+    },
+    "parity.json": {
+      "case_count": 2,
+      "points": 4.0,
+      "sha256": "55a7d0b529a191ea6197a9f10958b001f250d1beaee989f91341eee2a175b631"
+    },
+    "parse_validation.json": {
+      "case_count": 10,
+      "points": 10.0,
+      "sha256": "6308e5d6cf3ee6b756b22e7916635d6ab01747471fee8d1b6ed7c6ca17b97229"
+    },
+    "performance.json": {
+      "case_count": 2,
+      "points": 6.0,
+      "sha256": "10304378c65e1121984378cf46dcd3b5afdaa6c7f2f58cd18d04ca5b38efa1f2"
+    },
+    "reporting.json": {
+      "case_count": 3,
+      "points": 5.0,
+      "sha256": "eb79235b75b380abc7fd4adeab65838bfd03a8222cc11fbdb2a9dabef00551bc"
+    }
+  },
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

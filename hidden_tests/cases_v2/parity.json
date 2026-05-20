@@ -1,0 +1,168 @@
+{
+  "benchmark": "ruleledger_v2",
+  "cases": [
+    {
+      "category": "parity",
+      "expected": {
+        "report": "account_id,status,plan,total_paid_cents,currency,seats,usage,usage_limit,over_limit,coupon_code,coupon_active,invoice_ids,last_invoice_id,last_period_start,last_period_end,merged_from_account_ids,closed_at,last_event_at\nacct_parity_dst,active,pro,4900,USD,2,25,10000,false,,false,,,,,acct_parity_src,,2026-11-04T00:00:00.000Z\n",
+        "summaries": [
+          {
+            "accountId": "acct_parity_dst",
+            "closedAt": null,
+            "couponActive": false,
+            "couponCode": null,
+            "currency": "USD",
+            "features": [
+              "dashboard",
+              "exports",
+              "priority_support",
+              "rules"
+            ],
+            "invoiceIds": [],
+            "lastEventAt": "2026-11-04T00:00:00.000Z",
+            "lastInvoiceId": null,
+            "lastPeriodEnd": null,
+            "lastPeriodStart": null,
+            "mergedFromAccountIds": [
+              "acct_parity_src"
+            ],
+            "overLimit": false,
+            "plan": "pro",
+            "seats": 2,
+            "status": "active",
+            "totalPaidCents": 4900,
+            "usage": 25,
+            "usageLimit": 10000
+          }
+        ]
+      },
+      "id": "parity.bitemporal_merge_report",
+      "input": {
+        "as_of": "2026-12-01T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_parity_src",
+            "id": "evt_parity_src_open",
+            "plan": "starter",
+            "timestamp": "2026-11-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_parity_src",
+            "id": "evt_parity_src_usage",
+            "timestamp": "2026-11-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 25
+          },
+          {
+            "account_id": "acct_parity_dst",
+            "id": "evt_parity_dst_open",
+            "plan": "pro",
+            "timestamp": "2026-11-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_parity_dst",
+            "id": "evt_parity_merge",
+            "merge_from_account_id": "acct_parity_src",
+            "timestamp": "2026-11-03T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_parity_dst",
+            "amount_cents": 4900,
+            "currency": "usd",
+            "id": "evt_parity_pay",
+            "timestamp": "2026-11-04T00:00:00Z",
+            "type": "payment_succeeded"
+          }
+        ]
+      },
+      "languages": [
+        "parity"
+      ],
+      "operation": "v2_parity",
+      "points": 2.0,
+      "rule_ids": [
+        "MG-002",
+        "RP-001",
+        "PY-001"
+      ]
+    },
+    {
+      "category": "parity",
+      "expected": {
+        "report": "account_id,status,plan,total_paid_cents,currency,seats,usage,usage_limit,over_limit,coupon_code,coupon_active,invoice_ids,last_invoice_id,last_period_start,last_period_end,merged_from_account_ids,closed_at,last_event_at\nacct_parity_corr,active,starter,0,,1,12,1000,false,,false,,,,,,,2026-11-02T00:00:00.000Z\n",
+        "summaries": [
+          {
+            "accountId": "acct_parity_corr",
+            "closedAt": null,
+            "couponActive": false,
+            "couponCode": null,
+            "currency": null,
+            "features": [
+              "dashboard",
+              "exports"
+            ],
+            "invoiceIds": [],
+            "lastEventAt": "2026-11-02T00:00:00.000Z",
+            "lastInvoiceId": null,
+            "lastPeriodEnd": null,
+            "lastPeriodStart": null,
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "starter",
+            "seats": 1,
+            "status": "active",
+            "totalPaidCents": 0,
+            "usage": 12,
+            "usageLimit": 1000
+          }
+        ]
+      },
+      "id": "parity.correction_void_csv",
+      "input": {
+        "as_of": "2026-12-01T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_parity_corr",
+            "id": "evt_parity_corr_open",
+            "plan": "starter",
+            "timestamp": "2026-11-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_parity_corr",
+            "id": "evt_parity_usage",
+            "timestamp": "2026-11-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 10
+          },
+          {
+            "account_id": "acct_parity_corr",
+            "correction_of": "evt_parity_usage",
+            "effective_at": "2026-11-02T00:00:00Z",
+            "id": "evt_parity_correct",
+            "recorded_at": "2026-11-03T00:00:00Z",
+            "timestamp": "2026-11-03T00:00:00Z",
+            "type": "event_corrected",
+            "usage": 12
+          }
+        ]
+      },
+      "languages": [
+        "parity"
+      ],
+      "operation": "v2_parity",
+      "points": 2.0,
+      "rule_ids": [
+        "CV-002",
+        "CV-003",
+        "PY-001"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

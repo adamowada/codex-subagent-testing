@@ -1,0 +1,188 @@
+{
+  "benchmark": "ruleledger_v2",
+  "cases": [
+    {
+      "category": "billing_proration",
+      "expected": {
+        "changeEffectiveAt": "2026-05-16T12:00:00.000Z",
+        "netAdjustmentCents": 1850,
+        "newChargeCents": 2450,
+        "newPlan": "pro",
+        "oldCreditCents": -600,
+        "oldPlan": "starter",
+        "periodEnd": "2026-06-01T00:00:00.000Z",
+        "periodStart": "2026-05-01T00:00:00.000Z",
+        "quantity": 1
+      },
+      "id": "billing.mid_month_upgrade_one_seat",
+      "input": {
+        "change_effective_at": "2026-05-16T12:00:00Z",
+        "new_plan": "pro",
+        "old_plan": "starter",
+        "period_end": "2026-06-01T00:00:00Z",
+        "period_start": "2026-05-01T00:00:00Z",
+        "quantity": 1
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_calculate_proration",
+      "points": 2.0,
+      "rule_ids": [
+        "BL-003",
+        "BL-004",
+        "BL-005",
+        "BL-006"
+      ]
+    },
+    {
+      "category": "billing_proration",
+      "expected": {
+        "changeEffectiveAt": "2026-05-20T00:00:00.000Z",
+        "netAdjustmentCents": -17420,
+        "newChargeCents": 5690,
+        "newPlan": "pro",
+        "oldCreditCents": -23110,
+        "oldPlan": "enterprise",
+        "periodEnd": "2026-06-01T00:00:00.000Z",
+        "periodStart": "2026-05-01T00:00:00.000Z",
+        "quantity": 3
+      },
+      "id": "billing.downgrade_three_seats",
+      "input": {
+        "change_effective_at": "2026-05-20T00:00:00Z",
+        "new_plan": "pro",
+        "old_plan": "enterprise",
+        "period_end": "2026-06-01T00:00:00Z",
+        "period_start": "2026-05-01T00:00:00Z",
+        "quantity": 3
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_calculate_proration",
+      "points": 2.0,
+      "rule_ids": [
+        "BL-004",
+        "BL-006",
+        "BL-007"
+      ]
+    },
+    {
+      "category": "billing_proration",
+      "expected": {
+        "changeEffectiveAt": "2026-01-02T00:00:00.000Z",
+        "netAdjustmentCents": 1850,
+        "newChargeCents": 2450,
+        "newPlan": "pro",
+        "oldCreditCents": -600,
+        "oldPlan": "starter",
+        "periodEnd": "2026-01-03T00:00:00.000Z",
+        "periodStart": "2026-01-01T00:00:00.000Z",
+        "quantity": 1
+      },
+      "id": "billing.half_away_rounding_boundary",
+      "input": {
+        "change_effective_at": "2026-01-02T00:00:00Z",
+        "new_plan": "pro",
+        "old_plan": "starter",
+        "period_end": "2026-01-03T00:00:00Z",
+        "period_start": "2026-01-01T00:00:00Z",
+        "quantity": 1
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_calculate_proration",
+      "points": 2.0,
+      "rule_ids": [
+        "BL-004",
+        "BL-005"
+      ]
+    },
+    {
+      "category": "billing_proration",
+      "expected": [
+        {
+          "accountId": "acct_bill",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": "USD",
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [
+            "inv_bill_001"
+          ],
+          "lastEventAt": "2026-05-02T00:00:00.000Z",
+          "lastInvoiceId": "inv_bill_001",
+          "lastPeriodEnd": "2026-06-01T00:00:00.000Z",
+          "lastPeriodStart": "2026-05-01T00:00:00.000Z",
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 2,
+          "status": "active",
+          "totalPaidCents": 9800,
+          "usage": 0,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "billing.invoice_metadata_summary",
+      "input": {
+        "as_of": "2026-05-03T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_bill",
+            "id": "evt_bill_open",
+            "plan": "pro",
+            "quantity": 2,
+            "timestamp": "2026-05-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_bill",
+            "amount_cents": 9800,
+            "currency": "usd",
+            "id": "evt_bill_invoice",
+            "invoice_id": "inv_bill_001",
+            "period_end": "2026-06-01T00:00:00Z",
+            "period_start": "2026-05-01T00:00:00Z",
+            "timestamp": "2026-05-01T00:00:00Z",
+            "type": "invoice_issued"
+          },
+          {
+            "account_id": "acct_bill",
+            "amount_cents": 9800,
+            "currency": "usd",
+            "id": "evt_bill_pay",
+            "timestamp": "2026-05-02T00:00:00Z",
+            "type": "payment_succeeded"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "BL-001",
+        "BL-002",
+        "BL-003",
+        "RP-001"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-20T00:00:00.000Z",
+  "schema_version": 2,
+  "seed": 20260520
+}

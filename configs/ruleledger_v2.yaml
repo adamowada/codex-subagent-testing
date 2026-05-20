@@ -18,7 +18,7 @@
   },
   "paths": {
     "benchmark_template": "benchmark_template_v2",
-    "hidden_cases": "hidden_tests/cases_v2_placeholder",
+    "hidden_cases": "hidden_tests/cases_v2",
     "prompt_templates": {
       "common": "prompts/task_common.md",
       "solo": "prompts/task_solo.md",

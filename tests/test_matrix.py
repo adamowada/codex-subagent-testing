@@ -105,7 +105,7 @@ def test_ruleledger_v2_config_selects_real_v2_starter_assets() -> None:
     assert runs[0]["benchmark"] == {
         "version": "ruleledger_v2",
         "template_path": "benchmark_template_v2",
-        "hidden_cases_path": "hidden_tests/cases_v2_placeholder",
+        "hidden_cases_path": "hidden_tests/cases_v2",
         "scoring_path": "configs/scoring_v2.yaml",
         "scoring_profile": "starter_quality_v2",
     }
