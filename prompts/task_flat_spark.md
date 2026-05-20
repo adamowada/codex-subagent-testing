@@ -21,6 +21,15 @@ Assign exactly six Spark leaves:
 
 Spark leaves are leaves. They must not spawn additional agents, invoke Codex, call external AI, or exceed the configured topology.
 
+## Subagent Launch Rules
+
+Use the configured agent types from the rendered Codex config when spawning leaves.
+
+- Direct mode uses `spark_direct_implementer`, `spark_direct_tester`, and `spark_adversary`.
+- Proposal mode uses `spark_proposal_implementer`, `spark_proposal_tester`, and `spark_adversary`.
+
+When selecting one of these configured agent types, pass the concrete task and needed context in the message, and do not request a full-history fork or set explicit `model` or `reasoning_effort` fields. The local config supplies each leaf's model, reasoning effort, sandbox, and instructions.
+
 ## Role Ownership
 
 ### TypeScript Parser And Normalizer

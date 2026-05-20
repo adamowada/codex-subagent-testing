@@ -19,6 +19,7 @@ from harness.orchestrator import (
     archive_failed_phase_artifacts,
     archive_phase_artifacts,
     phase_stale_after,
+    run_public_tests,
 )
 from harness.preflight import _check_codex_version
 
@@ -212,6 +213,33 @@ def test_public_test_launch_errors_are_repairable(tmp_path: Path) -> None:
     assert _public_tests_have_launch_errors(tmp_path)
 
 
+def test_run_public_tests_uses_launchable_npm_cmd_from_path(tmp_path: Path, monkeypatch) -> None:
+    tools_dir = tmp_path / "tools"
+    tools_dir.mkdir()
+    npm = _fake_npm_cmd(tools_dir)
+    (tools_dir / "npm.ps1").write_text("Write-Output wrong npm shim\n", encoding="utf-8")
+    monkeypatch.delenv("NPM_BIN", raising=False)
+    monkeypatch.setenv("PATH", str(tools_dir))
+
+    worktree = tmp_path / "worktree"
+    (worktree / "node_modules" / ".bin").mkdir(parents=True)
+    (worktree / "node_modules" / ".bin" / "tsc").write_text("fake tsc\n", encoding="utf-8")
+    (worktree / "tests_public_py").mkdir(parents=True)
+    (worktree / "package.json").write_text('{"scripts":{}}\n', encoding="utf-8")
+    (worktree / "tests_public_py" / "test_smoke.py").write_text("def test_smoke():\n    assert True\n", encoding="utf-8")
+    run_dir = tmp_path / "run"
+
+    results = run_public_tests(worktree, run_dir, {"timeouts": {"implementation_seconds": 30}})
+
+    typecheck_meta = json.loads((run_dir / "typecheck.meta.json").read_text(encoding="utf-8"))
+    public_ts_meta = json.loads((run_dir / "public_ts.meta.json").read_text(encoding="utf-8"))
+    assert Path(typecheck_meta["command"][0]).resolve() == npm.resolve()
+    assert Path(public_ts_meta["command"][0]).resolve() == npm.resolve()
+    assert typecheck_meta["returncode"] == 0
+    assert public_ts_meta["returncode"] == 0
+    assert results["public_py"].returncode == 0
+
+
 def test_phase_stale_after_detects_newer_upstream_phase() -> None:
     state = {
         "phases": {
@@ -233,5 +261,16 @@ def _fake_executable(directory: Path, name: str) -> Path:
 
     path = directory / name
     path.write_text("#!/bin/sh\necho fake codex\n", encoding="utf-8")
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+    return path
+
+
+def _fake_npm_cmd(directory: Path) -> Path:
+    path = directory / "npm.cmd"
+    if os.name == "nt":
+        path.write_text("@echo fake npm %*\r\n@exit /B 0\r\n", encoding="utf-8")
+        return path
+
+    path.write_text("#!/bin/sh\necho fake npm \"$@\"\nexit 0\n", encoding="utf-8")
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
     return path

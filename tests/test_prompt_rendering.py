@@ -83,6 +83,16 @@ def test_flat_prompt_contains_six_leaf_roles(runs: list[dict]) -> None:
         assert role in prompt
 
 
+def test_flat_prompt_includes_configured_subagent_launch_rules(runs: list[dict]) -> None:
+    prompt = render_implementation_prompt(_run(runs, "C1", "direct"), REPO_ROOT)
+
+    assert "Subagent Launch Rules" in prompt
+    assert "`spark_direct_implementer`" in prompt
+    assert "do not request a full-history fork" in prompt
+    assert "`model`" in prompt
+    assert "`reasoning_effort`" in prompt
+
+
 def test_c4_prompt_contains_sublead_ownership(runs: list[dict]) -> None:
     prompt = render_implementation_prompt(_run(runs, "C4", "direct"), REPO_ROOT)
 
@@ -90,6 +100,14 @@ def test_c4_prompt_contains_sublead_ownership(runs: list[dict]) -> None:
     assert "Sublead B: Python Implementation" in prompt
     assert "Sublead C: Parity, Fixtures, Public Tests, And Risk" in prompt
     assert "Each sublead coordinates six Spark xhigh leaves" in prompt
+
+
+def test_c4_prompt_includes_configured_subagent_launch_rules(runs: list[dict]) -> None:
+    prompt = render_implementation_prompt(_run(runs, "C4", "proposal"), REPO_ROOT)
+
+    assert "`gpt55_medium_sublead`" in prompt
+    assert "`spark_proposal_implementer`" in prompt
+    assert "do not request a full-history fork" in prompt
 
 
 def test_direct_and_proposal_mode_text_is_distinct(runs: list[dict]) -> None:
