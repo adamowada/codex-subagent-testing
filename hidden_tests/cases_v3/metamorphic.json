@@ -1,0 +1,253 @@
+{
+  "benchmark": "ruleledger_v3",
+  "cases": [
+    {
+      "category": "metamorphic",
+      "expected": {
+        "baseline": [
+          {
+            "accountId": "acct_v3_meta",
+            "closedAt": null,
+            "couponActive": false,
+            "couponCode": null,
+            "currency": "USD",
+            "features": [
+              "dashboard",
+              "exports",
+              "priority_support",
+              "rules"
+            ],
+            "invoiceIds": [
+              "inv_meta"
+            ],
+            "lastEventAt": "2026-01-04T00:00:00.000Z",
+            "lastInvoiceId": "inv_meta",
+            "lastPeriodEnd": "2026-02-01T00:00:00.000Z",
+            "lastPeriodStart": "2026-01-01T00:00:00.000Z",
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "pro",
+            "seats": 1,
+            "status": "active",
+            "totalPaidCents": 0,
+            "usage": 8,
+            "usageLimit": 10000
+          }
+        ],
+        "variants": [
+          {
+            "equivalent": true,
+            "name": "shuffled_input",
+            "value": [
+              {
+                "accountId": "acct_v3_meta",
+                "closedAt": null,
+                "couponActive": false,
+                "couponCode": null,
+                "currency": "USD",
+                "features": [
+                  "dashboard",
+                  "exports",
+                  "priority_support",
+                  "rules"
+                ],
+                "invoiceIds": [
+                  "inv_meta"
+                ],
+                "lastEventAt": "2026-01-04T00:00:00.000Z",
+                "lastInvoiceId": "inv_meta",
+                "lastPeriodEnd": "2026-02-01T00:00:00.000Z",
+                "lastPeriodStart": "2026-01-01T00:00:00.000Z",
+                "mergedFromAccountIds": [],
+                "overLimit": false,
+                "plan": "pro",
+                "seats": 1,
+                "status": "active",
+                "totalPaidCents": 0,
+                "usage": 8,
+                "usageLimit": 10000
+              }
+            ]
+          },
+          {
+            "equivalent": true,
+            "name": "unrelated_account_injection",
+            "value": [
+              {
+                "accountId": "acct_v3_meta",
+                "closedAt": null,
+                "couponActive": false,
+                "couponCode": null,
+                "currency": "USD",
+                "features": [
+                  "dashboard",
+                  "exports",
+                  "priority_support",
+                  "rules"
+                ],
+                "invoiceIds": [
+                  "inv_meta"
+                ],
+                "lastEventAt": "2026-01-04T00:00:00.000Z",
+                "lastInvoiceId": "inv_meta",
+                "lastPeriodEnd": "2026-02-01T00:00:00.000Z",
+                "lastPeriodStart": "2026-01-01T00:00:00.000Z",
+                "mergedFromAccountIds": [],
+                "overLimit": false,
+                "plan": "pro",
+                "seats": 1,
+                "status": "active",
+                "totalPaidCents": 0,
+                "usage": 8,
+                "usageLimit": 10000
+              }
+            ]
+          }
+        ]
+      },
+      "id": "v3.metamorphic.replay_equivalence",
+      "input": {
+        "as_of": "2026-01-15T00:00:00Z",
+        "baseline": [
+          {
+            "account_id": "acct_v3_meta",
+            "id": "evt_meta_open",
+            "plan": "pro",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_v3_meta",
+            "id": "evt_meta_usage_a",
+            "timestamp": "2026-01-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 3
+          },
+          {
+            "account_id": "acct_v3_meta",
+            "id": "evt_meta_usage_b",
+            "timestamp": "2026-01-03T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 5
+          },
+          {
+            "account_id": "acct_v3_meta",
+            "amount_cents": 4900,
+            "currency": "usd",
+            "id": "evt_meta_invoice",
+            "invoice_id": "inv_meta",
+            "period_end": "2026-02-01T00:00:00Z",
+            "period_start": "2026-01-01T00:00:00Z",
+            "timestamp": "2026-01-04T00:00:00Z",
+            "type": "invoice_issued"
+          }
+        ],
+        "target_account_id": "acct_v3_meta",
+        "variants": [
+          {
+            "name": "shuffled_input",
+            "raw_events": [
+              {
+                "account_id": "acct_v3_meta",
+                "id": "evt_meta_usage_b",
+                "timestamp": "2026-01-03T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 5
+              },
+              {
+                "account_id": "acct_v3_meta",
+                "id": "evt_meta_open",
+                "plan": "pro",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_v3_meta",
+                "amount_cents": 4900,
+                "currency": "usd",
+                "id": "evt_meta_invoice",
+                "invoice_id": "inv_meta",
+                "period_end": "2026-02-01T00:00:00Z",
+                "period_start": "2026-01-01T00:00:00Z",
+                "timestamp": "2026-01-04T00:00:00Z",
+                "type": "invoice_issued"
+              },
+              {
+                "account_id": "acct_v3_meta",
+                "id": "evt_meta_usage_a",
+                "timestamp": "2026-01-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 3
+              }
+            ]
+          },
+          {
+            "name": "unrelated_account_injection",
+            "raw_events": [
+              {
+                "account_id": "acct_v3_meta",
+                "id": "evt_meta_open",
+                "plan": "pro",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_v3_meta",
+                "id": "evt_meta_usage_a",
+                "timestamp": "2026-01-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 3
+              },
+              {
+                "account_id": "acct_v3_meta",
+                "id": "evt_meta_usage_b",
+                "timestamp": "2026-01-03T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 5
+              },
+              {
+                "account_id": "acct_v3_meta",
+                "amount_cents": 4900,
+                "currency": "usd",
+                "id": "evt_meta_invoice",
+                "invoice_id": "inv_meta",
+                "period_end": "2026-02-01T00:00:00Z",
+                "period_start": "2026-01-01T00:00:00Z",
+                "timestamp": "2026-01-04T00:00:00Z",
+                "type": "invoice_issued"
+              },
+              {
+                "account_id": "acct_v3_other",
+                "id": "evt_meta_unrelated_open",
+                "plan": "free",
+                "timestamp": "2026-01-01T00:00:00Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_v3_other",
+                "id": "evt_meta_unrelated_usage",
+                "timestamp": "2026-01-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 999
+              }
+            ]
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_metamorphic",
+      "points": 2.0,
+      "rule_ids": [
+        "OR-001",
+        "OR-003",
+        "PY-001"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-29T00:00:00.000Z",
+  "schema_version": 3,
+  "seed": 20260529
+}

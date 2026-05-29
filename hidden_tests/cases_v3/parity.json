@@ -1,0 +1,89 @@
+{
+  "benchmark": "ruleledger_v3",
+  "cases": [
+    {
+      "category": "parity",
+      "expected": {
+        "report": "account_id,status,plan,total_paid_cents,currency,seats,usage,usage_limit,over_limit,coupon_code,coupon_active,invoice_ids,last_invoice_id,last_period_start,last_period_end,merged_from_account_ids,closed_at,last_event_at\nacct_v3_parity,active,enterprise,0,USD,1,0,100000,false,SAVE10,true,inv_v3_parity,inv_v3_parity,2026-03-01T00:00:00.000Z,2026-04-01T00:00:00.000Z,,,2026-03-03T00:00:00.000Z\n",
+        "summaries": [
+          {
+            "accountId": "acct_v3_parity",
+            "closedAt": null,
+            "couponActive": true,
+            "couponCode": "SAVE10",
+            "currency": "USD",
+            "features": [
+              "audit_log",
+              "dashboard",
+              "exports",
+              "priority_support",
+              "rules",
+              "sso"
+            ],
+            "invoiceIds": [
+              "inv_v3_parity"
+            ],
+            "lastEventAt": "2026-03-03T00:00:00.000Z",
+            "lastInvoiceId": "inv_v3_parity",
+            "lastPeriodEnd": "2026-04-01T00:00:00.000Z",
+            "lastPeriodStart": "2026-03-01T00:00:00.000Z",
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "enterprise",
+            "seats": 1,
+            "status": "active",
+            "totalPaidCents": 0,
+            "usage": 0,
+            "usageLimit": 100000
+          }
+        ]
+      },
+      "id": "v3.parity.summary_and_report",
+      "input": {
+        "as_of": "2026-03-15T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_v3_parity",
+            "id": "evt_parity_open",
+            "plan": "enterprise",
+            "timestamp": "2026-03-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_v3_parity",
+            "coupon": "save10",
+            "expires_at": "2026-04-01T00:00:00Z",
+            "id": "evt_parity_coupon",
+            "timestamp": "2026-03-02T00:00:00Z",
+            "type": "coupon_applied"
+          },
+          {
+            "account_id": "acct_v3_parity",
+            "amount_cents": 19900,
+            "currency": "usd",
+            "id": "evt_parity_invoice",
+            "invoice_id": "inv_v3_parity",
+            "period_end": "2026-04-01T00:00:00Z",
+            "period_start": "2026-03-01T00:00:00Z",
+            "timestamp": "2026-03-03T00:00:00Z",
+            "type": "invoice_issued"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_parity",
+      "points": 1.0,
+      "rule_ids": [
+        "PY-001",
+        "RP-001",
+        "RP-006"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-29T00:00:00.000Z",
+  "schema_version": 3,
+  "seed": 20260529
+}

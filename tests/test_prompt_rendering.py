@@ -18,6 +18,7 @@ from harness.prompt_rendering import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
+RULELEDGER_V3_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_sanity.yaml"
 
 
 @pytest.fixture
@@ -135,6 +136,18 @@ def test_v2_prompt_uses_hard_mode_contract_and_public_hooks() -> None:
     assert "bitemporal view handling" in spark_prompt
 
 
+def test_v3_prompt_uses_issue_brief_and_reasoning_ladder_docs() -> None:
+    v3_runs = expand_experiment_matrix(load_experiment_config(RULELEDGER_V3_CONFIG_PATH))
+    prompt = render_implementation_prompt(v3_runs[0], REPO_ROOT)
+
+    assert "RuleLedger V3 Shared Task" in prompt
+    assert "docs/ruleledger_v3_issue_brief.md" in prompt
+    assert "docs/ruleledger_v3_architecture.md" in prompt
+    assert "larger starter surface" in prompt
+    assert "one giant bypass file" in prompt
+    assert "root_sandbox: danger-full-access" in prompt
+
+
 def test_every_implementation_prompt_has_safety_and_json_contract(runs: list[dict]) -> None:
     for run in runs:
         prompt = render_implementation_prompt(run, REPO_ROOT)
@@ -168,9 +181,17 @@ def test_codex_config_for_c0_has_no_subagent_templates(runs: list[dict]) -> None
 
     assert config["model"] == "gpt-5.5"
     assert config["model_reasoning_effort"] == "xhigh"
+    assert config["sandbox"] == "workspace-write"
     assert config["agents"]["max_depth"] == 0
     assert config["agents"]["max_threads"] == 1
     assert set(config["agents"]) == {"max_depth", "max_threads"}
+
+
+def test_v3_codex_config_uses_windows_safe_sandbox() -> None:
+    v3_runs = expand_experiment_matrix(load_experiment_config(RULELEDGER_V3_CONFIG_PATH))
+    config = tomllib.loads(render_codex_config(v3_runs[0], REPO_ROOT)["config.toml"])
+
+    assert config["sandbox"] == "danger-full-access"
 
 
 def test_codex_config_direct_mode_uses_writable_leaf_roles(runs: list[dict]) -> None:
@@ -239,6 +260,10 @@ def test_prompt_and_config_templates_do_not_reference_hidden_case_files() -> Non
         "lifecycle_precedence.json",
         "billing_proration.json",
         "account_merges.json",
+        "compatibility.json",
+        "evolution.json",
+        "metamorphic.json",
+        "reasoning_ladder.json",
         "metamorphic_invariants.json",
         "performance.json",
         "reporting.json",

@@ -1,0 +1,14 @@
+{
+  "name": "ruleledger-benchmark-template-v3",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:public": "npm run build && node --test tests_public_ts/*.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.5.4"
+  }
+}

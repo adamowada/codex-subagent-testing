@@ -1,0 +1,105 @@
+{
+  "benchmark": "ruleledger_v3",
+  "cases": [
+    {
+      "category": "pass_to_pass",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_v3_compat",
+          "amountCents": 4900,
+          "currency": "USD",
+          "effectiveAt": "2026-04-01T00:00:00.000Z",
+          "id": "evt_v3_compat_payment",
+          "invoiceId": "inv_v3_compat",
+          "periodEnd": "2026-05-01T00:00:00.000Z",
+          "periodStart": "2026-04-01T00:00:00.000Z",
+          "recordedAt": "2026-04-01T12:15:31.000Z",
+          "sequence": 4,
+          "timestamp": "2026-04-01T12:15:30.000Z",
+          "type": "payment_succeeded"
+        }
+      },
+      "id": "v3.compat.normalize_payment",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_v3_compat",
+          "amount": "49.00",
+          "currency": "usd",
+          "effective_at": "2026-04-01T00:00:00Z",
+          "id": "evt_v3_compat_payment",
+          "invoice_id": "inv_v3_compat",
+          "period_end": "2026-05-01T00:00:00Z",
+          "period_start": "2026-04-01T00:00:00Z",
+          "recorded_at": "2026-04-01T12:15:31Z",
+          "sequence": 4,
+          "timestamp": "2026-04-01T08:15:30-04:00",
+          "type": "payment_succeeded"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1.0,
+      "rule_ids": [
+        "BT-001",
+        "BL-001",
+        "BL-002"
+      ]
+    },
+    {
+      "category": "pass_to_pass",
+      "expected": "account_id,status,plan,total_paid_cents,currency,seats,usage,usage_limit,over_limit,coupon_code,coupon_active,invoice_ids,last_invoice_id,last_period_start,last_period_end,merged_from_account_ids,closed_at,last_event_at\nacct_v3_report,active,pro,4900,USD,3,12,10000,false,\"SPRING,50\",true,inv_a|inv_b,inv_b,2026-04-01T00:00:00.000Z,2026-05-01T00:00:00.000Z,,,2026-04-01T00:00:00.000Z\n",
+      "id": "v3.compat.report_csv_escaping",
+      "input": {
+        "summaries": [
+          {
+            "accountId": "acct_v3_report",
+            "closedAt": null,
+            "couponActive": true,
+            "couponCode": "SPRING,50",
+            "currency": "USD",
+            "features": [
+              "dashboard",
+              "exports",
+              "priority_support",
+              "rules"
+            ],
+            "invoiceIds": [
+              "inv_a",
+              "inv_b"
+            ],
+            "lastEventAt": "2026-04-01T00:00:00.000Z",
+            "lastInvoiceId": "inv_b",
+            "lastPeriodEnd": "2026-05-01T00:00:00.000Z",
+            "lastPeriodStart": "2026-04-01T00:00:00.000Z",
+            "mergedFromAccountIds": [],
+            "overLimit": false,
+            "plan": "pro",
+            "seats": 3,
+            "status": "active",
+            "totalPaidCents": 4900,
+            "usage": 12,
+            "usageLimit": 10000
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_export_report",
+      "points": 1.0,
+      "rule_ids": [
+        "RP-001",
+        "RP-006",
+        "PY-001"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-29T00:00:00.000Z",
+  "schema_version": 3,
+  "seed": 20260529
+}

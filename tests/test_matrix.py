@@ -21,6 +21,8 @@ SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2.yaml"
 RULELEDGER_V2_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
 RULELEDGER_V2_EXPERIMENT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_experiment.yaml"
+RULELEDGER_V3_SANITY_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_sanity.yaml"
+RULELEDGER_V3_EXPERIMENT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_experiment.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -190,6 +192,53 @@ def test_ruleledger_v2_full_config_expands_to_readiness_matrix() -> None:
     } == {"direct": "workspace-write", "proposal": "read-only"}
 
 
+def test_ruleledger_v3_sanity_config_expands_to_reasoning_sweep() -> None:
+    config = load_experiment_config(RULELEDGER_V3_SANITY_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert config["judge"]["sandbox"] == "danger-full-access"
+    assert [run["run_id"] for run in runs] == ["V3S0_r01", "V3S1_r01", "V3S2_r01", "V3S3_r01"]
+    assert [run["root"]["reasoning"] for run in runs] == ["low", "medium", "high", "xhigh"]
+    assert {run["root"]["sandbox"] for run in runs} == {"danger-full-access"}
+    assert {run["topology"] for run in runs} == {"solo"}
+    assert {run["spark_mode"] for run in runs} == {None}
+    assert {run["benchmark"]["version"] for run in runs} == {"ruleledger_v3"}
+    assert runs[0]["benchmark"] == {
+        "version": "ruleledger_v3",
+        "template_path": "benchmark_template_v3",
+        "hidden_cases_path": "hidden_tests/cases_v3",
+        "scoring_path": "configs/scoring_v3.yaml",
+        "scoring_profile": "reasoning_ladder_v3",
+    }
+    assert runs[0]["scoring_weights"] == {
+        "hidden_correctness": 0.50,
+        "hidden_parity": 0.15,
+        "performance": 0.10,
+        "judge": 0.20,
+        "minimality": 0.05,
+    }
+    assert summary["total_runs"] == 4
+    assert summary["by_root_reasoning"] == {"high": 1, "low": 1, "medium": 1, "xhigh": 1}
+    assert summary["benchmark_assets"]["template_path"] == "benchmark_template_v3"
+
+
+def test_ruleledger_v3_full_config_expands_to_consistency_matrix() -> None:
+    config = load_experiment_config(RULELEDGER_V3_EXPERIMENT_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert len(runs) == 12
+    assert runs[0]["run_id"] == "V3C0_r01"
+    assert runs[-1]["run_id"] == "V3C3_r03"
+    assert summary["by_benchmark_version"] == {"ruleledger_v3": 12}
+    assert summary["by_cell"] == {"V3C0": 3, "V3C1": 3, "V3C2": 3, "V3C3": 3}
+    assert summary["by_root_reasoning"] == {"high": 3, "low": 3, "medium": 3, "xhigh": 3}
+    assert {run["root"]["sandbox"] for run in runs} == {"danger-full-access"}
+    assert summary["by_spark_mode"] == {"none": 12}
+    assert summary["by_topology"] == {"solo": 12}
+
+
 def test_c4_topology_resolves_to_eighteen_spark_leaves(config: dict) -> None:
     runs = expand_experiment_matrix(config)
     c4 = next(run for run in runs if run["cell_id"] == "C4")
@@ -285,11 +334,27 @@ def test_scoring_path_cannot_escape_repository(config: dict, tmp_path: Path) -> 
         load_experiment_config(path)
 
 
-def test_judge_must_remain_gpt55_xhigh_read_only(config: dict) -> None:
+def test_initial_judge_must_remain_gpt55_xhigh_read_only(config: dict) -> None:
     candidate = copy.deepcopy(config)
     candidate["judge"]["sandbox"] = "workspace-write"
 
     with pytest.raises(ExperimentConfigError, match="judge.sandbox"):
+        validate_experiment_config(candidate)
+
+
+def test_non_initial_configs_can_record_effective_judge_sandbox() -> None:
+    config = load_experiment_config(RULELEDGER_V3_SANITY_CONFIG_PATH)
+
+    validate_experiment_config(config)
+
+    assert config["judge"]["sandbox"] == "danger-full-access"
+
+
+def test_unknown_root_sandbox_fails_validation(config: dict) -> None:
+    candidate = copy.deepcopy(config)
+    candidate["cells"][0]["root"]["sandbox"] = "network-only"
+
+    with pytest.raises(ExperimentConfigError, match="root.sandbox"):
         validate_experiment_config(candidate)
 
 

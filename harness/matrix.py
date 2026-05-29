@@ -11,6 +11,7 @@ from typing import Any, Mapping, Sequence
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 VALID_REASONING = {"none", "minimal", "low", "medium", "high", "xhigh"}
+VALID_SANDBOXES = {"read-only", "workspace-write", "danger-full-access"}
 INITIAL_SPARK_MODEL = "gpt-5.3-codex-spark"
 INITIAL_GPT55_MODEL = "gpt-5.5"
 INITIAL_SPARK_REASONING = "xhigh"
@@ -145,7 +146,8 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
     _validate_reasoning(judge.get("reasoning"), "judge.reasoning", errors)
     if judge.get("reasoning") != "xhigh":
         errors.append("judge.reasoning: expected xhigh")
-    if judge.get("sandbox") != "read-only":
+    _validate_sandbox(judge.get("sandbox"), "judge.sandbox", errors)
+    if strict_initial_contract and judge.get("sandbox") != "read-only":
         errors.append("judge.sandbox: expected read-only")
     _validate_prompt_template_reference(
         judge.get("prompt_template"),
@@ -207,6 +209,7 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
         if strict_initial_contract and root.get("model") != INITIAL_GPT55_MODEL:
             errors.append(f"{path}.root.model: expected {INITIAL_GPT55_MODEL}")
         _validate_reasoning(root.get("reasoning"), f"{path}.root.reasoning", errors)
+        _validate_sandbox(root.get("sandbox", "workspace-write"), f"{path}.root.sandbox", errors)
         if strict_initial_contract:
             _validate_initial_root_reasoning(cell_id, root.get("reasoning"), path, errors)
 
@@ -629,6 +632,11 @@ def _validate_model_identifier(value: Any, path: str, errors: list[str]) -> None
 def _validate_reasoning(value: Any, path: str, errors: list[str]) -> None:
     if not isinstance(value, str) or value not in VALID_REASONING:
         errors.append(f"{path}: expected one of {sorted(VALID_REASONING)}")
+
+
+def _validate_sandbox(value: Any, path: str, errors: list[str]) -> None:
+    if not isinstance(value, str) or value not in VALID_SANDBOXES:
+        errors.append(f"{path}: expected one of {sorted(VALID_SANDBOXES)}")
 
 
 def _validate_prompt_template_reference(

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "profile": "reasoning_ladder_v3",
+  "weights": {
+    "hidden_correctness": 0.50,
+    "hidden_parity": 0.15,
+    "performance": 0.10,
+    "judge": 0.20,
+    "minimality": 0.05
+  },
+  "minimality": {
+    "target_production_loc": 900,
+    "penalty_window": 1600
+  }
+}

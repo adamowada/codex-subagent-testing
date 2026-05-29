@@ -30,14 +30,17 @@ from harness.codex_runner import (
     ProcessResult,
     build_implementation_command,
     build_judge_command,
+    codex_events_have_failure,
     command_for_display,
     extract_final_response,
+    implementation_final_response_errors,
     iso_now,
     materialize_worktree_command,
     resolve_codex_bin,
     resolve_npm_bin,
     run_logged_command,
     run_process_to_files,
+    summarize_codex_events,
     write_process_result,
 )
 from harness.jsonl_usage import summarize_usage, write_usage_summary
@@ -585,8 +588,17 @@ def run_implementation_and_tests(
             command_display=display_command,
         )
         write_process_result(run_dir / "wall_time.json", result)
-        final_response = extract_final_response(run_dir / "events.jsonl")
+        events_path = run_dir / "events.jsonl"
+        final_response = extract_final_response(events_path)
+        event_summary = summarize_codex_events(events_path)
+        final_response_errors = implementation_final_response_errors(final_response)
         _write_json(run_dir / "final_response.json", final_response)
+        implementation_failed = (
+            result.returncode != 0
+            or result.timed_out
+            or codex_events_have_failure(event_summary)
+            or bool(final_response_errors)
+        )
         phase_data = {
             "returncode": result.returncode,
             "timed_out": result.timed_out,
@@ -594,13 +606,15 @@ def run_implementation_and_tests(
             "stdout_path": result.stdout_path,
             "stderr_path": result.stderr_path,
             "final_response_parsed": final_response.get("parsed"),
+            "codex_event_summary": event_summary,
+            "final_response_errors": final_response_errors,
         }
         if archived_to is not None:
             phase_data["previous_artifacts_archived_to"] = archived_to
         mark_phase(
             run_dir,
             "implemented",
-            "completed" if result.returncode == 0 and not result.timed_out else "failed",
+            "failed" if implementation_failed else "completed",
             phase_data,
         )
         _append_log(
@@ -747,8 +761,16 @@ def run_judge(
         command_display=display_command,
     )
     write_process_result(run_dir / "judge.wall_time.json", result)
-    judge_json = extract_final_response(run_dir / "judge.events.jsonl")
+    judge_events_path = run_dir / "judge.events.jsonl"
+    judge_json = extract_final_response(judge_events_path)
+    event_summary = summarize_codex_events(judge_events_path)
     _write_json(run_dir / "judge.json", judge_json)
+    judge_failed = (
+        result.returncode != 0
+        or result.timed_out
+        or codex_events_have_failure(event_summary)
+        or not judge_json.get("parsed")
+    )
     phase_data = {
         "returncode": result.returncode,
         "timed_out": result.timed_out,
@@ -756,6 +778,7 @@ def run_judge(
         "stdout_path": result.stdout_path,
         "stderr_path": result.stderr_path,
         "parsed": judge_json.get("parsed"),
+        "codex_event_summary": event_summary,
     }
     if archived_to is not None:
         phase_data["previous_artifacts_archived_to"] = archived_to
@@ -764,7 +787,7 @@ def run_judge(
     mark_phase(
         run_dir,
         "judged",
-        "completed" if result.returncode == 0 and not result.timed_out and judge_json.get("parsed") else "failed",
+        "failed" if judge_failed else "completed",
         phase_data,
     )
     _append_log(

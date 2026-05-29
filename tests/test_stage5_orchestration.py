@@ -28,6 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 RULELEDGER_V2_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
+RULELEDGER_V3_SANITY_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_sanity.yaml"
 
 
 @pytest.fixture
@@ -164,6 +165,20 @@ def test_implementation_command_uses_rendered_agent_config(runs: list[dict], tmp
     assert "agents.spark_direct_implementer.config_file" in "\n".join(command)
     assert "spark_direct_implementer.toml" in "\n".join(command)
     assert "agents.spark_direct_implementer.sandbox=\"workspace-write\"" in command
+
+
+def test_implementation_command_uses_rendered_root_sandbox(tmp_path: Path) -> None:
+    run = expand_experiment_matrix(load_experiment_config(RULELEDGER_V3_SANITY_CONFIG_PATH))[0]
+    config_dir = tmp_path / "codex_config"
+    for relative_path, contents in render_codex_config(run, REPO_ROOT).items():
+        path = config_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents, encoding="utf-8")
+
+    command = build_implementation_command("codex", run, "prompt text", config_dir=config_dir)
+
+    sandbox_index = command.index("--sandbox")
+    assert command[sandbox_index + 1] == "danger-full-access"
 
 
 def test_judge_command_is_read_only_xhigh(runs: list[dict]) -> None:

@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "benchmark": {
+    "version": "ruleledger_v3"
+  },
+  "experiment": {
+    "id": "ruleledger_v3_sanity",
+    "repeat_count": 1,
+    "seed": 20260529
+  },
+  "parallelism": {
+    "implementation_jobs": 1,
+    "judge_jobs": 1
+  },
+  "timeouts": {
+    "implementation_seconds": 7200,
+    "judge_seconds": 1800
+  },
+  "paths": {
+    "benchmark_template": "benchmark_template_v3",
+    "hidden_cases": "hidden_tests/cases_v3",
+    "prompt_templates": {
+      "common": "prompts/task_common_v3.md",
+      "solo": "prompts/task_solo.md",
+      "flat_spark": "prompts/task_flat_spark_v3.md",
+      "depth2_subleads": "prompts/task_depth2_subleads.md",
+      "judge": "prompts/judge.md"
+    },
+    "codex_config_template": "codex_templates/config.toml.j2"
+  },
+  "models": {
+    "gpt55": "gpt-5.5",
+    "spark": "gpt-5.3-codex-spark"
+  },
+  "spark_modes": {},
+  "scoring": {
+    "path": "configs/scoring_v3.yaml"
+  },
+  "judge": {
+    "model": "gpt-5.5",
+    "reasoning": "xhigh",
+    "prompt_template": "judge",
+    "sandbox": "danger-full-access"
+  },
+  "cells": [
+    {
+      "id": "V3S0",
+      "name": "ruleledger_v3_solo_low",
+      "repeats": 1,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "low",
+        "sandbox": "danger-full-access"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "V3S1",
+      "name": "ruleledger_v3_solo_medium",
+      "repeats": 1,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "medium",
+        "sandbox": "danger-full-access"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "V3S2",
+      "name": "ruleledger_v3_solo_high",
+      "repeats": 1,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "high",
+        "sandbox": "danger-full-access"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "V3S3",
+      "name": "ruleledger_v3_solo_xhigh",
+      "repeats": 1,
+      "spark_modes": [],
+      "topology": "solo",
+      "prompt_template": "solo",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "xhigh",
+        "sandbox": "danger-full-access"
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    }
+  ]
+}

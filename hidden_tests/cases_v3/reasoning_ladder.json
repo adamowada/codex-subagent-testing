@@ -1,0 +1,205 @@
+{
+  "benchmark": "ruleledger_v3",
+  "cases": [
+    {
+      "category": "fail_to_pass",
+      "expected": [
+        {
+          "accountId": "acct_v3_main",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-01-03T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [
+            "acct_v3_source"
+          ],
+          "overLimit": false,
+          "plan": "starter",
+          "seats": 3,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 10,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "v3.reasoning.audit_before_late_plan",
+      "input": {
+        "audit_as_of": "2026-01-07T23:59:59Z",
+        "business_as_of": "2026-01-10T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_v3_main",
+            "id": "evt_open_primary",
+            "plan": "starter",
+            "quantity": 2,
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_v3_source",
+            "id": "evt_open_source",
+            "plan": "free",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_v3_source",
+            "id": "evt_source_usage",
+            "timestamp": "2026-01-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 10
+          },
+          {
+            "account_id": "acct_v3_main",
+            "id": "evt_merge_source",
+            "merge_from_account_id": "acct_v3_source",
+            "timestamp": "2026-01-03T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_v3_main",
+            "effective_at": "2026-01-04T00:00:00Z",
+            "id": "evt_late_plan",
+            "plan": "pro",
+            "recorded_at": "2026-01-08T00:00:00Z",
+            "timestamp": "2026-01-08T00:00:00Z",
+            "type": "plan_changed"
+          },
+          {
+            "account_id": "acct_v3_main",
+            "correction_of": "evt_source_usage",
+            "effective_at": "2026-01-02T00:00:00Z",
+            "id": "evt_correct_usage",
+            "recorded_at": "2026-01-09T00:00:00Z",
+            "timestamp": "2026-01-09T00:00:00Z",
+            "type": "event_corrected",
+            "usage": 14
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "BT-004",
+        "BT-005",
+        "MG-002"
+      ]
+    },
+    {
+      "category": "localization",
+      "expected": [
+        {
+          "accountId": "acct_v3_main",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-01-04T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [
+            "acct_v3_source"
+          ],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 3,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 14,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "v3.reasoning.audit_after_correction",
+      "input": {
+        "audit_as_of": "2026-01-10T00:00:00Z",
+        "business_as_of": "2026-01-10T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_v3_main",
+            "id": "evt_open_primary",
+            "plan": "starter",
+            "quantity": 2,
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_v3_source",
+            "id": "evt_open_source",
+            "plan": "free",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_v3_source",
+            "id": "evt_source_usage",
+            "timestamp": "2026-01-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 10
+          },
+          {
+            "account_id": "acct_v3_main",
+            "id": "evt_merge_source",
+            "merge_from_account_id": "acct_v3_source",
+            "timestamp": "2026-01-03T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_v3_main",
+            "effective_at": "2026-01-04T00:00:00Z",
+            "id": "evt_late_plan",
+            "plan": "pro",
+            "recorded_at": "2026-01-08T00:00:00Z",
+            "timestamp": "2026-01-08T00:00:00Z",
+            "type": "plan_changed"
+          },
+          {
+            "account_id": "acct_v3_main",
+            "correction_of": "evt_source_usage",
+            "effective_at": "2026-01-02T00:00:00Z",
+            "id": "evt_correct_usage",
+            "recorded_at": "2026-01-09T00:00:00Z",
+            "timestamp": "2026-01-09T00:00:00Z",
+            "type": "event_corrected",
+            "usage": 14
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 2.0,
+      "rule_ids": [
+        "CV-002",
+        "CV-003",
+        "MG-005",
+        "PY-001"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-29T00:00:00.000Z",
+  "schema_version": 3,
+  "seed": 20260529
+}

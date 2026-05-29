@@ -19,6 +19,7 @@ KNOWN_COMPONENTS = {
 HIDDEN_CORRECTNESS_EXCLUDED_CATEGORIES = {"parity", "performance"}
 DEFAULT_MINIMALITY_TARGET_PRODUCTION_LOC = 500
 DEFAULT_MINIMALITY_PENALTY_WINDOW = 1000
+INFRASTRUCTURE_FAILURE_PHASES = {"prepared", "baseline_committed", "rendered", "implemented"}
 
 PUBLIC_COMMANDS = {
     "typecheck": "typecheck.meta.json",
@@ -85,12 +86,16 @@ def compute_run_score(run_dir: str | Path, run: Mapping[str, Any]) -> dict[str, 
     if "minimality" in weights:
         component_scores["minimality"] = round(_minimality_score(diff_stats, run, warnings), 6)
 
+    infrastructure_failed = _has_infrastructure_phase_failure(run_path, warnings)
     quality_score = 0.0
     for name, weight in weights.items():
         if name not in KNOWN_COMPONENTS:
             warnings.append(f"unknown scoring component {name!r}; contribution treated as 0.0")
         quality_score += component_scores.get(name, 0.0) * float(weight)
     quality_score = round(quality_score, 6)
+    if infrastructure_failed:
+        warnings.append("infrastructure phase failed; quality_score forced to 0.0")
+        quality_score = 0.0
 
     totals = usage.get("totals", {}) if isinstance(usage, Mapping) else {}
     implementation_tokens = _safe_int(totals.get("implementation_tokens"))
@@ -360,7 +365,7 @@ def _status(
             for name, phase in phases.items()
             if isinstance(phase, Mapping) and phase.get("status") == "failed"
         ]
-        if any(name in {"prepared", "baseline_committed", "rendered"} for name in failed):
+        if any(name in INFRASTRUCTURE_FAILURE_PHASES for name in failed):
             return "failed"
         if failed:
             return "partial"
@@ -371,6 +376,17 @@ def _status(
     if weighted_components and all(component_scores.get(name, 0.0) >= 1.0 for name in weighted_components):
         return "passed"
     return "partial"
+
+
+def _has_infrastructure_phase_failure(run_path: Path, warnings: list[str]) -> bool:
+    state = _read_json(run_path / "state.json", warnings, "run state")
+    phases = state.get("phases", {}) if isinstance(state, Mapping) else {}
+    if not isinstance(phases, Mapping):
+        return False
+    return any(
+        isinstance(phases.get(name), Mapping) and phases[name].get("status") == "failed"
+        for name in INFRASTRUCTURE_FAILURE_PHASES
+    )
 
 
 def _read_json(path: Path, warnings: list[str] | None = None, label: str | None = None) -> dict[str, Any]:

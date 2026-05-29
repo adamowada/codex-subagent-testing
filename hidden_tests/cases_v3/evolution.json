@@ -1,0 +1,182 @@
+{
+  "benchmark": "ruleledger_v3",
+  "cases": [
+    {
+      "category": "evolution",
+      "expected": [
+        {
+          "accountId": "acct_v3_evo",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "invoiceIds": [],
+          "lastEventAt": "2026-01-01T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "starter",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "v3.evolution.before_correction",
+      "input": {
+        "audit_as_of": "2026-01-03T12:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_open",
+            "plan": "starter",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_usage",
+            "timestamp": "2026-01-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 4
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_void",
+            "timestamp": "2026-01-03T00:00:00Z",
+            "type": "event_voided",
+            "voided_event_id": "evt_evo_usage"
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "correction_of": "evt_evo_usage",
+            "effective_at": "2026-01-02T00:00:00Z",
+            "id": "evt_evo_reactivate_usage",
+            "recorded_at": "2026-01-04T00:00:00Z",
+            "timestamp": "2026-01-04T00:00:00Z",
+            "type": "event_corrected",
+            "usage": 9
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_close",
+            "timestamp": "2026-01-05T00:00:00Z",
+            "type": "account_closed"
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_reopen_attempt",
+            "timestamp": "2026-01-06T00:00:00Z",
+            "type": "account_reactivated"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 1.5,
+      "rule_ids": [
+        "CV-002",
+        "CV-005",
+        "LC-007"
+      ]
+    },
+    {
+      "category": "evolution",
+      "expected": [
+        {
+          "accountId": "acct_v3_evo",
+          "closedAt": "2026-01-05T00:00:00.000Z",
+          "couponActive": false,
+          "couponCode": null,
+          "currency": null,
+          "features": [],
+          "invoiceIds": [],
+          "lastEventAt": "2026-01-06T00:00:00.000Z",
+          "lastInvoiceId": null,
+          "lastPeriodEnd": null,
+          "lastPeriodStart": null,
+          "mergedFromAccountIds": [],
+          "overLimit": true,
+          "plan": "starter",
+          "seats": 1,
+          "status": "closed",
+          "totalPaidCents": 0,
+          "usage": 9,
+          "usageLimit": 0
+        }
+      ],
+      "id": "v3.evolution.after_reactivation_and_close",
+      "input": {
+        "audit_as_of": "2026-01-07T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_open",
+            "plan": "starter",
+            "timestamp": "2026-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_usage",
+            "timestamp": "2026-01-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 4
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_void",
+            "timestamp": "2026-01-03T00:00:00Z",
+            "type": "event_voided",
+            "voided_event_id": "evt_evo_usage"
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "correction_of": "evt_evo_usage",
+            "effective_at": "2026-01-02T00:00:00Z",
+            "id": "evt_evo_reactivate_usage",
+            "recorded_at": "2026-01-04T00:00:00Z",
+            "timestamp": "2026-01-04T00:00:00Z",
+            "type": "event_corrected",
+            "usage": 9
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_close",
+            "timestamp": "2026-01-05T00:00:00Z",
+            "type": "account_closed"
+          },
+          {
+            "account_id": "acct_v3_evo",
+            "id": "evt_evo_reopen_attempt",
+            "timestamp": "2026-01-06T00:00:00Z",
+            "type": "account_reactivated"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 1.5,
+      "rule_ids": [
+        "CV-006",
+        "LC-007"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-29T00:00:00.000Z",
+  "schema_version": 3,
+  "seed": 20260529
+}

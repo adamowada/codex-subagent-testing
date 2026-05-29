@@ -1,0 +1,47 @@
+{
+  "benchmark": "ruleledger_v3",
+  "category_weights": {
+    "evolution": 0.15,
+    "fail_to_pass": 0.25,
+    "localization": 0.15,
+    "metamorphic": 0.1,
+    "parity": 0.1,
+    "pass_to_pass": 0.15,
+    "performance": 0.1
+  },
+  "files": {
+    "compatibility.json": {
+      "case_count": 2,
+      "points": 2.0,
+      "sha256": "4d38f3854bcbc722913dbc009be4ee09fdaf2edbb0a41c54efdc03dad65765b3"
+    },
+    "evolution.json": {
+      "case_count": 2,
+      "points": 3.0,
+      "sha256": "a5c994a0047cf5c27d655424134d23336d35b1f16194aef84354da98d377545f"
+    },
+    "metamorphic.json": {
+      "case_count": 1,
+      "points": 2.0,
+      "sha256": "62f96f3c7f6e90bba940a00cab4ed2b584c657f786e1b4c7c9e8507b7bb99731"
+    },
+    "parity.json": {
+      "case_count": 1,
+      "points": 1.0,
+      "sha256": "c21ef5019e56b3dfbec6f1a0b79766b1409b73cf761ea74155d2de8b9a46a51f"
+    },
+    "performance.json": {
+      "case_count": 1,
+      "points": 2.0,
+      "sha256": "bc7eca9ebf06514da82684d2f41719c3c17b7d907c899bef9029a348be7870ff"
+    },
+    "reasoning_ladder.json": {
+      "case_count": 2,
+      "points": 4.0,
+      "sha256": "29e298e24913881add74b7b15ebbce5d6fd15f6cdeeddfe752d3c98f56ce20ad"
+    }
+  },
+  "generated_at": "2026-05-29T00:00:00.000Z",
+  "schema_version": 3,
+  "seed": 20260529
+}

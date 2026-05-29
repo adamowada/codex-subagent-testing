@@ -114,6 +114,27 @@ def test_missing_and_malformed_artifacts_score_as_zero_with_warnings(tmp_path: P
     assert any("scoring weights sum to 1.200000" in warning for warning in score["warnings"])
 
 
+def test_implementation_infrastructure_failure_forces_zero_quality(tmp_path: Path) -> None:
+    run = _run({"hidden_tests": 1.0})
+    _write_json(tmp_path / "typecheck.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "public_ts.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "public_py.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "hidden-results.json", {"summary": {"score": 1.0}})
+    _write_json(tmp_path / "judge.json", {"parsed": False})
+    _write_json(tmp_path / "usage.json", {"totals": {"implementation_tokens": 0}})
+    _write_json(tmp_path / "wall_time.json", {"elapsed_seconds": 1})
+    _write_json(tmp_path / "judge.wall_time.json", {"elapsed_seconds": 1})
+    _write_json(tmp_path / "state.json", {"phases": {"implemented": {"status": "failed"}}})
+    (tmp_path / "diff-numstat.txt").write_text("", encoding="utf-8")
+
+    score = compute_run_score(tmp_path, run)
+
+    assert score["component_scores"]["hidden_tests"] == 1.0
+    assert score["quality_score"] == 0.0
+    assert score["status"] == "failed"
+    assert any("quality_score forced to 0.0" in warning for warning in score["warnings"])
+
+
 def test_minimality_component_uses_configured_loc_threshold(tmp_path: Path) -> None:
     run = _run(
         {"minimality": 1.0},
