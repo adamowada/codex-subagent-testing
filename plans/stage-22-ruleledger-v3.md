@@ -192,12 +192,29 @@ effective root and judge sandbox for this Windows workflow. The original initial
 experiment contract still requires a read-only judge sandbox.
 
 A second single-run smoke then hit the account-level Codex usage limit before
-model work began. The harness now treats Codex JSONL `error`/`turn.failed`
-events and malformed implementation final JSON as failed implementation
-infrastructure, preserves the failure summary in `state.json`, and forces
-quality to `0.0` for those infrastructure-failed runs instead of scoring the
-starter baseline as a partial benchmark result.
+model work began. The harness treats Codex JSONL `error`/`turn.failed` events
+as failed implementation infrastructure, preserves the failure summary in
+`state.json`, and forces quality to `0.0` for those infrastructure-failed runs
+instead of scoring the starter baseline as a partial benchmark result.
 
-Next calibration step: after the Codex quota resets, rerun the four-run v3
-sanity sweep and compare category spread across `low`, `medium`, `high`, and
-`xhigh`.
+## Checkpoint: First V3 Sanity Signal
+
+Run `20260531T054503-ruleledger_v3_sanity-v3_sanity_measured_02` completed the
+four solo reasoning cells after quota reset. Official quality was initially
+zeroed because malformed implementation/judge final JSON marked otherwise
+healthy Codex turns as infrastructure failures. The raw hidden results still
+showed the desired reasoning ladder:
+
+- low: hidden correctness `0.363636`, no source changes.
+- medium: hidden correctness `0.363636`, no source changes.
+- high: hidden correctness `0.636364`, two runtime files changed.
+- xhigh: hidden correctness `1.0`, seven focused module/test files changed.
+
+This is useful benchmark signal, not an infrastructure failure. The harness now
+keeps malformed final JSON as recorded protocol evidence and judge-score loss,
+but only treats process failures, timeouts, missing event streams, and Codex
+`error`/`turn.failed` events as implementation infrastructure failures.
+
+Next calibration step: rerun the four-run v3 sanity sweep with the corrected
+harness scoring path, then run the multi-repeat follow-up if the ladder remains
+visible.

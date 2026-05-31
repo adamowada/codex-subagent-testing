@@ -597,7 +597,6 @@ def run_implementation_and_tests(
             result.returncode != 0
             or result.timed_out
             or codex_events_have_failure(event_summary)
-            or bool(final_response_errors)
         )
         phase_data = {
             "returncode": result.returncode,
@@ -769,7 +768,6 @@ def run_judge(
         result.returncode != 0
         or result.timed_out
         or codex_events_have_failure(event_summary)
-        or not judge_json.get("parsed")
     )
     phase_data = {
         "returncode": result.returncode,

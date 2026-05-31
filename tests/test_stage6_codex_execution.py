@@ -478,6 +478,68 @@ def test_extract_final_response_uses_last_parseable_json_object(tmp_path: Path) 
     assert final["value"] == {"status": "success"}
 
 
+def test_extract_final_response_ignores_tool_json_candidates(tmp_path: Path) -> None:
+    events_path = tmp_path / "events.jsonl"
+    events_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {
+                            "type": "mcp_tool_call",
+                            "result": {"content": [{"type": "text", "text": '{"tool": "not_final"}'}]},
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "agent_message", "text": "finished without strict json"},
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    final = extract_final_response(events_path)
+
+    assert not final["parsed"]
+    assert final["raw"] == "finished without strict json"
+    assert final["error"] == "no_strict_json_object_found"
+
+
+def test_extract_final_response_does_not_fall_back_past_latest_agent_message(tmp_path: Path) -> None:
+    events_path = tmp_path / "events.jsonl"
+    events_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "agent_message", "text": '{"status": "old"}'},
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "agent_message", "text": "final prose only"},
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    final = extract_final_response(events_path)
+
+    assert not final["parsed"]
+    assert final["raw"] == "final prose only"
+
+
 def test_check_codex_version_records_stdout_stderr_and_returncode() -> None:
     check = _check_codex_version(sys.executable)
 

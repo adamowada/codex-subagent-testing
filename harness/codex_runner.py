@@ -275,7 +275,7 @@ def extract_final_response(events_path: Path) -> dict[str, Any]:
     if not events_path.exists():
         return {"parsed": False, "raw": "", "error": "events_file_missing"}
 
-    candidates: list[str] = []
+    message_candidates: list[list[str]] = []
     for line in events_path.read_text(encoding="utf-8", errors="replace").splitlines():
         if not line.strip():
             continue
@@ -283,16 +283,26 @@ def extract_final_response(events_path: Path) -> dict[str, Any]:
             event = json.loads(line)
         except json.JSONDecodeError:
             continue
-        candidates.extend(_collect_text_candidates(event))
+        candidates = _collect_final_response_candidates(event)
+        if candidates:
+            message_candidates.append(candidates)
 
-    for raw in reversed(candidates):
+    if not message_candidates:
+        return {
+            "parsed": False,
+            "raw": "",
+            "error": "no_strict_json_object_found",
+        }
+
+    latest_candidates = message_candidates[-1]
+    for raw in reversed(latest_candidates):
         parsed = _parse_json_object_from_text(raw)
         if parsed["parsed"]:
             return parsed
 
     return {
         "parsed": False,
-        "raw": candidates[-1] if candidates else "",
+        "raw": latest_candidates[-1],
         "error": "no_strict_json_object_found",
     }
 
@@ -482,7 +492,7 @@ def _toml_value(value: Any) -> str:
 def _collect_text_candidates(value: Any) -> list[str]:
     candidates: list[str] = []
     if isinstance(value, str):
-        if "{" in value and "}" in value:
+        if value.strip():
             candidates.append(value)
         return candidates
     if isinstance(value, list):
@@ -497,6 +507,18 @@ def _collect_text_candidates(value: Any) -> list[str]:
                 candidates.extend(_collect_text_candidates(item))
         return candidates
     return candidates
+
+
+def _collect_final_response_candidates(event: Mapping[str, Any]) -> list[str]:
+    event_type = event.get("type")
+    if event_type in {"message", "agent_message"}:
+        return _collect_text_candidates(event)
+
+    item = event.get("item")
+    if event_type == "item.completed" and isinstance(item, Mapping) and item.get("type") == "agent_message":
+        return _collect_text_candidates(item)
+
+    return []
 
 
 def _parse_json_object_from_text(text: str) -> dict[str, Any]:
