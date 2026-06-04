@@ -54,6 +54,8 @@ def test_v3_template_exposes_issue_and_architecture_docs() -> None:
     assert "malformed optional invoice period timestamp" in issue
     assert "plain deterministic string order" in issue
     assert "source account after an account merge" in issue
+    assert "separate business and audit cutoffs" in issue
+    assert "void references a correction event" in issue
     assert "src/replay.ts" in architecture
     assert "ruleledger/replay.py" in architecture
 
@@ -235,6 +237,39 @@ def test_v3_hidden_cases_include_support_escalation_pressure() -> None:
         }
     ]
     assert "inv_support_corrected" in merge_correction["expected"]["report"]
+
+
+def test_v3_hidden_cases_include_bitemporal_merge_chain_pressure() -> None:
+    _, cases = load_cases(CASES_V3_DIR)
+    cases_by_id = {case["id"]: case for case in cases}
+
+    before_ops = cases_by_id["v3.reasoning.merge_chain_audit_before_source_operations"]
+    assert before_ops["operation"] == "v2_reduce_and_summarize"
+    assert before_ops["input"]["business_as_of"] == "2026-06-13T00:00:00Z"
+    assert before_ops["input"]["audit_as_of"] == "2026-06-07T23:59:59Z"
+    assert before_ops["expected"][0]["accountId"] == "acct_bt_final"
+    assert before_ops["expected"][0]["usage"] == 13
+    assert before_ops["expected"][0]["totalPaidCents"] == 1200
+    assert before_ops["expected"][0]["invoiceIds"] == ["inv_bt_original"]
+    assert before_ops["expected"][0]["mergedFromAccountIds"] == [
+        "acct_bt_source",
+        "acct_bt_mid",
+    ]
+
+    after_corrections = cases_by_id["v3.reasoning.merge_chain_after_source_corrections"]
+    assert after_corrections["operation"] == "v2_reduce_and_summarize"
+    assert after_corrections["input"]["audit_as_of"] == "2026-06-09T12:00:00Z"
+    assert after_corrections["expected"][0]["usage"] == 19
+    assert after_corrections["expected"][0]["totalPaidCents"] == 4900
+    assert after_corrections["expected"][0]["invoiceIds"] == ["inv_bt_corrected"]
+
+    after_void = cases_by_id["v3.evolution.merge_chain_void_retracts_source_correction"]
+    assert after_void["operation"] == "v2_parity"
+    assert after_void["input"]["audit_as_of"] == "2026-06-13T00:00:00Z"
+    assert after_void["expected"]["summaries"][0]["usage"] == 7
+    assert after_void["expected"]["summaries"][0]["seats"] == 5
+    assert after_void["expected"]["summaries"][0]["totalPaidCents"] == 4900
+    assert "acct_bt_source|acct_bt_mid" in after_void["expected"]["report"]
 
 
 def test_v3_performance_case_is_large_enough_to_exercise_algorithmic_shape() -> None:

@@ -201,6 +201,128 @@ def localization_cases() -> list[dict[str, Any]]:
     ]
 
 
+def bitemporal_merge_chain_events() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "evt_bt_final_open",
+            "account_id": "acct_bt_final",
+            "type": "account_opened",
+            "timestamp": "2026-06-01T00:00:00Z",
+            "plan": "starter",
+            "quantity": 1,
+        },
+        {
+            "id": "evt_bt_mid_open",
+            "account_id": "acct_bt_mid",
+            "type": "account_opened",
+            "timestamp": "2026-06-01T00:00:01Z",
+            "plan": "pro",
+            "quantity": 2,
+        },
+        {
+            "id": "evt_bt_source_open",
+            "account_id": "acct_bt_source",
+            "type": "account_opened",
+            "timestamp": "2026-06-01T00:00:02Z",
+            "plan": "free",
+        },
+        {
+            "id": "evt_bt_final_currency",
+            "account_id": "acct_bt_final",
+            "type": "payment_succeeded",
+            "timestamp": "2026-06-01T00:30:00Z",
+            "amount_cents": 0,
+            "currency": "usd",
+        },
+        {
+            "id": "evt_bt_source_usage",
+            "account_id": "acct_bt_source",
+            "type": "usage_recorded",
+            "timestamp": "2026-06-02T00:00:00Z",
+            "usage": 9,
+        },
+        {
+            "id": "evt_bt_source_payment",
+            "account_id": "acct_bt_source",
+            "type": "payment_succeeded",
+            "timestamp": "2026-06-02T01:00:00Z",
+            "amount_cents": 1200,
+            "currency": "usd",
+            "invoice_id": "inv_bt_original",
+            "period_start": "2026-06-01T00:00:00Z",
+            "period_end": "2026-07-01T00:00:00Z",
+        },
+        {
+            "id": "evt_bt_merge_source_mid",
+            "account_id": "acct_bt_mid",
+            "type": "account_merged",
+            "timestamp": "2026-06-03T00:00:00Z",
+            "merge_from_account_id": "acct_bt_source",
+        },
+        {
+            "id": "evt_bt_mid_usage",
+            "account_id": "acct_bt_mid",
+            "type": "usage_recorded",
+            "timestamp": "2026-06-04T00:00:00Z",
+            "usage": 4,
+        },
+        {
+            "id": "evt_bt_merge_mid_final",
+            "account_id": "acct_bt_final",
+            "type": "account_merged",
+            "timestamp": "2026-06-05T00:00:00Z",
+            "merge_from_account_id": "acct_bt_mid",
+        },
+        {
+            "id": "evt_bt_correct_source_usage",
+            "account_id": "acct_bt_source",
+            "type": "event_corrected",
+            "timestamp": "2026-06-08T00:00:00Z",
+            "recorded_at": "2026-06-08T00:00:00Z",
+            "effective_at": "2026-06-02T00:00:00Z",
+            "correction_of": "evt_bt_source_usage",
+            "usage": 15,
+        },
+        {
+            "id": "evt_bt_correct_source_payment",
+            "account_id": "acct_bt_source",
+            "type": "event_corrected",
+            "timestamp": "2026-06-09T00:00:00Z",
+            "recorded_at": "2026-06-09T00:00:00Z",
+            "effective_at": "2026-06-02T01:00:00Z",
+            "correction_of": "evt_bt_source_payment",
+            "amount_cents": 4900,
+            "currency": "usd",
+            "invoice_id": "inv_bt_corrected",
+            "period_start": "2026-06-01T00:00:00Z",
+            "period_end": "2026-07-01T00:00:00Z",
+        },
+        {
+            "id": "evt_bt_void_usage_correction",
+            "account_id": "acct_bt_source",
+            "type": "event_voided",
+            "timestamp": "2026-06-10T00:00:00Z",
+            "recorded_at": "2026-06-10T00:00:00Z",
+            "effective_at": "2026-06-02T00:00:00Z",
+            "voided_event_id": "evt_bt_correct_source_usage",
+        },
+        {
+            "id": "evt_bt_source_late_usage",
+            "account_id": "acct_bt_source",
+            "type": "usage_recorded",
+            "timestamp": "2026-06-11T00:00:00Z",
+            "usage": 3,
+        },
+        {
+            "id": "evt_bt_final_seat_delta",
+            "account_id": "acct_bt_final",
+            "type": "seat_delta_recorded",
+            "timestamp": "2026-06-12T00:00:00Z",
+            "seat_delta": 1,
+        },
+    ]
+
+
 def reasoning_ladder_cases() -> list[dict[str, Any]]:
     raw_events = [
         {
@@ -277,6 +399,30 @@ def reasoning_ladder_cases() -> list[dict[str, Any]]:
                 "audit_as_of": "2026-01-10T00:00:00Z",
             },
             points=2.0,
+        ),
+        evaluated_case(
+            "v3.reasoning.merge_chain_audit_before_source_operations",
+            "fail_to_pass",
+            ["BT-004", "BT-005", "MG-002", "MG-005"],
+            "v2_reduce_and_summarize",
+            {
+                "raw_events": bitemporal_merge_chain_events(),
+                "business_as_of": "2026-06-13T00:00:00Z",
+                "audit_as_of": "2026-06-07T23:59:59Z",
+            },
+            points=2.5,
+        ),
+        evaluated_case(
+            "v3.reasoning.merge_chain_after_source_corrections",
+            "localization",
+            ["BT-004", "BT-005", "CV-002", "MG-005", "PY-001"],
+            "v2_reduce_and_summarize",
+            {
+                "raw_events": bitemporal_merge_chain_events(),
+                "business_as_of": "2026-06-09T12:00:00Z",
+                "audit_as_of": "2026-06-09T12:00:00Z",
+            },
+            points=2.5,
         ),
     ]
 
@@ -487,6 +633,18 @@ def evolution_cases() -> list[dict[str, Any]]:
                 "audit_as_of": "2026-02-09T00:00:00Z",
             },
             points=2.5,
+        ),
+        evaluated_case(
+            "v3.evolution.merge_chain_void_retracts_source_correction",
+            "evolution",
+            ["BT-004", "CV-002", "MG-002", "MG-005", "RP-001"],
+            "v2_parity",
+            {
+                "raw_events": bitemporal_merge_chain_events(),
+                "business_as_of": "2026-06-13T00:00:00Z",
+                "audit_as_of": "2026-06-13T00:00:00Z",
+            },
+            points=3.0,
         ),
     ]
 

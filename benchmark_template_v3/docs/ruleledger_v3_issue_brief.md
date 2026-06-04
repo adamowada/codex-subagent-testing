@@ -72,3 +72,13 @@ in ways that are not all enumerated in the public examples.
   still target the original event. If the corrected or voided event contributes
   value that the destination inherited through the merge, the destination view
   and report row should reflect the visible operation.
+- When support asks for separate business and audit cutoffs, do not collapse
+  them into one timestamp. Audit visibility decides which late corrections and
+  voids are known; business visibility decides which effective facts belong in
+  the view. Once a correction or void is audit-visible, apply it to the
+  original target event before replaying merge lineage, even through multiple
+  merge hops.
+- If a void references a correction event, treat it as a void of the original
+  corrected fact. The support team uses this to retract a bad correction rather
+  than to resurrect whichever value happened to be present before the
+  correction was recorded.

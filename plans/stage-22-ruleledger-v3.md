@@ -51,6 +51,22 @@ adding more hidden unit tests.
   behavioral inference, and project organization. It also warns that models
   often collapse complex work into monolithic single-file solutions.
   Source: https://arxiv.org/abs/2605.03546
+- OpenAI's 2026 SWE-bench Verified retirement note reinforces that older public
+  issue benchmarks can stop measuring frontier coding once contamination and
+  flawed tests dominate the residual misses. RuleLedger should therefore keep
+  hidden cases generated from private fixtures, while keeping visible
+  requirements fair and human-interpretable.
+  Source: https://openai.com/index/why-we-no-longer-evaluate-swe-bench-verified/
+- SWE-Bench+ reports that solution leakage and weak tests can greatly inflate
+  apparent solve rates. This supports v3's split between visible issue-style
+  requirements and hidden pass/fail/parity/performance cases that validate
+  general behavior rather than a named fixture.
+  Source: https://arxiv.org/abs/2410.06992
+- SWE-bench Multimodal shows that real software issues often include partial
+  context beyond a literal rule list. RuleLedger v3 should mimic that pressure
+  textually with support-escalation notes that require synthesizing intent,
+  compatibility, and module ownership.
+  Source: https://www.swebench.com/multimodal.html
 
 ## Why V2 Is Not Enough
 
@@ -432,3 +448,61 @@ low/medium/high/xhigh ladder. Next hypotheses:
 - Consider weighting or category design so architecture/localization gains
   from xhigh remain visible without letting medium/high behavioral misses be
   masked by broad pass-to-pass coverage.
+
+## Checkpoint: Bitemporal Merge-Chain Pressure
+
+The next hardening pass turned the support-escalation ambiguity into paired
+hidden cases rather than a single fixture:
+
+- `v3.reasoning.merge_chain_audit_before_source_operations`: a two-hop source
+  merge chain where late source-side operations are not yet audit-visible, so
+  the final destination still reflects the inherited original usage, payment,
+  invoice, and merge lineage.
+- `v3.reasoning.merge_chain_after_source_corrections`: the same chain after
+  late corrections become audit-visible, requiring the original source usage
+  and payment to be amended before replaying into the final destination.
+- `v3.evolution.merge_chain_void_retracts_source_correction`: a later void that
+  references the correction record must void the original corrected usage fact,
+  while preserving the corrected payment and final report row.
+
+The visible issue brief now says support views may carry separate business and
+audit cutoffs, that audit visibility decides which corrections/voids are known,
+and that voiding a correction event retracts the original corrected fact. This
+keeps the hidden cases fair while still requiring multi-step synthesis across
+bitemporal replay, correction/void targeting, account alias lineage, and CSV
+reporting.
+
+Targeted verification after this pass:
+
+- `python -m pytest -q tests\test_stage22_ruleledger_v3.py` -> `13 passed`.
+- `python -m pytest -q` -> `170 passed`.
+- Starter hidden-runner baseline -> `23/83` points, `15/42` language cases, no
+  runner errors.
+
+Fresh measured run
+`20260604T162656-ruleledger_v3_sanity-v3_sanity_measured_08` completed all
+four implementations, judges, scores, aggregate outputs, HTML report, PDF
+report, CSV, SQLite, and validation artifacts. Validation again warned that
+judge outputs were not parsed as strict JSON, so the reported quality scores
+still include zero judge contribution.
+
+| Cell | Reasoning | Hidden Points | Hidden Executions | New Bitemporal Cases | Quality |
+|---|---:|---:|---:|---|---:|
+| V3S0 | low | `29/83` | `19/42` | failed all six language executions | `0.311642` |
+| V3S1 | medium | `23/83` | `15/42` | failed all six language executions | `0.266865` |
+| V3S2 | high | `77/83` | `39/42` | passed all six language executions | `0.721505` |
+| V3S3 | xhigh | `81/83` | `41/42` | passed all six language executions | `0.743887` |
+
+This pass materially improved the high/xhigh split from the lower reasoning
+cells. The new bitemporal merge-chain cases behaved as intended: only high and
+xhigh solved them in both TypeScript and Python. Xhigh still led high, mainly
+because it also satisfied module ownership/runtime pressure that high only
+partly solved.
+
+The full objective is still not proven. Medium produced a near-baseline/no-op
+implementation in this repeat, so low beat medium slightly and the evidence is
+not a clean adjacent reasoning ladder. The next calibration step should be a
+multi-repeat sweep or a targeted second sanity repeat to determine whether the
+medium result is stochastic noise. If medium remains unstable, add one or two
+medium-accessible but low-resistant cases so the bottom of the ladder has a
+more reliable separation without weakening the high/xhigh pressure.
