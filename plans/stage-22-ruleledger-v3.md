@@ -327,3 +327,52 @@ consistently provide recognized numeric score fields, so the judge component
 scored as zero. The correctness spread above is therefore driven by hidden
 tests, public checks, typecheck, performance, parity, and minimality rather than
 numeric judge scoring.
+
+## Checkpoint: Multi-Repeat Variance Finding
+
+The three-repeat follow-up run
+`20260604T134244-ruleledger_v3_full-v3_full_measured_01` completed all 12
+implementations, judges, scores, aggregate outputs, HTML report, PDF report,
+CSV, SQLite, and validation artifacts. Validation warned only that every judge
+final response failed strict JSON parsing and therefore contributed zero judge
+score. Hidden-test isolation, run artifacts, resume compatibility, and report
+outputs passed validation.
+
+Hidden correctness showed that the exact-proration hardening improved the
+single-run top-end signal, but did not produce a stable low/medium/high/xhigh
+ladder across repeats:
+
+| Reasoning | Hidden Points By Repeat | Mean Hidden Points | Mean Quality |
+|---|---:|---:|---:|
+| low | `44/57`, `40/57`, `20/57` | `34.67` | `0.546126` |
+| medium | `57/57`, `55/57`, `46/57` | `52.67` | `0.728133` |
+| high | `50/57`, `47/57`, `55/57` | `50.67` | `0.697171` |
+| xhigh | `52/57`, `57/57`, `57/57` | `55.33` | `0.736159` |
+
+The result is useful but not complete. It proves low is unstable and usually
+weaker, and it keeps xhigh as the best average performer. It also shows that
+medium can saturate the current hidden suite and that high does not reliably
+beat medium. The benchmark is therefore close to the target, but current
+evidence does not prove clear differentiation between every adjacent reasoning
+level.
+
+Recurring misses mapped to named cases:
+
+- `case-332dfe6baf13` -> `v3.compat.proration_large_quantity_exactness`.
+- `case-3dd88ef1ca5b` -> `v3.evolution.chain_merge_correction`.
+- `case-13275aa6eee4` -> `v3.localization.module_ownership`.
+- `case-80e510435da1` -> `v3.localization.runtime_compatibility_boundary`.
+- `case-dd63e85189dc` -> `v3.reasoning.audit_before_late_plan`.
+- `case-48ce9076decc` -> `v3.reasoning.audit_after_correction`.
+
+Next hypothesis: the current suite still rewards careful implementation of an
+explicit rule list more than it rewards high/xhigh-style triage under human
+ambiguity. The next benchmark hardening pass should add visible support-style
+escalation notes that require synthesizing priority, backwards compatibility,
+and cross-module ownership without enumerating every fixture. Hidden cases
+should validate fair implications of those visible notes, such as conflicting
+audit/business views, normalized invalid optional timestamps, deterministic
+cross-language ordering, and report/billing effects after merge correction.
+This should be done by changing the visible v3 issue brief, generator/oracle,
+and generated cases together, then rerunning the one-repeat sanity sweep before
+another multi-repeat check.
