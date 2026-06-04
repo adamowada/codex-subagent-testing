@@ -29,6 +29,11 @@ reporting, and parity-friendly data shapes.
 9. Treat compatibility runtime files as migration scaffolding. When v3 behavior
    touches a clear domain area, prefer implementing or extracting it in that
    domain module rather than expanding the runtime indefinitely.
+10. Do not treat the compatibility runtime as the final architecture. A v3
+    solution should leave normalization, replay, billing, and reporting logic
+    reviewable in their domain modules, even if small compatibility wrappers
+    remain for older public APIs. Avoid leaving a second, stale runtime
+    implementation that can drift from the public entrypoints.
 
 ## Regression Expectations
 
@@ -49,3 +54,8 @@ The public entrypoints may remain small facades, but production logic should be
 structured into reviewable helpers or modules. A giant rewrite that happens to
 pass a few examples is risky and should score poorly under judge and
 minimality/maintainability review.
+
+Support escalations for v3 are intentionally issue-style rather than a complete
+truth table. Expect future views to combine audit cutoffs, business-effective
+cutoffs, duplicate event IDs, corrections, voids, account merges, and reporting
+in ways that are not all enumerated in the public examples.

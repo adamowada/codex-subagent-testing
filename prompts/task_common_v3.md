@@ -4,6 +4,11 @@ You are working inside one measured RuleLedger v3 implementation workspace. Impl
 
 RuleLedger v3 keeps the v2 subscription-ledger semantics and adds software-engineering pressure through a larger starter surface, compatibility requirements, migration behavior, performance constraints, and maintainability expectations.
 
+The visible brief is written like a human issue, not like a complete fixture
+catalog. Infer the general rule system behind the examples, especially where
+audit cutoffs, business-effective cutoffs, corrections, voids, duplicate event
+IDs, account merges, and reporting interact.
+
 Read these visible files before editing:
 
 - `README.md`
@@ -56,6 +61,8 @@ Python behavior must remain JSON-compatible with TypeScript for the same inputs.
 
 - Preserve v2 behavior while implementing the v3 issue brief.
 - Localize changes across the relevant modules instead of replacing the starter with one giant bypass file.
+- Do not leave changed domain areas as direct compatibility-runtime re-export facades; make normalization, replay, billing, and reporting logic reviewable in their modules.
+- Keep compatibility runtimes thin once logic moves; stale parallel implementations are a maintenance risk.
 - Keep public APIs stable and deterministic.
 - Maintain cross-language parity for summaries and CSV output.
 - Preserve existing behavior while adding new behavior.

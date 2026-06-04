@@ -218,3 +218,72 @@ but only treats process failures, timeouts, missing event streams, and Codex
 Next calibration step: rerun the four-run v3 sanity sweep with the corrected
 harness scoring path, then run the multi-repeat follow-up if the ladder remains
 visible.
+
+## Checkpoint: Reasoning-Pressure Hardening
+
+The next hardening pass incorporated the SWE-benchmark lessons above into the
+RuleLedger v3 generator and prompt:
+
+- Added source-shape localization pressure so a measured run cannot solve v3
+  only by growing the compatibility runtime.
+- Added issue-style ambiguity in the visible brief and prompt instead of a full
+  hidden truth table.
+- Added harder evolution cases for audit-visible duplicate IDs, merge chains,
+  post-merge source events, corrections, invoices, and seats.
+- Added an 11k-event merge/correction performance digest to catch replay logic
+  that scales only on simple per-account streams.
+
+Starter hidden score after this pass was `18/49` points (`0.367347`
+point-score), with `localization` and `fail_to_pass` at zero and the simpler
+compatibility/metamorphic/parity categories still passing.
+
+Run `20260604T104608-ruleledger_v3_sanity-v3_sanity_measured_04` showed better
+separation but still saturated high and xhigh hidden correctness:
+
+| Cell | Reasoning | Hidden Points | Hidden Categories | Quality |
+|---|---:|---:|---|---:|
+| V3S0 | low | `39/49` | localization `0.0` | `0.664865` |
+| V3S1 | medium | `43/49` | localization `0.4` | `0.718919` |
+| V3S2 | high | `49/49` | all saturated | `0.762906` |
+| V3S3 | xhigh | `49/49` | all saturated | `0.757062` |
+
+Qualitatively, the run was useful: low made a runtime-only patch, medium
+localized mostly into replay and missed merge state migration, while high and
+xhigh both performed broad modular rewrites. The remaining problem was that the
+hidden suite did not distinguish high from xhigh on correctness.
+
+## Checkpoint: Runtime-Boundary Calibration
+
+To target the high/xhigh tie without making hidden behavior arbitrary, the next
+pass added a separate localization contract for compatibility runtime files:
+after domain modules own v3 logic, `src/runtime.ts` and `ruleledger/_runtime.py`
+should remain thin delegates instead of a stale second implementation. This is
+a split-brain compatibility risk, not just style preference, and it follows the
+visible architecture notes.
+
+The new generated suite has 28 language cases and 53 possible points. Replaying
+it against the previous measured outputs produced the intended retrospective
+ladder: low `39/53`, medium `43/53`, high `49/53`, xhigh `53/53`. The starter
+baseline remained weak at `18/53`.
+
+Fresh measured run
+`20260604T114216-ruleledger_v3_sanity-v3_sanity_measured_05` adapted to the
+visible runtime-boundary guidance:
+
+| Cell | Reasoning | Hidden Points | Main Hidden Misses | Quality |
+|---|---:|---:|---|---:|
+| V3S0 | low | `38/53` | merge-chain evolution plus module/runtime ownership | `0.617073` |
+| V3S1 | medium | `48/53` | chain merge/correction evolution | `0.710337` |
+| V3S2 | high | `53/53` | none | `0.766844` |
+| V3S3 | xhigh | `53/53` | none | `0.760250` |
+
+This is a strong low/medium/high separation and a useful architecture signal.
+It still does not fully meet the original calibration target because high and
+xhigh tie on hidden correctness; they separate only through minimality,
+implementation tokens, and judge-observed residual risks. A quick oracle fuzz
+probe found candidate next edges around corrected source-account plan changes
+after merge and TypeScript/Python invalid-date parity. These should be reviewed
+for semantic fairness before adding another hidden case. The next calibration
+step is either a multi-repeat sweep to measure variance at the current
+difficulty, or one more evolution/parity hardening pass if strict high-vs-xhigh
+correctness spread is required.

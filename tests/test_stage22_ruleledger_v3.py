@@ -137,6 +137,45 @@ def test_v3_hidden_manifest_loads_required_categories_without_payload_leakage() 
     assert all(case["points"] > 0 for case in cases)
 
 
+def test_v3_hidden_cases_include_module_ownership_pressure() -> None:
+    _, cases = load_cases(CASES_V3_DIR)
+    architecture_cases = [
+        case
+        for case in cases
+        if case["category"] == "localization" and case["operation"] == "v3_architecture_contract"
+    ]
+
+    assert len(architecture_cases) == 1
+    assert architecture_cases[0]["points"] >= 3.0
+    assert architecture_cases[0]["expected"] == {
+        "directRuntimeFacade": False,
+        "modularized": True,
+        "modules": {
+            "billing": True,
+            "normalize": True,
+            "replay": True,
+            "reporting": True,
+        },
+    }
+
+
+def test_v3_hidden_cases_include_runtime_boundary_pressure() -> None:
+    _, cases = load_cases(CASES_V3_DIR)
+    runtime_cases = [
+        case
+        for case in cases
+        if case["category"] == "localization"
+        and case["operation"] == "v3_runtime_compatibility_contract"
+    ]
+
+    assert len(runtime_cases) == 1
+    assert runtime_cases[0]["points"] >= 2.0
+    assert runtime_cases[0]["expected"] == {
+        "localImplementation": False,
+        "runtimeDelegates": True,
+    }
+
+
 def test_v3_performance_case_is_large_enough_to_exercise_algorithmic_shape() -> None:
     payload = json.loads((CASES_V3_DIR / "performance.json").read_text(encoding="utf-8"))
     event_counts = [

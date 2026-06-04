@@ -25,6 +25,7 @@ SAFE_ACTUAL_ERROR_REASONS = {"missing_account", "normalization_failed", "unsuppo
 
 JS_CASE_RUNNER = r"""
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 
@@ -292,6 +293,62 @@ function v2ParityPayload(mod, input) {
   return { ok: true, value: { summaries: summaries.value, report: report.value } };
 }
 
+function readSource(worktree, relativePath) {
+  try {
+    return readFileSync(resolve(worktree, relativePath), "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function hasLocalTsDefinition(source, names) {
+  return names.some((name) => {
+    const pattern = new RegExp(`\\b(function|const|let|var|class)\\s+${name}\\b`);
+    const exportPattern = new RegExp(`export\\s+(function|const|let|var|class)\\s+${name}\\b`);
+    return pattern.test(source) || exportPattern.test(source);
+  });
+}
+
+function v3ArchitectureContract(worktree) {
+  const sources = {
+    normalize: readSource(worktree, "src/normalize.ts"),
+    replay: readSource(worktree, "src/replay.ts"),
+    billing: readSource(worktree, "src/billing.ts"),
+    reporting: readSource(worktree, "src/report.ts")
+  };
+  const modules = {
+    normalize: hasLocalTsDefinition(sources.normalize, ["parseEventLine", "normalizeEvent", "normalizeEventV2"]),
+    replay: hasLocalTsDefinition(sources.replay, ["reduceAccountState", "reduceAccountStateV2", "summarizeAccount"]),
+    billing: hasLocalTsDefinition(sources.billing, ["calculatePlanChangeProrationV2", "calculatePlanChangeProration"]),
+    reporting: hasLocalTsDefinition(sources.reporting, ["exportLedgerReport", "exportLedgerReportV2"])
+  };
+  const directRuntimeFacade = Object.values(sources).some((source) => /from\s+["']\.\/runtime\.js["']/.test(source));
+  return {
+    modularized: Object.values(modules).every((value) => value === true),
+    directRuntimeFacade,
+    modules
+  };
+}
+
+function v3RuntimeCompatibilityContract(worktree) {
+  const source = readSource(worktree, "src/runtime.ts");
+  const requiredDelegates = ["normalize", "replay", "billing", "report"];
+  const runtimeDelegates = requiredDelegates.every((moduleName) => {
+    const pattern = new RegExp(`from\\s+["']\\./${moduleName}\\.js["']`);
+    return pattern.test(source);
+  });
+  const localImplementation = hasLocalTsDefinition(source, [
+    "parseEventLine",
+    "normalizeEvent",
+    "reduceAccountState",
+    "reduceAccountStateV2",
+    "summarizeAccount",
+    "calculatePlanChangeProrationV2",
+    "exportLedgerReport"
+  ]);
+  return { runtimeDelegates, localImplementation };
+}
+
 async function main() {
   const chunks = [];
   for await (const chunk of process.stdin) {
@@ -360,6 +417,12 @@ async function main() {
     const result = v2ParityPayload(mod, input);
     return result.ok ? result.value : result;
   }
+  if (operation === "v3_architecture_contract") {
+    return v3ArchitectureContract(payload.worktree);
+  }
+  if (operation === "v3_runtime_compatibility_contract") {
+    return v3RuntimeCompatibilityContract(payload.worktree);
+  }
   return { ok: false, error: "unsupported_operation", operation };
 }
 
@@ -385,6 +448,7 @@ import importlib
 import inspect
 import json
 import sys
+from pathlib import Path
 
 
 def deep_clone(value):
@@ -651,6 +715,57 @@ def v2_parity_payload(mod, input_payload):
     return {"ok": True, "value": {"summaries": summaries["value"], "report": report["value"]}}
 
 
+def read_source(worktree, relative_path):
+    try:
+        return (Path(worktree) / relative_path).read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
+def has_local_py_definition(source, names):
+    return any(f"def {name}" in source or f"async def {name}" in source for name in names)
+
+
+def v3_architecture_contract(worktree):
+    sources = {
+        "normalize": read_source(worktree, Path("ruleledger") / "normalize.py"),
+        "replay": read_source(worktree, Path("ruleledger") / "replay.py"),
+        "billing": read_source(worktree, Path("ruleledger") / "billing.py"),
+        "reporting": read_source(worktree, Path("ruleledger") / "reporting.py"),
+    }
+    modules = {
+        "normalize": has_local_py_definition(sources["normalize"], ("parse_event_line", "normalize_event", "normalize_event_v2")),
+        "replay": has_local_py_definition(sources["replay"], ("reduce_account_state", "reduce_account_state_v2", "summarize_account")),
+        "billing": has_local_py_definition(sources["billing"], ("calculate_plan_change_proration_v2", "calculate_plan_change_proration")),
+        "reporting": has_local_py_definition(sources["reporting"], ("export_ledger_report", "export_ledger_report_v2")),
+    }
+    direct_runtime_facade = any("._runtime" in source for source in sources.values())
+    return {
+        "modularized": all(modules.values()),
+        "directRuntimeFacade": direct_runtime_facade,
+        "modules": modules,
+    }
+
+
+def v3_runtime_compatibility_contract(worktree):
+    source = read_source(worktree, Path("ruleledger") / "_runtime.py")
+    required_delegates = (".normalize", ".replay", ".billing", ".reporting")
+    runtime_delegates = all(f"from {module_name} import" in source for module_name in required_delegates)
+    local_implementation = has_local_py_definition(
+        source,
+        (
+            "parse_event_line",
+            "normalize_event",
+            "reduce_account_state",
+            "reduce_account_state_v2",
+            "summarize_account",
+            "calculate_plan_change_proration_v2",
+            "export_ledger_report",
+        ),
+    )
+    return {"runtimeDelegates": runtime_delegates, "localImplementation": local_implementation}
+
+
 def main():
     payload = json.load(sys.stdin)
     mod = load_module(payload["worktree"])
@@ -707,6 +822,10 @@ def main():
     if operation == "v2_parity":
         result = v2_parity_payload(mod, input_payload)
         return result["value"] if result.get("ok") else result
+    if operation == "v3_architecture_contract":
+        return v3_architecture_contract(payload["worktree"])
+    if operation == "v3_runtime_compatibility_contract":
+        return v3_runtime_compatibility_contract(payload["worktree"])
     return {"ok": False, "error": "unsupported_operation", "operation": operation}
 
 

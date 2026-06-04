@@ -1,44 +1,49 @@
 {
   "benchmark": "ruleledger_v3",
   "category_weights": {
-    "evolution": 0.15,
-    "fail_to_pass": 0.25,
-    "localization": 0.15,
+    "evolution": 0.2,
+    "fail_to_pass": 0.2,
+    "localization": 0.25,
     "metamorphic": 0.1,
-    "parity": 0.1,
-    "pass_to_pass": 0.15,
+    "parity": 0.05,
+    "pass_to_pass": 0.1,
     "performance": 0.1
   },
   "files": {
     "compatibility.json": {
       "case_count": 2,
       "points": 2.0,
-      "sha256": "4d38f3854bcbc722913dbc009be4ee09fdaf2edbb0a41c54efdc03dad65765b3"
+      "sha256": "5cab78846c1aab4c25560b1bec76e678d8f8e864e933bf49828364c396e2656c"
     },
     "evolution.json": {
+      "case_count": 4,
+      "points": 7.5,
+      "sha256": "1621788184683e3416ad595952b4136bdadf70faa6253717c4f5df1efc2fa0a2"
+    },
+    "localization.json": {
       "case_count": 2,
-      "points": 3.0,
-      "sha256": "a5c994a0047cf5c27d655424134d23336d35b1f16194aef84354da98d377545f"
+      "points": 5.0,
+      "sha256": "d4cdfbd74b49e6248e833c0107b24859995fc8bc917fcdf8849149c79144d475"
     },
     "metamorphic.json": {
       "case_count": 1,
       "points": 2.0,
-      "sha256": "62f96f3c7f6e90bba940a00cab4ed2b584c657f786e1b4c7c9e8507b7bb99731"
+      "sha256": "6f4d96ce64adff135705cde16a96bdd38c9979002a9384f90a61de4653798e71"
     },
     "parity.json": {
       "case_count": 1,
       "points": 1.0,
-      "sha256": "c21ef5019e56b3dfbec6f1a0b79766b1409b73cf761ea74155d2de8b9a46a51f"
+      "sha256": "c78ea4ad533188ccde9625fdb17eabae27db060b3ce611a563a299ec3ffee725"
     },
     "performance.json": {
-      "case_count": 1,
-      "points": 2.0,
-      "sha256": "bc7eca9ebf06514da82684d2f41719c3c17b7d907c899bef9029a348be7870ff"
+      "case_count": 2,
+      "points": 5.0,
+      "sha256": "d05955db0fd25945ba1b2c9f8c494a339bcbd3e7814562b813cbc19bdbea0e2b"
     },
     "reasoning_ladder.json": {
       "case_count": 2,
       "points": 4.0,
-      "sha256": "29e298e24913881add74b7b15ebbce5d6fd15f6cdeeddfe752d3c98f56ce20ad"
+      "sha256": "a29e8af71c2a92c47dbca64a13ebcfbc034f682a654d8b24a93d2d306310b0be"
     }
   },
   "generated_at": "2026-05-29T00:00:00.000Z",
