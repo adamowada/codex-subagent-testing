@@ -98,6 +98,17 @@ def compatibility_cases() -> list[dict[str, Any]]:
         "period_start": "2026-02-01T00:00:00Z",
         "period_end": "2026-02-30T00:00:00Z",
     }
+    archival_event = {
+        "id": "evt_v3_archive_year_0001",
+        "account_id": "acct_v3_archive",
+        "type": "invoice_issued",
+        "timestamp": "0001-01-01T00:00:00Z",
+        "amount_cents": 100,
+        "currency": "usd",
+        "invoice_id": "inv_archive_0001",
+        "period_start": "0001-01-01T00:00:00Z",
+        "period_end": "0001-02-01T00:00:00Z",
+    }
     summary = {
         "accountId": "acct_v3_report",
         "status": "active",
@@ -147,6 +158,14 @@ def compatibility_cases() -> list[dict[str, Any]]:
             points=1.5,
         ),
         evaluated_case(
+            "v3.compat.normalize_archival_year_0001",
+            "pass_to_pass",
+            ["BT-001", "BL-002", "PY-001"],
+            "normalize_event",
+            {"raw_event": archival_event},
+            points=1.5,
+        ),
+        evaluated_case(
             "v3.compat.report_csv_escaping",
             "pass_to_pass",
             ["RP-001", "RP-006", "PY-001"],
@@ -174,6 +193,21 @@ def compatibility_cases() -> list[dict[str, Any]]:
                 "period_end": "2026-02-01T00:00:00Z",
                 "change_effective_at": "2026-01-02T00:00:01Z",
                 "quantity": 100_000_000_007,
+            },
+            points=2.0,
+        ),
+        evaluated_case(
+            "v3.compat.proration_large_quantity_downgrade_exactness",
+            "pass_to_pass",
+            ["BL-004", "BL-005", "BL-007", "PY-001"],
+            "v2_calculate_proration",
+            {
+                "old_plan": "enterprise",
+                "new_plan": "starter",
+                "period_start": "2026-02-01T00:00:00Z",
+                "period_end": "2026-03-01T00:00:00Z",
+                "change_effective_at": "2026-02-14T12:00:00.001Z",
+                "quantity": 100_000_000_019,
             },
             points=2.0,
         ),

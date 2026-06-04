@@ -82,3 +82,10 @@ in ways that are not all enumerated in the public examples.
   corrected fact. The support team uses this to retract a bad correction rather
   than to resurrect whichever value happened to be present before the
   correction was recorded.
+- Finance has seen high-seat downgrades drift by a cent when implementations
+  use floating-point prorations. V2's exact millisecond proration and
+  half-away-from-zero rounding apply equally to credits, charges, upgrades, and
+  downgrades, even when the seat count is large.
+- Archival imports may contain four-digit years before 0100. Timestamp
+  normalization should preserve the represented UTC instant instead of letting
+  host date constructors remap years like 0001 to a modern century.

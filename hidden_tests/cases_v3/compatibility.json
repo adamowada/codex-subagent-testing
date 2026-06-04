@@ -97,6 +97,51 @@
     },
     {
       "category": "pass_to_pass",
+      "expected": {
+        "ok": true,
+        "value": {
+          "accountId": "acct_v3_archive",
+          "amountCents": 100,
+          "currency": "USD",
+          "effectiveAt": "0001-01-01T00:00:00.000Z",
+          "id": "evt_v3_archive_year_0001",
+          "invoiceId": "inv_archive_0001",
+          "periodEnd": "0001-02-01T00:00:00.000Z",
+          "periodStart": "0001-01-01T00:00:00.000Z",
+          "recordedAt": "0001-01-01T00:00:00.000Z",
+          "sequence": 0,
+          "timestamp": "0001-01-01T00:00:00.000Z",
+          "type": "invoice_issued"
+        }
+      },
+      "id": "v3.compat.normalize_archival_year_0001",
+      "input": {
+        "raw_event": {
+          "account_id": "acct_v3_archive",
+          "amount_cents": 100,
+          "currency": "usd",
+          "id": "evt_v3_archive_year_0001",
+          "invoice_id": "inv_archive_0001",
+          "period_end": "0001-02-01T00:00:00Z",
+          "period_start": "0001-01-01T00:00:00Z",
+          "timestamp": "0001-01-01T00:00:00Z",
+          "type": "invoice_issued"
+        }
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "normalize_event",
+      "points": 1.5,
+      "rule_ids": [
+        "BT-001",
+        "BL-002",
+        "PY-001"
+      ]
+    },
+    {
+      "category": "pass_to_pass",
       "expected": "account_id,status,plan,total_paid_cents,currency,seats,usage,usage_limit,over_limit,coupon_code,coupon_active,invoice_ids,last_invoice_id,last_period_start,last_period_end,merged_from_account_ids,closed_at,last_event_at\nacct_v3_report,active,pro,4900,USD,3,12,10000,false,\"SPRING,50\",true,inv_a|inv_b,inv_b,2026-04-01T00:00:00.000Z,2026-05-01T00:00:00.000Z,,,2026-04-01T00:00:00.000Z\n",
       "id": "v3.compat.report_csv_escaping",
       "input": {
@@ -325,6 +370,41 @@
         "period_end": "2026-02-01T00:00:00Z",
         "period_start": "2026-01-01T00:00:00Z",
         "quantity": 100000000007
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_calculate_proration",
+      "points": 2.0,
+      "rule_ids": [
+        "BL-004",
+        "BL-005",
+        "BL-007",
+        "PY-001"
+      ]
+    },
+    {
+      "category": "pass_to_pass",
+      "expected": {
+        "changeEffectiveAt": "2026-02-14T12:00:00.001Z",
+        "netAdjustmentCents": -968392856553869,
+        "newChargeCents": 62142857105061,
+        "newPlan": "starter",
+        "oldCreditCents": -1030535713658930,
+        "oldPlan": "enterprise",
+        "periodEnd": "2026-03-01T00:00:00.000Z",
+        "periodStart": "2026-02-01T00:00:00.000Z",
+        "quantity": 100000000019
+      },
+      "id": "v3.compat.proration_large_quantity_downgrade_exactness",
+      "input": {
+        "change_effective_at": "2026-02-14T12:00:00.001Z",
+        "new_plan": "starter",
+        "old_plan": "enterprise",
+        "period_end": "2026-03-01T00:00:00Z",
+        "period_start": "2026-02-01T00:00:00Z",
+        "quantity": 100000000019
       },
       "languages": [
         "typescript",

@@ -506,3 +506,74 @@ multi-repeat sweep or a targeted second sanity repeat to determine whether the
 medium result is stochastic noise. If medium remains unstable, add one or two
 medium-accessible but low-resistant cases so the bottom of the ladder has a
 more reliable separation without weakening the high/xhigh pressure.
+
+A targeted medium-only recheck
+`20260604T171449-ruleledger_v3_sanity-v3_medium_recheck_01` confirmed the
+six-second medium result was a prompt/measurement anomaly rather than the
+normal medium behavior. The recheck spent `374.5s` in implementation, changed
+four files, and scored `71/83` hidden points (`37/42` language executions),
+quality `0.710448`. It failed TypeScript exact proration and both
+architecture/runtime ownership checks, matching the expected medium profile.
+
+The subsequent 12-run consistency sweep
+`20260604T172734-ruleledger_v3_full-v3_full_measured_02` completed three
+repeats per reasoning level:
+
+| Reasoning | Hidden Scores | Mean Hidden | Mean Quality | Notes |
+|---|---:|---:|---:|---|
+| low | `0.572473`, `0.825564`, `0.326905` | `0.574981` | `0.521543` | high variance, often misses architecture and bitemporal chain pressure |
+| medium | `0.523375`, `0.854135`, `0.854135` | `0.743882` | `0.638209` | two strong behavioral runs, still misses architecture/runtime and TS exact proration |
+| high | `0.985714`, `0.704052`, `0.985714` | `0.891827` | `0.697742` | two near-perfect runs, one bitemporal-chain miss |
+| xhigh | `0.718337`, `1.000000`, `1.000000` | `0.906112` | `0.705230` | two perfect runs, one bitemporal-chain miss |
+
+This is the best evidence so far: means are monotonic across all four reasoning
+levels and the medium no-op did not recur. It is still not a fully proven clear
+ladder because high and xhigh overlap heavily and each had one chain-family
+miss. A stable xhigh/high distinction did appear in TypeScript exact billing:
+high failed `v3.compat.proration_large_quantity_exactness` in all three
+repeats, while xhigh passed it in all three repeats. The next hardening pass
+should broaden that fair compatibility pressure rather than inventing vague
+new requirements.
+
+## Checkpoint: Exact Compatibility Tail Pass
+
+The next pass adds visible support notes and hidden pass-to-pass cases for two
+old-behavior tails that high-reasoning runs commonly miss while xhigh handles:
+
+- exact large-seat downgrade proration with half-away-from-zero rounding across
+  both negative credits and positive replacement charges;
+- archival four-digit timestamp years before 0100, which catch host date
+  constructor quirks such as JavaScript's `Date.UTC` year remapping.
+
+These cases borrow from SWE-Bench+ and SWE-bench Verified lessons: preserve
+old behavior with pass-to-pass tests while adding new issue pressure, and keep
+the public requirement human-readable instead of leaking hidden fixtures.
+
+Verification after this pass:
+
+- `python -m pytest -q tests\test_stage22_ruleledger_v3.py` -> `14 passed`.
+- `python -m pytest -q` -> `171 passed`.
+- Starter hidden-runner baseline -> `30/90` points, `19/46` language cases, no
+  runner errors.
+
+The follow-up sanity run
+`20260604T182952-ruleledger_v3_sanity-v3_sanity_measured_09` completed all
+four implementations, judges, scoring, aggregate outputs, HTML report, PDF
+report, CSV, SQLite, and validation artifacts. Validation again warned that
+judge outputs were not parsed as strict JSON.
+
+| Cell | Reasoning | Hidden Points | Hidden Executions | Exact-Tail Cases | Quality |
+|---|---:|---:|---:|---|---:|
+| V3S0 | low | `80/90` | `42/46` | passed all six language executions | `0.732433` |
+| V3S1 | medium | `80/90` | `42/46` | passed all six language executions | `0.732433` |
+| V3S2 | high | `59/90` | `34/46` | passed all six language executions | `0.590541` |
+| V3S3 | xhigh | `66/90` | `36/46` | passed all six language executions | `0.592057` |
+
+This run shows the exact-tail additions are fair but saturated in this sample:
+all reasoning levels solved archival year `0001`, large upgrade proration, and
+large downgrade proration in both languages. The high/xhigh drop came from
+missed bitemporal merge-chain cases, while low and medium happened to solve
+them. The current benchmark should keep these compatibility guards, but they
+do not by themselves strengthen adjacent reasoning separation. The next
+pressure pass should focus on deeper chain reasoning or scoring design rather
+than adding more concrete compatibility arithmetic.

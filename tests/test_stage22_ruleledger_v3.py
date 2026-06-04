@@ -56,6 +56,8 @@ def test_v3_template_exposes_issue_and_architecture_docs() -> None:
     assert "source account after an account merge" in issue
     assert "separate business and audit cutoffs" in issue
     assert "void references a correction event" in issue
+    assert "high-seat downgrades" in issue
+    assert "four-digit years before 0100" in issue
     assert "src/replay.ts" in architecture
     assert "ruleledger/replay.py" in architecture
 
@@ -188,13 +190,39 @@ def test_v3_hidden_cases_include_large_quantity_proration_pressure() -> None:
         case
         for case in cases
         if case["category"] == "pass_to_pass"
-        and case["id"] == "v3.compat.proration_large_quantity_exactness"
+        and case["id"]
+        in {
+            "v3.compat.proration_large_quantity_exactness",
+            "v3.compat.proration_large_quantity_downgrade_exactness",
+        }
     ]
 
-    assert len(proration_cases) == 1
-    assert proration_cases[0]["operation"] == "v2_calculate_proration"
-    assert proration_cases[0]["input"]["quantity"] > 100_000_000_000
-    assert proration_cases[0]["expected"]["newChargeCents"] == 474_193_365_475_248
+    assert len(proration_cases) == 2
+    cases_by_id = {case["id"]: case for case in proration_cases}
+
+    upgrade = cases_by_id["v3.compat.proration_large_quantity_exactness"]
+    assert upgrade["operation"] == "v2_calculate_proration"
+    assert upgrade["input"]["quantity"] > 100_000_000_000
+    assert upgrade["expected"]["newChargeCents"] == 474_193_365_475_248
+
+    downgrade = cases_by_id["v3.compat.proration_large_quantity_downgrade_exactness"]
+    assert downgrade["operation"] == "v2_calculate_proration"
+    assert downgrade["input"]["old_plan"] == "enterprise"
+    assert downgrade["input"]["new_plan"] == "starter"
+    assert downgrade["expected"]["oldCreditCents"] == -1_030_535_713_658_930
+    assert downgrade["expected"]["newChargeCents"] == 62_142_857_105_061
+    assert downgrade["expected"]["netAdjustmentCents"] == -968_392_856_553_869
+
+
+def test_v3_hidden_cases_include_archival_timestamp_pressure() -> None:
+    _, cases = load_cases(CASES_V3_DIR)
+    cases_by_id = {case["id"]: case for case in cases}
+
+    archival = cases_by_id["v3.compat.normalize_archival_year_0001"]
+    assert archival["operation"] == "normalize_event"
+    assert archival["expected"]["ok"] is True
+    assert archival["expected"]["value"]["timestamp"] == "0001-01-01T00:00:00.000Z"
+    assert archival["expected"]["value"]["periodEnd"] == "0001-02-01T00:00:00.000Z"
 
 
 def test_v3_hidden_cases_include_support_escalation_pressure() -> None:
