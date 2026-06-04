@@ -176,6 +176,14 @@ def test_judge_prompt_does_not_reveal_topology(runs: list[dict]) -> None:
             assert value not in prompt
 
 
+def test_judge_prompt_requires_single_json_object(runs: list[dict]) -> None:
+    prompt = render_judge_prompt(runs[0], REPO_ROOT)
+
+    assert "single JSON object that starts with `{` and ends with `}`" in prompt
+    assert "Do not use Markdown" in prompt
+    assert "scores the judge contribution as zero" in prompt
+
+
 def test_codex_config_for_c0_has_no_subagent_templates(runs: list[dict]) -> None:
     config = tomllib.loads(render_codex_config(_run(runs, "C0", None), REPO_ROOT)["config.toml"])
 

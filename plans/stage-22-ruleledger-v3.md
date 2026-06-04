@@ -629,3 +629,46 @@ stochastic old-chain family or the scoring design. In particular, stronger
 multi-view cases that require the same ledger to satisfy summary, report, and
 architecture expectations may reward xhigh's broader synthesis better than
 adding another isolated fixture.
+
+## Checkpoint: Judge JSON Scoring Repair
+
+The next pass addressed a measurement-path problem rather than another hidden
+fixture. The v3 judge was producing useful review prose, but the harness scored
+judge contribution as zero because `judge.json` did not contain strict JSON.
+The judge prompt now explicitly requires a single final JSON object, warns that
+Markdown/prose output scores zero, and names the exact output shape. The scorer
+and Stage 11 validation now also accept a parsed top-level `score` alias in
+addition to `overall_score` and the four rubric-specific score fields. This
+keeps the harness robust to the JSON shape the judge actually emitted while
+still requiring parsed JSON.
+
+Verification after this pass:
+
+- `python -m pytest -q tests\test_stage9_scoring.py tests\test_stage11_validation.py tests\test_prompt_rendering.py`
+  -> `45 passed`.
+- `python -m pytest -q` -> `175 passed`.
+
+The follow-up sanity run
+`20260604T203502-ruleledger_v3_sanity-v3_sanity_measured_11_judge_json`
+completed all four implementations, judges, scoring, aggregate outputs, HTML
+report, PDF report, CSV, SQLite, and validation artifacts. After recomputing
+with the patched scorer/validator, Stage 11 validation passed and the
+`judge_json` check validated parsed judge JSON for all four runs.
+
+| Cell | Reasoning | Hidden Points | Judge | Minimality | Quality |
+|---|---:|---:|---:|---:|---:|
+| V3S0 | low | `90/102` | `0.858897` | `1.000000` | `0.902012` |
+| V3S1 | medium | `102/102` | `0.940000` | `0.444375` | `0.960219` |
+| V3S2 | high | `71/102` | `0.650000` | `0.968750` | `0.748205` |
+| V3S3 | xhigh | `102/102` | `1.000000` | `0.145625` | `0.957281` |
+
+This repair materially improves measurement fidelity: xhigh now receives the
+top judge score and no longer loses all judge contribution to formatting. It
+still does not prove the full ladder. Medium and xhigh both reached perfect
+hidden correctness in this repeat, while xhigh's larger implementation lost
+enough minimality score to finish just below medium on aggregate quality. High
+again missed the older bitemporal chain family. The next calibration question
+is no longer "why is judge always zero"; it is whether scoring should reduce
+minimality's ability to mask perfect correctness/judge results, and whether the
+old chain cases need replacement or multi-view reinforcement to reduce
+stochastic misses.

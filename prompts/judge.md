@@ -17,7 +17,13 @@ Treat ordinary implementation failures as valid measurement outcomes. Label infr
 
 ## Output
 
-Return strict JSON only, with no prose before or after it:
+Return strict JSON only, with no prose before or after it. Your entire final
+message must be a single JSON object that starts with `{` and ends with `}`.
+Do not use Markdown, headings, bullets, a verdict label, or a fenced code block
+in the final answer. If you write prose instead of JSON, the harness records
+the judge artifact as unparsed and scores the judge contribution as zero.
+
+Use this exact shape:
 
 ```json
 {

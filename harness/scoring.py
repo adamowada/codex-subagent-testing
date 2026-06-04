@@ -288,8 +288,9 @@ def _judge_score(payload: Mapping[str, Any], warnings: list[str]) -> float:
         warnings.append("judge output was not parsed as strict JSON")
         return 0.0
 
-    if isinstance(value.get("overall_score"), (int, float)):
-        return _normalized_score(value["overall_score"])
+    for key in ("overall_score", "score"):
+        if isinstance(value.get(key), (int, float)):
+            return _normalized_score(value[key])
 
     keys = ["correctness_score", "parity_score", "maintainability_score", "test_evidence_score"]
     scores = [_normalized_score(value.get(key)) for key in keys if isinstance(value.get(key), (int, float))]

@@ -684,8 +684,9 @@ def _check_names(preflight: Mapping[str, Any], status: str) -> list[str]:
 
 
 def _judge_has_numeric_score(value: Mapping[str, Any]) -> bool:
-    if isinstance(value.get("overall_score"), (int, float)) and not isinstance(value.get("overall_score"), bool):
-        return True
+    for key in ("overall_score", "score"):
+        if isinstance(value.get(key), (int, float)) and not isinstance(value.get(key), bool):
+            return True
     for key in ("correctness_score", "parity_score", "maintainability_score", "test_evidence_score"):
         if isinstance(value.get(key), (int, float)) and not isinstance(value.get(key), bool):
             return True
