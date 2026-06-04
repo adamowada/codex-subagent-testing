@@ -11,9 +11,9 @@
   },
   "files": {
     "compatibility.json": {
-      "case_count": 2,
-      "points": 2.0,
-      "sha256": "5cab78846c1aab4c25560b1bec76e678d8f8e864e933bf49828364c396e2656c"
+      "case_count": 3,
+      "points": 4.0,
+      "sha256": "6aa514e88969a52c0f3ac906bebff168c90803bbaf3ee47a9f4f08ca8453b3ca"
     },
     "evolution.json": {
       "case_count": 4,

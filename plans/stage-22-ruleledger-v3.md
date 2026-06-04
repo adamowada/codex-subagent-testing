@@ -287,3 +287,43 @@ for semantic fairness before adding another hidden case. The next calibration
 step is either a multi-repeat sweep to measure variance at the current
 difficulty, or one more evolution/parity hardening pass if strict high-vs-xhigh
 correctness spread is required.
+
+## Checkpoint: Exact-Proration Top-End Pressure
+
+The next hardening pass added one fair pass-to-pass compatibility edge for
+large-quantity proration. The visible v2 billing rule `BL-004` already requires
+integer/rational arithmetic instead of floating point. A fuzz probe found that
+the measured high solution still used TypeScript `number` arithmetic while the
+measured xhigh solution used `BigInt`. The new generated case uses a safe JSON
+integer quantity greater than `100_000_000_000` and expects exact cent rounding
+for a near-full-period starter-to-pro change.
+
+The generated v3 suite now has 30 language cases and 57 possible points. The
+starter baseline remains weak at `20/57`, with `fail_to_pass` and
+`localization` at zero.
+
+Fresh measured run
+`20260604T125222-ruleledger_v3_sanity-v3_sanity_measured_06` produced a clear
+top-end correctness split:
+
+| Cell | Reasoning | Hidden Points | Main Hidden Misses | Quality |
+|---|---:|---:|---|---:|
+| V3S0 | low | `26/57` | exact proration, fail-to-pass, localization, performance | `0.462222` |
+| V3S1 | medium | `20/57` | no-op implementation; broad evolution/localization misses | `0.395556` |
+| V3S2 | high | `30/57` | exact proration, fail-to-pass, evolution, performance | `0.487698` |
+| V3S3 | xhigh | `52/57` | one two-language evolution case | `0.704538` |
+
+The hidden categories now differentiate the high/xhigh boundary: high still
+misses `pass_to_pass`, `fail_to_pass`, `evolution`, and `performance`, while
+xhigh reaches full `fail_to_pass`, `localization`, `pass_to_pass`, and
+`performance`. The single-repeat low/medium ordering is still noisy because
+the medium run was effectively a no-op. The next calibration step should be a
+multi-repeat sanity sweep to estimate variance before further hidden-case
+hardening.
+
+The run completed all implementation, hidden, report, and validation artifacts.
+Final validation warned only on judge-output shape: the judge responses did not
+consistently provide recognized numeric score fields, so the judge component
+scored as zero. The correctness spread above is therefore driven by hidden
+tests, public checks, typecheck, performance, parity, and minimality rather than
+numeric judge scoring.

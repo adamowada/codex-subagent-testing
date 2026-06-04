@@ -126,6 +126,21 @@ def compatibility_cases() -> list[dict[str, Any]]:
             {"summaries": [summary]},
             points=1.0,
         ),
+        evaluated_case(
+            "v3.compat.proration_large_quantity_exactness",
+            "pass_to_pass",
+            ["BL-004", "BL-005", "BL-007", "PY-001"],
+            "v2_calculate_proration",
+            {
+                "old_plan": "starter",
+                "new_plan": "pro",
+                "period_start": "2026-01-01T00:00:00Z",
+                "period_end": "2026-02-01T00:00:00Z",
+                "change_effective_at": "2026-01-02T00:00:01Z",
+                "quantity": 100_000_000_007,
+            },
+            points=2.0,
+        ),
     ]
 
 

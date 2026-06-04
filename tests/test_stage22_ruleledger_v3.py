@@ -176,6 +176,21 @@ def test_v3_hidden_cases_include_runtime_boundary_pressure() -> None:
     }
 
 
+def test_v3_hidden_cases_include_large_quantity_proration_pressure() -> None:
+    _, cases = load_cases(CASES_V3_DIR)
+    proration_cases = [
+        case
+        for case in cases
+        if case["category"] == "pass_to_pass"
+        and case["id"] == "v3.compat.proration_large_quantity_exactness"
+    ]
+
+    assert len(proration_cases) == 1
+    assert proration_cases[0]["operation"] == "v2_calculate_proration"
+    assert proration_cases[0]["input"]["quantity"] > 100_000_000_000
+    assert proration_cases[0]["expected"]["newChargeCents"] == 474_193_365_475_248
+
+
 def test_v3_performance_case_is_large_enough_to_exercise_algorithmic_shape() -> None:
     payload = json.loads((CASES_V3_DIR / "performance.json").read_text(encoding="utf-8"))
     event_counts = [

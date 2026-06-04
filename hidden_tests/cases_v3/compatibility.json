@@ -97,6 +97,41 @@
         "RP-006",
         "PY-001"
       ]
+    },
+    {
+      "category": "pass_to_pass",
+      "expected": {
+        "changeEffectiveAt": "2026-01-02T00:00:01.000Z",
+        "netAdjustmentCents": 358064378011922,
+        "newChargeCents": 474193365475248,
+        "newPlan": "pro",
+        "oldCreditCents": -116128987463326,
+        "oldPlan": "starter",
+        "periodEnd": "2026-02-01T00:00:00.000Z",
+        "periodStart": "2026-01-01T00:00:00.000Z",
+        "quantity": 100000000007
+      },
+      "id": "v3.compat.proration_large_quantity_exactness",
+      "input": {
+        "change_effective_at": "2026-01-02T00:00:01Z",
+        "new_plan": "pro",
+        "old_plan": "starter",
+        "period_end": "2026-02-01T00:00:00Z",
+        "period_start": "2026-01-01T00:00:00Z",
+        "quantity": 100000000007
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_calculate_proration",
+      "points": 2.0,
+      "rule_ids": [
+        "BL-004",
+        "BL-005",
+        "BL-007",
+        "PY-001"
+      ]
     }
   ],
   "generated_at": "2026-05-29T00:00:00.000Z",
