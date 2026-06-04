@@ -764,11 +764,7 @@ def run_judge(
     judge_json = extract_final_response(judge_events_path)
     event_summary = summarize_codex_events(judge_events_path)
     _write_json(run_dir / "judge.json", judge_json)
-    judge_failed = (
-        result.returncode != 0
-        or result.timed_out
-        or codex_events_have_failure(event_summary)
-    )
+    judge_failed = judge_phase_failed(result, event_summary, judge_json)
     phase_data = {
         "returncode": result.returncode,
         "timed_out": result.timed_out,
@@ -797,6 +793,19 @@ def run_judge(
         ),
     )
     status.update_run(str(run["run_id"]), phase="judged")
+
+
+def judge_phase_failed(
+    result: ProcessResult,
+    event_summary: Mapping[str, Any],
+    judge_json: Mapping[str, Any],
+) -> bool:
+    return (
+        result.returncode != 0
+        or result.timed_out
+        or codex_events_have_failure(event_summary)
+        or judge_json.get("parsed") is False
+    )
 
 
 def parse_usage_and_score(
@@ -1245,7 +1254,9 @@ def load_state(run_dir: Path) -> dict[str, Any]:
             "updated_at": iso_now(),
             "phases": {phase: {"status": "pending"} for phase in STATE_PHASES},
         }
-    return _read_json(path)
+    state = _read_json(path)
+    state.setdefault("schema_version", 1)
+    return state
 
 
 def _phase_updated_at(state: Mapping[str, Any], phase: str) -> str | None:
@@ -1353,6 +1364,11 @@ def prepare_judge_evidence(run_dir: Path, worktree: Path) -> None:
         target = evidence_dir / name
         shutil.copy2(source, target)
         copied.append(name)
+
+    schema_source = REPO_ROOT / "prompts" / "judge_output.schema.json"
+    schema_target = evidence_dir / "judge_output.schema.json"
+    shutil.copy2(schema_source, schema_target)
+    copied.append(schema_target.name)
 
     _write_json(
         evidence_dir / "evidence-manifest.json",

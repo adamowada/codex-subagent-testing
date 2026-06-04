@@ -5,11 +5,11 @@
     "hidden_correctness": 0.50,
     "hidden_parity": 0.15,
     "performance": 0.10,
-    "judge": 0.20,
-    "minimality": 0.05
+    "judge": 0.22,
+    "minimality": 0.03
   },
   "minimality": {
-    "target_production_loc": 900,
-    "penalty_window": 1600
+    "target_production_loc": 1200,
+    "penalty_window": 4000
   }
 }

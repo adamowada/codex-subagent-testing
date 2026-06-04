@@ -672,3 +672,48 @@ is no longer "why is judge always zero"; it is whether scoring should reduce
 minimality's ability to mask perfect correctness/judge results, and whether the
 old chain cases need replacement or multi-view reinforcement to reduce
 stochastic misses.
+
+## Checkpoint: Scoring Profile and Judge Schema Calibration
+
+The next pass addressed two measurement-calibration issues exposed by the
+previous sanity run:
+
+- v3 minimality was too strong for a two-language, multi-module benchmark. The
+  v3 scoring profile now keeps hidden correctness at `0.50`, keeps hidden
+  parity and performance unchanged, raises judge contribution from `0.20` to
+  `0.22`, lowers minimality from `0.05` to `0.03`, and widens the v3
+  production-LOC penalty from `900/1600` to `1200/4000`.
+- Judge JSON reliability needed CLI enforcement, not just prompt wording. The
+  harness now supplies `--output-schema judge_evidence/judge_output.schema.json`
+  for judge runs, copies the schema into the judge evidence bundle, and marks a
+  judge phase failed when the final response does not parse as JSON so
+  `--rerun-failed` can repair it.
+
+Verification after the source changes:
+
+- `python -m pytest -q tests\test_stage5_orchestration.py tests\test_stage6_codex_execution.py tests\test_stage9_scoring.py tests\test_stage11_validation.py tests\test_prompt_rendering.py tests\test_matrix.py`
+  -> `119 passed`.
+- `python -m pytest -q` -> `177 passed`.
+
+The schema-enforced sanity repeat reused experiment directory
+`20260604T213736-ruleledger_v3_sanity-v3_sanity_measured_12_scoring`. A first
+pass in that directory confirmed the scoring change but still had unparsed
+judge prose. After adding the schema enforcement, a rerun produced parsed judge
+JSON for all four cells; a direct Stage 11 validation pass confirmed parsed
+judge JSON, report outputs, hidden isolation, and run artifacts after repairing
+a generated state-file encoding issue from the manual rerun setup.
+
+| Cell | Reasoning | Hidden Correctness | Judge | Minimality | Quality |
+|---|---:|---:|---:|---:|---:|
+| V3S0 | low | `0.465116` | `0.395000` | `1.000000` | `0.439458` |
+| V3S1 | medium | `0.860465` | `0.765000` | `1.000000` | `0.878533` |
+| V3S2 | high | `0.639535` | `0.699020` | `1.000000` | `0.753552` |
+| V3S3 | xhigh | `1.000000` | `0.987500` | `0.719500` | `0.988835` |
+
+This is the best v3 separation so far at the top end: xhigh solved all hidden
+categories, received a pass-level judge assessment, and remained highest even
+with a larger patch. The ladder is still not complete because medium
+outperformed high in this repeat. The next improvement should target the
+medium/high instability directly, likely by replacing or reinforcing the older
+chain cases with multi-view reasoning cases that reward systematic replay
+modeling rather than isolated fixture luck.

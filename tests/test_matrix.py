@@ -215,8 +215,12 @@ def test_ruleledger_v3_sanity_config_expands_to_reasoning_sweep() -> None:
         "hidden_correctness": 0.50,
         "hidden_parity": 0.15,
         "performance": 0.10,
-        "judge": 0.20,
-        "minimality": 0.05,
+        "judge": 0.22,
+        "minimality": 0.03,
+    }
+    assert runs[0]["scoring_minimality"] == {
+        "target_production_loc": 1200,
+        "penalty_window": 4000,
     }
     assert summary["total_runs"] == 4
     assert summary["by_root_reasoning"] == {"high": 1, "low": 1, "medium": 1, "xhigh": 1}

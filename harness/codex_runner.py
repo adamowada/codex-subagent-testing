@@ -120,6 +120,8 @@ def build_judge_command(codex_bin: str, run: Mapping[str, Any], prompt: str) -> 
         str(judge.get("sandbox", "read-only")),
         "--model",
         str(judge["model"]),
+        "--output-schema",
+        "judge_evidence/judge_output.schema.json",
         "-c",
         f"model_reasoning_effort={judge['reasoning']}",
         prompt,

@@ -13,6 +13,8 @@ from harness.orchestrator import (
     capture_diff,
     configure_worktree_git_excludes,
     initialize_git_baseline,
+    judge_phase_failed,
+    load_state,
     prepare_judge_evidence,
     run_hidden_tests,
     resolve_experiment_dir,
@@ -186,8 +188,36 @@ def test_judge_command_is_read_only_xhigh(runs: list[dict]) -> None:
 
     assert command[:4] == ["codex", "--ask-for-approval", "never", "exec"]
     assert "read-only" in command
+    schema_index = command.index("--output-schema")
+    assert command[schema_index + 1] == "judge_evidence/judge_output.schema.json"
     assert "model_reasoning_effort=xhigh" in command
     assert command[-1] == "judge prompt"
+
+
+def test_judge_phase_failed_when_final_response_is_not_json() -> None:
+    result = ProcessResult(
+        command=["codex"],
+        command_display=["codex"],
+        cwd=".",
+        started_at="2026-01-01T00:00:00+00:00",
+        finished_at="2026-01-01T00:00:01+00:00",
+        elapsed_seconds=1.0,
+        returncode=0,
+        timed_out=False,
+    )
+
+    assert judge_phase_failed(result, {"events_file_exists": True}, {"parsed": False})
+    assert not judge_phase_failed(result, {"events_file_exists": True}, {"parsed": True})
+
+
+def test_load_state_restores_missing_schema_version(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "state.json").write_text(json.dumps({"phases": {}}), encoding="utf-8")
+
+    state = load_state(run_dir)
+
+    assert state["schema_version"] == 1
 
 
 def test_usage_parser_reads_turn_completed_usage(tmp_path: Path) -> None:
@@ -301,7 +331,10 @@ def test_prepare_judge_evidence_copies_sanitized_artifacts(tmp_path: Path) -> No
     evidence = worktree / "judge_evidence"
     assert (evidence / "hidden-results.json").exists()
     assert (evidence / "public_py.log").read_text(encoding="utf-8") == "public output\n"
+    assert (evidence / "judge_output.schema.json").exists()
     assert (evidence / "evidence-manifest.json").exists()
+    manifest = json.loads((evidence / "evidence-manifest.json").read_text(encoding="utf-8"))
+    assert "judge_output.schema.json" in manifest["files"]
     assert not (evidence / "manifest.json").exists()
     assert not (evidence / "metadata.json").exists()
 
