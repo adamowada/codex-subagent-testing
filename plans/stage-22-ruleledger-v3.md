@@ -577,3 +577,55 @@ them. The current benchmark should keep these compatibility guards, but they
 do not by themselves strengthen adjacent reasoning separation. The next
 pressure pass should focus on deeper chain reasoning or scoring design rather
 than adding more concrete compatibility arithmetic.
+
+## Checkpoint: Corrected Merge-Record Pressure
+
+The next pass moved back toward the user's preferred ambiguity shape: support
+describes an issue class rather than a concrete arithmetic tail. The visible
+brief now notes that back-office corrections may target merge records
+themselves, that corrected merge records should replay lineage from the
+corrected source account, and that voiding such a correction voids the original
+merge fact rather than reverting to the mistaken source account.
+
+Two hidden cases exercise that behavior:
+
+- `v3.reasoning.corrected_merge_record_retargets_lineage`: before the void is
+  audit-visible, a corrected merge from `acct_cm_true` should cause the final
+  account to inherit the true source's usage, payment, seats, invoice, and
+  lineage while leaving the mistaken source separate.
+- `v3.evolution.voided_merge_correction_removes_lineage`: after the correction
+  void is audit-visible, the merge fact is removed and the report must show the
+  final, true-source, and mistaken-source accounts as separate rows.
+
+Verification after this pass:
+
+- `python -m pytest -q tests\test_stage22_ruleledger_v3.py` -> `15 passed`.
+- `python -m pytest -q` -> `172 passed`.
+- Starter hidden-runner baseline -> `30/102` points, `19/50` language cases, no
+  runner errors.
+
+The follow-up sanity run
+`20260604T193140-ruleledger_v3_sanity-v3_sanity_measured_10` completed all
+four implementations, judges, scoring, aggregate outputs, HTML report, PDF
+report, CSV, SQLite, and validation artifacts. Validation again warned that
+judge outputs were not parsed as strict JSON. The first launch was stranded by
+the outer shell timeout after low/medium implementation, then resumed cleanly
+from the same experiment directory for high/xhigh, judging, and scoring.
+
+| Cell | Reasoning | Hidden Points | Hidden Executions | Corrected-Merge Cases | Quality |
+|---|---:|---:|---:|---|---:|
+| V3S0 | low | `61/102` | `34/50` | failed retargeted lineage, passed voided merge correction | `0.484883` |
+| V3S1 | medium | `92/102` | `46/50` | passed all four language executions | `0.741861` |
+| V3S2 | high | `71/102` | `38/50` | passed all four language executions | `0.619768` |
+| V3S3 | xhigh | `81/102` | `42/50` | passed all four language executions | `0.633126` |
+
+This pass improved low-vs-rest separation: low missed the retargeted merge
+lineage case that medium/high/xhigh solved. It still did not produce a clean
+adjacent ladder. Medium again solved the older bitemporal chain family while
+high and xhigh missed several of those cases; xhigh did outperform high by
+passing the architecture/runtime localization checks, but its larger patch was
+heavily penalized by minimality. The next hypothesis should address either the
+stochastic old-chain family or the scoring design. In particular, stronger
+multi-view cases that require the same ledger to satisfy summary, report, and
+architecture expectations may reward xhigh's broader synthesis better than
+adding another isolated fixture.

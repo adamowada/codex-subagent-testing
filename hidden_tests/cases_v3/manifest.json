@@ -16,9 +16,9 @@
       "sha256": "196151d660df824b66027ce5c2133b9e53a82b15eb7a01cd49be21fb5a7a430d"
     },
     "evolution.json": {
-      "case_count": 5,
-      "points": 10.5,
-      "sha256": "c9bba9f8aa78e0c71c26fa87841e066a6b12eb0073c754541ada52fab30a7f29"
+      "case_count": 6,
+      "points": 13.5,
+      "sha256": "d934fae19c805b94caf2e48830382b1908533561c0dde9716874197740d8417f"
     },
     "localization.json": {
       "case_count": 2,
@@ -41,9 +41,9 @@
       "sha256": "d05955db0fd25945ba1b2c9f8c494a339bcbd3e7814562b813cbc19bdbea0e2b"
     },
     "reasoning_ladder.json": {
-      "case_count": 4,
-      "points": 9.0,
-      "sha256": "191cd79046d537b9703ca7076a2484d713b4ff9bb06c2f155e090c598c88a0c5"
+      "case_count": 5,
+      "points": 12.0,
+      "sha256": "a25da07377c4d1402da8f56e71612f09859b0ca830c6993e3f719ec2eaf9b9e3"
     }
   },
   "generated_at": "2026-05-29T00:00:00.000Z",

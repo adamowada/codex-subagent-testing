@@ -82,6 +82,10 @@ in ways that are not all enumerated in the public examples.
   corrected fact. The support team uses this to retract a bad correction rather
   than to resurrect whichever value happened to be present before the
   correction was recorded.
+- Back-office corrections may also target merge records. A corrected merge
+  should replay lineage from the corrected source account; if that correction
+  is voided, the original merge fact is voided rather than falling back to the
+  mistaken source account.
 - Finance has seen high-seat downgrades drift by a cent when implementations
   use floating-point prorations. V2's exact millisecond proration and
   half-away-from-zero rounding apply equally to credits, charges, upgrades, and

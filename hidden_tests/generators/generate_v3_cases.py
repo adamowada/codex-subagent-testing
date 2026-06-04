@@ -357,6 +357,119 @@ def bitemporal_merge_chain_events() -> list[dict[str, Any]]:
     ]
 
 
+def corrected_merge_record_events() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "evt_cm_final_open",
+            "account_id": "acct_cm_final",
+            "type": "account_opened",
+            "timestamp": "2026-07-01T00:00:00Z",
+            "plan": "starter",
+            "quantity": 1,
+        },
+        {
+            "id": "evt_cm_wrong_open",
+            "account_id": "acct_cm_wrong",
+            "type": "account_opened",
+            "timestamp": "2026-07-01T00:00:01Z",
+            "plan": "pro",
+            "quantity": 2,
+        },
+        {
+            "id": "evt_cm_true_open",
+            "account_id": "acct_cm_true",
+            "type": "account_opened",
+            "timestamp": "2026-07-01T00:00:02Z",
+            "plan": "enterprise",
+            "quantity": 3,
+        },
+        {
+            "id": "evt_cm_final_currency",
+            "account_id": "acct_cm_final",
+            "type": "payment_succeeded",
+            "timestamp": "2026-07-01T01:00:00Z",
+            "amount_cents": 0,
+            "currency": "usd",
+        },
+        {
+            "id": "evt_cm_wrong_usage",
+            "account_id": "acct_cm_wrong",
+            "type": "usage_recorded",
+            "timestamp": "2026-07-02T00:00:00Z",
+            "usage": 5,
+        },
+        {
+            "id": "evt_cm_wrong_payment",
+            "account_id": "acct_cm_wrong",
+            "type": "payment_succeeded",
+            "timestamp": "2026-07-02T01:00:00Z",
+            "amount_cents": 1200,
+            "currency": "usd",
+            "invoice_id": "inv_cm_wrong",
+            "period_start": "2026-07-01T00:00:00Z",
+            "period_end": "2026-08-01T00:00:00Z",
+        },
+        {
+            "id": "evt_cm_true_usage",
+            "account_id": "acct_cm_true",
+            "type": "usage_recorded",
+            "timestamp": "2026-07-02T02:00:00Z",
+            "usage": 17,
+        },
+        {
+            "id": "evt_cm_true_payment",
+            "account_id": "acct_cm_true",
+            "type": "payment_succeeded",
+            "timestamp": "2026-07-02T03:00:00Z",
+            "amount_cents": 19900,
+            "currency": "usd",
+            "invoice_id": "inv_cm_true",
+            "period_start": "2026-07-01T00:00:00Z",
+            "period_end": "2026-08-01T00:00:00Z",
+        },
+        {
+            "id": "evt_cm_merge_wrong",
+            "account_id": "acct_cm_final",
+            "type": "account_merged",
+            "timestamp": "2026-07-03T00:00:00Z",
+            "merge_from_account_id": "acct_cm_wrong",
+        },
+        {
+            "id": "evt_cm_final_usage",
+            "account_id": "acct_cm_final",
+            "type": "usage_recorded",
+            "timestamp": "2026-07-04T00:00:00Z",
+            "usage": 2,
+        },
+        {
+            "id": "evt_cm_final_seat_delta",
+            "account_id": "acct_cm_final",
+            "type": "seat_delta_recorded",
+            "timestamp": "2026-07-04T01:00:00Z",
+            "seat_delta": 1,
+        },
+        {
+            "id": "evt_cm_correct_merge",
+            "account_id": "acct_cm_final",
+            "type": "event_corrected",
+            "timestamp": "2026-07-05T00:00:00Z",
+            "recorded_at": "2026-07-05T00:00:00Z",
+            "effective_at": "2026-07-03T00:00:00Z",
+            "correction_of": "evt_cm_merge_wrong",
+            "merge_from_account_id": "acct_cm_true",
+        },
+        {
+            "id": "evt_cm_void_merge_correction",
+            "account_id": "acct_cm_final",
+            "type": "event_voided",
+            "timestamp": "2026-07-06T00:00:00Z",
+            "recorded_at": "2026-07-06T00:00:00Z",
+            "effective_at": "2026-07-03T00:00:00Z",
+            "voided_event_id": "evt_cm_correct_merge",
+        },
+    ]
+
+
 def reasoning_ladder_cases() -> list[dict[str, Any]]:
     raw_events = [
         {
@@ -457,6 +570,18 @@ def reasoning_ladder_cases() -> list[dict[str, Any]]:
                 "audit_as_of": "2026-06-09T12:00:00Z",
             },
             points=2.5,
+        ),
+        evaluated_case(
+            "v3.reasoning.corrected_merge_record_retargets_lineage",
+            "fail_to_pass",
+            ["BT-004", "BT-005", "CV-002", "MG-005"],
+            "v2_reduce_and_summarize",
+            {
+                "raw_events": corrected_merge_record_events(),
+                "business_as_of": "2026-07-07T00:00:00Z",
+                "audit_as_of": "2026-07-05T12:00:00Z",
+            },
+            points=3.0,
         ),
     ]
 
@@ -677,6 +802,18 @@ def evolution_cases() -> list[dict[str, Any]]:
                 "raw_events": bitemporal_merge_chain_events(),
                 "business_as_of": "2026-06-13T00:00:00Z",
                 "audit_as_of": "2026-06-13T00:00:00Z",
+            },
+            points=3.0,
+        ),
+        evaluated_case(
+            "v3.evolution.voided_merge_correction_removes_lineage",
+            "evolution",
+            ["BT-004", "CV-002", "MG-005", "RP-001"],
+            "v2_parity",
+            {
+                "raw_events": corrected_merge_record_events(),
+                "business_as_of": "2026-07-07T00:00:00Z",
+                "audit_as_of": "2026-07-06T12:00:00Z",
             },
             points=3.0,
         ),

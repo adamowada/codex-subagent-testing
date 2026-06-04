@@ -56,6 +56,7 @@ def test_v3_template_exposes_issue_and_architecture_docs() -> None:
     assert "source account after an account merge" in issue
     assert "separate business and audit cutoffs" in issue
     assert "void references a correction event" in issue
+    assert "Back-office corrections may also target merge records" in issue
     assert "high-seat downgrades" in issue
     assert "four-digit years before 0100" in issue
     assert "src/replay.ts" in architecture
@@ -298,6 +299,37 @@ def test_v3_hidden_cases_include_bitemporal_merge_chain_pressure() -> None:
     assert after_void["expected"]["summaries"][0]["seats"] == 5
     assert after_void["expected"]["summaries"][0]["totalPaidCents"] == 4900
     assert "acct_bt_source|acct_bt_mid" in after_void["expected"]["report"]
+
+
+def test_v3_hidden_cases_include_corrected_merge_record_pressure() -> None:
+    _, cases = load_cases(CASES_V3_DIR)
+    cases_by_id = {case["id"]: case for case in cases}
+
+    after_correction = cases_by_id["v3.reasoning.corrected_merge_record_retargets_lineage"]
+    assert after_correction["operation"] == "v2_reduce_and_summarize"
+    assert after_correction["input"]["audit_as_of"] == "2026-07-05T12:00:00Z"
+    assert after_correction["expected"][0]["accountId"] == "acct_cm_final"
+    assert after_correction["expected"][0]["usage"] == 19
+    assert after_correction["expected"][0]["seats"] == 5
+    assert after_correction["expected"][0]["totalPaidCents"] == 19900
+    assert after_correction["expected"][0]["invoiceIds"] == ["inv_cm_true"]
+    assert after_correction["expected"][0]["mergedFromAccountIds"] == ["acct_cm_true"]
+    assert after_correction["expected"][1]["accountId"] == "acct_cm_wrong"
+
+    after_void = cases_by_id["v3.evolution.voided_merge_correction_removes_lineage"]
+    assert after_void["operation"] == "v2_parity"
+    assert after_void["input"]["audit_as_of"] == "2026-07-06T12:00:00Z"
+    assert [row["accountId"] for row in after_void["expected"]["summaries"]] == [
+        "acct_cm_final",
+        "acct_cm_true",
+        "acct_cm_wrong",
+    ]
+    assert after_void["expected"]["summaries"][0]["usage"] == 2
+    assert after_void["expected"]["summaries"][0]["seats"] == 2
+    assert after_void["expected"]["summaries"][0]["totalPaidCents"] == 0
+    assert after_void["expected"]["summaries"][0]["mergedFromAccountIds"] == []
+    assert "acct_cm_final,active,starter,0,USD,2,2" in after_void["expected"]["report"]
+    assert "acct_cm_true,active,enterprise,19900,USD,3,17" in after_void["expected"]["report"]
 
 
 def test_v3_performance_case_is_large_enough_to_exercise_algorithmic_shape() -> None:

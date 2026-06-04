@@ -538,6 +538,194 @@
         "MG-005",
         "PY-001"
       ]
+    },
+    {
+      "category": "fail_to_pass",
+      "expected": [
+        {
+          "accountId": "acct_cm_final",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": "USD",
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "invoiceIds": [
+            "inv_cm_true"
+          ],
+          "lastEventAt": "2026-07-04T01:00:00.000Z",
+          "lastInvoiceId": "inv_cm_true",
+          "lastPeriodEnd": "2026-08-01T00:00:00.000Z",
+          "lastPeriodStart": "2026-07-01T00:00:00.000Z",
+          "mergedFromAccountIds": [
+            "acct_cm_true"
+          ],
+          "overLimit": false,
+          "plan": "starter",
+          "seats": 5,
+          "status": "active",
+          "totalPaidCents": 19900,
+          "usage": 19,
+          "usageLimit": 1000
+        },
+        {
+          "accountId": "acct_cm_wrong",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": "USD",
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [
+            "inv_cm_wrong"
+          ],
+          "lastEventAt": "2026-07-02T01:00:00.000Z",
+          "lastInvoiceId": "inv_cm_wrong",
+          "lastPeriodEnd": "2026-08-01T00:00:00.000Z",
+          "lastPeriodStart": "2026-07-01T00:00:00.000Z",
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 2,
+          "status": "active",
+          "totalPaidCents": 1200,
+          "usage": 5,
+          "usageLimit": 10000
+        }
+      ],
+      "id": "v3.reasoning.corrected_merge_record_retargets_lineage",
+      "input": {
+        "audit_as_of": "2026-07-05T12:00:00Z",
+        "business_as_of": "2026-07-07T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_cm_final",
+            "id": "evt_cm_final_open",
+            "plan": "starter",
+            "quantity": 1,
+            "timestamp": "2026-07-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_cm_wrong",
+            "id": "evt_cm_wrong_open",
+            "plan": "pro",
+            "quantity": 2,
+            "timestamp": "2026-07-01T00:00:01Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_cm_true",
+            "id": "evt_cm_true_open",
+            "plan": "enterprise",
+            "quantity": 3,
+            "timestamp": "2026-07-01T00:00:02Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_cm_final",
+            "amount_cents": 0,
+            "currency": "usd",
+            "id": "evt_cm_final_currency",
+            "timestamp": "2026-07-01T01:00:00Z",
+            "type": "payment_succeeded"
+          },
+          {
+            "account_id": "acct_cm_wrong",
+            "id": "evt_cm_wrong_usage",
+            "timestamp": "2026-07-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 5
+          },
+          {
+            "account_id": "acct_cm_wrong",
+            "amount_cents": 1200,
+            "currency": "usd",
+            "id": "evt_cm_wrong_payment",
+            "invoice_id": "inv_cm_wrong",
+            "period_end": "2026-08-01T00:00:00Z",
+            "period_start": "2026-07-01T00:00:00Z",
+            "timestamp": "2026-07-02T01:00:00Z",
+            "type": "payment_succeeded"
+          },
+          {
+            "account_id": "acct_cm_true",
+            "id": "evt_cm_true_usage",
+            "timestamp": "2026-07-02T02:00:00Z",
+            "type": "usage_recorded",
+            "usage": 17
+          },
+          {
+            "account_id": "acct_cm_true",
+            "amount_cents": 19900,
+            "currency": "usd",
+            "id": "evt_cm_true_payment",
+            "invoice_id": "inv_cm_true",
+            "period_end": "2026-08-01T00:00:00Z",
+            "period_start": "2026-07-01T00:00:00Z",
+            "timestamp": "2026-07-02T03:00:00Z",
+            "type": "payment_succeeded"
+          },
+          {
+            "account_id": "acct_cm_final",
+            "id": "evt_cm_merge_wrong",
+            "merge_from_account_id": "acct_cm_wrong",
+            "timestamp": "2026-07-03T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_cm_final",
+            "id": "evt_cm_final_usage",
+            "timestamp": "2026-07-04T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 2
+          },
+          {
+            "account_id": "acct_cm_final",
+            "id": "evt_cm_final_seat_delta",
+            "seat_delta": 1,
+            "timestamp": "2026-07-04T01:00:00Z",
+            "type": "seat_delta_recorded"
+          },
+          {
+            "account_id": "acct_cm_final",
+            "correction_of": "evt_cm_merge_wrong",
+            "effective_at": "2026-07-03T00:00:00Z",
+            "id": "evt_cm_correct_merge",
+            "merge_from_account_id": "acct_cm_true",
+            "recorded_at": "2026-07-05T00:00:00Z",
+            "timestamp": "2026-07-05T00:00:00Z",
+            "type": "event_corrected"
+          },
+          {
+            "account_id": "acct_cm_final",
+            "effective_at": "2026-07-03T00:00:00Z",
+            "id": "evt_cm_void_merge_correction",
+            "recorded_at": "2026-07-06T00:00:00Z",
+            "timestamp": "2026-07-06T00:00:00Z",
+            "type": "event_voided",
+            "voided_event_id": "evt_cm_correct_merge"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 3.0,
+      "rule_ids": [
+        "BT-004",
+        "BT-005",
+        "CV-002",
+        "MG-005"
+      ]
     }
   ],
   "generated_at": "2026-05-29T00:00:00.000Z",
