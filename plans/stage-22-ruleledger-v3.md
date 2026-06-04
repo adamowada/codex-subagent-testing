@@ -376,3 +376,59 @@ cross-language ordering, and report/billing effects after merge correction.
 This should be done by changing the visible v3 issue brief, generator/oracle,
 and generated cases together, then rerunning the one-repeat sanity sweep before
 another multi-repeat check.
+
+## Checkpoint: Support-Escalation Ambiguity Pass
+
+The next hardening pass added visible "Recent Support Escalations" to the v3
+issue brief and generated three fair hidden implications:
+
+- `v3.compat.invalid_optional_period_end`: optional invoice period timestamps
+  like `2026-02-30T00:00:00Z` must fail normalization rather than host-date
+  rollover.
+- `v3.compat.report_lexical_ordering`: report rows sort by plain deterministic
+  string order, not locale-aware or natural numeric collation.
+- `v3.parity.merge_source_correction_report`: a correction recorded on a source
+  account after merge still targets the original source event and updates the
+  canonical destination report.
+
+The generated v3 suite now has 36 language cases and 67 possible points. A
+baseline hidden-runner pass against the starter template completed without
+runner errors and scored `23/67` points (`15/36` language cases), so the new
+cases are executable and do not make the starter accidentally strong.
+
+Fresh measured run
+`20260604T152750-ruleledger_v3_sanity-v3_sanity_measured_07` completed all
+implementations, judges, scores, aggregate outputs, HTML report, PDF report,
+CSV, SQLite, and validation artifacts. Validation warned only that every judge
+final response failed strict JSON parsing and therefore contributed zero judge
+score; hidden-test isolation, run artifacts, resume compatibility, and report
+outputs passed validation.
+
+| Cell | Reasoning | Hidden Points | Hidden Executions | Main Hidden Misses | Quality |
+|---|---:|---:|---:|---|---:|
+| V3S0 | low | `32/67` | `21/36` | exact proration, chain merge/correction, localization, merge-source correction, performance, audit views | `0.394902` |
+| V3S1 | medium | `55/67` | `31/36` | TypeScript exact proration and architecture/runtime ownership | `0.682353` |
+| V3S2 | high | `50/67` | `29/36` | TypeScript exact proration, chain merge/correction, architecture/runtime ownership | `0.633333` |
+| V3S3 | xhigh | `67/67` | `36/36` | none | `0.758813` |
+
+This pass materially improved top-end separation: xhigh solved every hidden
+case and was the only cell to satisfy both domain behavior and module-ownership
+pressure. It also showed the new support-style cases are fair but not by
+themselves sufficient for medium/high separation: all non-low runs solved the
+invalid-date, lexical-ordering, and merge-source-correction cases, while low
+missed only the merge-source-correction support case among the new additions.
+
+The calibration remains incomplete for the original adjacent-level goal.
+Medium beat high in this single repeat because medium solved the evolution
+chain case and high did not. The current evidence supports a useful split of
+low vs medium/high and medium/high vs xhigh, but not a stable monotonic
+low/medium/high/xhigh ladder. Next hypotheses:
+
+- Add another evolution or bitemporal case that rewards full chain reasoning
+  without being as easy for medium to saturate, possibly involving audit-visible
+  correction/void operations across a merge chain and report/proration impact.
+- Add an exact-arithmetic or TypeScript-specific compatibility case that is
+  visible through the billing docs but hard to patch with `number` arithmetic.
+- Consider weighting or category design so architecture/localization gains
+  from xhigh remain visible without letting medium/high behavioral misses be
+  masked by broad pass-to-pass coverage.

@@ -59,3 +59,16 @@ Support escalations for v3 are intentionally issue-style rather than a complete
 truth table. Expect future views to combine audit cutoffs, business-effective
 cutoffs, duplicate event IDs, corrections, voids, account merges, and reporting
 in ways that are not all enumerated in the public examples.
+
+## Recent Support Escalations
+
+- A malformed optional invoice period timestamp should fail normalization. Do
+  not let host date libraries silently roll values like a February 30 period end
+  into a different valid date.
+- CSV report row order must be byte-stable across languages and hosts. Sort
+  account IDs by plain deterministic string order, not by locale-aware collation
+  or natural numeric grouping.
+- Corrections and voids recorded against a source account after an account merge
+  still target the original event. If the corrected or voided event contributes
+  value that the destination inherited through the merge, the destination view
+  and report row should reflect the visible operation.

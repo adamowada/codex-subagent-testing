@@ -50,6 +50,10 @@ def test_v3_template_exposes_issue_and_architecture_docs() -> None:
     assert "docs/ruleledger_v3_architecture.md" in readme
     assert "Preserve all v1 and v2 public APIs" in issue
     assert "near-linear account aggregation" in issue
+    assert "Recent Support Escalations" in issue
+    assert "malformed optional invoice period timestamp" in issue
+    assert "plain deterministic string order" in issue
+    assert "source account after an account merge" in issue
     assert "src/replay.ts" in architecture
     assert "ruleledger/replay.py" in architecture
 
@@ -189,6 +193,48 @@ def test_v3_hidden_cases_include_large_quantity_proration_pressure() -> None:
     assert proration_cases[0]["operation"] == "v2_calculate_proration"
     assert proration_cases[0]["input"]["quantity"] > 100_000_000_000
     assert proration_cases[0]["expected"]["newChargeCents"] == 474_193_365_475_248
+
+
+def test_v3_hidden_cases_include_support_escalation_pressure() -> None:
+    _, cases = load_cases(CASES_V3_DIR)
+    cases_by_id = {case["id"]: case for case in cases}
+
+    invalid_period = cases_by_id["v3.compat.invalid_optional_period_end"]
+    assert invalid_period["operation"] == "normalize_event"
+    assert invalid_period["expected"]["ok"] is False
+    assert "invalid_period_end" in invalid_period["expected"]["issues"]
+
+    lexical_report = cases_by_id["v3.compat.report_lexical_ordering"]
+    rows = lexical_report["expected"].splitlines()
+    account_ids = [row.split(",", maxsplit=1)[0] for row in rows[1:]]
+    assert account_ids == ["acct_10", "acct_2", "acct_A", "acct_Z", "acct_a"]
+
+    merge_correction = cases_by_id["v3.parity.merge_source_correction_report"]
+    assert merge_correction["operation"] == "v2_parity"
+    assert merge_correction["expected"]["summaries"] == [
+        {
+            "accountId": "acct_support_dest",
+            "status": "active",
+            "plan": "starter",
+            "features": ["dashboard", "exports"],
+            "usage": 8,
+            "usageLimit": 1000,
+            "overLimit": False,
+            "totalPaidCents": 4900,
+            "currency": "USD",
+            "seats": 3,
+            "couponCode": None,
+            "couponActive": False,
+            "invoiceIds": ["inv_support_corrected"],
+            "lastInvoiceId": "inv_support_corrected",
+            "lastPeriodStart": "2026-05-01T00:00:00.000Z",
+            "lastPeriodEnd": "2026-06-01T00:00:00.000Z",
+            "mergedFromAccountIds": ["acct_support_source"],
+            "closedAt": None,
+            "lastEventAt": "2026-05-03T00:00:00.000Z",
+        }
+    ]
+    assert "inv_support_corrected" in merge_correction["expected"]["report"]
 
 
 def test_v3_performance_case_is_large_enough_to_exercise_algorithmic_shape() -> None:

@@ -87,6 +87,17 @@ def compatibility_cases() -> list[dict[str, Any]]:
         "period_start": "2026-04-01T00:00:00Z",
         "period_end": "2026-05-01T00:00:00Z",
     }
+    invalid_period_event = {
+        "id": "evt_v3_compat_bad_period",
+        "account_id": "acct_v3_bad_period",
+        "type": "invoice_issued",
+        "timestamp": "2026-02-15T00:00:00Z",
+        "amount_cents": 19900,
+        "currency": "usd",
+        "invoice_id": "inv_bad_period",
+        "period_start": "2026-02-01T00:00:00Z",
+        "period_end": "2026-02-30T00:00:00Z",
+    }
     summary = {
         "accountId": "acct_v3_report",
         "status": "active",
@@ -108,6 +119,15 @@ def compatibility_cases() -> list[dict[str, Any]]:
         "closedAt": None,
         "lastEventAt": "2026-04-01T00:00:00.000Z",
     }
+    lexical_summaries = [
+        {
+            **summary,
+            "accountId": account_id,
+            "lastInvoiceId": f"inv_{account_id[-1]}",
+            "invoiceIds": [f"inv_{account_id[-1]}"],
+        }
+        for account_id in ["acct_a", "acct_Z", "acct_2", "acct_10", "acct_A"]
+    ]
 
     return [
         evaluated_case(
@@ -119,12 +139,28 @@ def compatibility_cases() -> list[dict[str, Any]]:
             points=1.0,
         ),
         evaluated_case(
+            "v3.compat.invalid_optional_period_end",
+            "pass_to_pass",
+            ["BT-001", "BL-002", "PY-001"],
+            "normalize_event",
+            {"raw_event": invalid_period_event},
+            points=1.5,
+        ),
+        evaluated_case(
             "v3.compat.report_csv_escaping",
             "pass_to_pass",
             ["RP-001", "RP-006", "PY-001"],
             "v2_export_report",
             {"summaries": [summary]},
             points=1.0,
+        ),
+        evaluated_case(
+            "v3.compat.report_lexical_ordering",
+            "pass_to_pass",
+            ["RP-001", "RP-006", "PY-001"],
+            "v2_export_report",
+            {"summaries": lexical_summaries},
+            points=1.5,
         ),
         evaluated_case(
             "v3.compat.proration_large_quantity_exactness",
@@ -710,6 +746,71 @@ def parity_cases() -> list[dict[str, Any]]:
             "period_end": "2026-04-01T00:00:00Z",
         },
     ]
+    merge_source_events = [
+        {
+            "id": "evt_support_dest_open",
+            "account_id": "acct_support_dest",
+            "type": "account_opened",
+            "timestamp": "2026-05-01T00:00:00Z",
+            "plan": "starter",
+            "quantity": 1,
+        },
+        {
+            "id": "evt_support_source_open",
+            "account_id": "acct_support_source",
+            "type": "account_opened",
+            "timestamp": "2026-05-01T00:00:00Z",
+            "plan": "pro",
+            "quantity": 2,
+        },
+        {
+            "id": "evt_support_dest_currency",
+            "account_id": "acct_support_dest",
+            "type": "payment_succeeded",
+            "timestamp": "2026-05-01T06:00:00Z",
+            "amount_cents": 0,
+            "currency": "usd",
+        },
+        {
+            "id": "evt_support_source_payment",
+            "account_id": "acct_support_source",
+            "type": "payment_succeeded",
+            "timestamp": "2026-05-02T00:00:00Z",
+            "amount_cents": 1200,
+            "currency": "usd",
+            "invoice_id": "inv_support_original",
+            "period_start": "2026-05-01T00:00:00Z",
+            "period_end": "2026-06-01T00:00:00Z",
+        },
+        {
+            "id": "evt_support_source_usage",
+            "account_id": "acct_support_source",
+            "type": "usage_recorded",
+            "timestamp": "2026-05-02T12:00:00Z",
+            "usage": 8,
+        },
+        {
+            "id": "evt_support_merge",
+            "account_id": "acct_support_dest",
+            "type": "account_merged",
+            "timestamp": "2026-05-03T00:00:00Z",
+            "merge_from_account_id": "acct_support_source",
+        },
+        {
+            "id": "evt_support_correct_payment",
+            "account_id": "acct_support_source",
+            "type": "event_corrected",
+            "timestamp": "2026-05-04T00:00:00Z",
+            "recorded_at": "2026-05-04T00:00:00Z",
+            "effective_at": "2026-05-02T00:00:00Z",
+            "correction_of": "evt_support_source_payment",
+            "amount_cents": 4900,
+            "currency": "usd",
+            "invoice_id": "inv_support_corrected",
+            "period_start": "2026-05-01T00:00:00Z",
+            "period_end": "2026-06-01T00:00:00Z",
+        },
+    ]
     return [
         evaluated_case(
             "v3.parity.summary_and_report",
@@ -718,6 +819,18 @@ def parity_cases() -> list[dict[str, Any]]:
             "v2_parity",
             {"raw_events": raw_events, "as_of": "2026-03-15T00:00:00Z"},
             points=1.0,
+        ),
+        evaluated_case(
+            "v3.parity.merge_source_correction_report",
+            "parity",
+            ["CV-002", "MG-002", "MG-005", "RP-001", "PY-001"],
+            "v2_parity",
+            {
+                "raw_events": merge_source_events,
+                "business_as_of": "2026-05-05T00:00:00Z",
+                "audit_as_of": "2026-05-05T00:00:00Z",
+            },
+            points=2.0,
         )
     ]
 
