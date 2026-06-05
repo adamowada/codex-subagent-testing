@@ -820,3 +820,48 @@ explicitly rewards category saturation and judge-confirmed completeness. If
 xhigh remains consistently isolated at the top while lower levels remain noisy,
 the benchmark may be differentiating "complete reasoning" from partial patching
 but not reliably ordering the three partial-reasoning modes.
+
+## Checkpoint: Ambiguous Brief Full Repeat
+
+The consistency run
+`20260605T044407-ruleledger_v3_full-v3_full_measured_03_ambiguous_brief`
+completed all twelve implementations, all twelve schema-enforced judges,
+scoring, aggregate outputs, HTML report, PDF report, CSV, SQLite, and Stage 11
+validation. Implementation and judge phases both completed with `12/12 ok, 0
+failed`, and final validation passed.
+
+| Reasoning | Quality Mean | Quality Range | Hidden Correctness Mean | Judge Mean |
+|---|---:|---:|---:|---:|
+| low | `0.610440` | `0.347031`-`0.835490` | `0.533981` | `0.530833` |
+| medium | `0.889757` | `0.865584`-`0.916938` | `0.885113` | `0.760000` |
+| high | `0.756127` | `0.690199`-`0.883316` | `0.642395` | `0.724167` |
+| xhigh | `0.818525` | `0.735877`-`0.957343` | `0.744337` | `0.799167` |
+
+This disproves the optimistic read from the preceding single-run sanity pass.
+The ambiguous brief does not yet produce a stable reasoning ladder. Medium won
+the repeat set and was the most consistent cell. Xhigh had the best single run
+(`0.957343` quality, `0.985437` hidden correctness), but its other two repeats
+fell back into the same partial-replay failure cluster as high.
+
+The hidden category means explain the inversion:
+
+- Medium saturated `evolution`, `fail_to_pass`, `metamorphic`, `parity`, and
+  `performance` in all three repeats. Its remaining misses were mainly
+  localization and pass-to-pass compatibility tails.
+- High had one medium-like repeat but missed the deeper evolution, metamorphic,
+  and reasoning-chain family in two of three repeats.
+- Xhigh had one near-complete repeat, but two repeats missed the chain
+  merge/correction, multi-view replay, and composed correction/void family.
+- Low remained clearly separated from the rest, but had one unusually strong
+  partial patch.
+
+The next benchmark change should not add another isolated fixture or rely only
+on category-saturation scoring. Those would likely preserve the medium plateau:
+the medium runs already solved most behavioral categories consistently. The
+next pass should make the visible task less checklist-shaped and more like a
+messy support escalation: one or two narrative incident threads whose symptoms
+span summaries, CSV reports, parity digests, and cross-language architecture,
+without listing every underlying rule family as a bullet. Hidden cases should
+then emphasize whether the implementation discovers a canonical replay model
+and preserves the intended module boundary, not whether it patched the already
+named domains one at a time.
