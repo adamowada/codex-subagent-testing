@@ -442,7 +442,7 @@
         "python"
       ],
       "operation": "v2_parity",
-      "points": 2.5,
+      "points": 1.5,
       "rule_ids": [
         "BT-004",
         "CV-002",

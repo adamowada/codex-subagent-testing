@@ -976,3 +976,77 @@ reporting, and digest stability separately, while preserving a final integrated
 case for synthesis. The visible brief should still be narrative, but the hidden
 suite needs enough partial-credit surface to distinguish "found the right
 architecture but missed one semantic edge" from "patched one runtime symptom."
+
+## Checkpoint: Diagnostic Incident and Architecture Reweighting
+
+The next pass split the integrated incident fixture into staged diagnostic
+checks instead of relying on one all-or-nothing final incident. The same
+month-close/backfill ledger now has earlier summary checkpoints for lineage
+before corrections, invoice correction after audit visibility, voided usage
+after correction voids, and the final account state before the existing final
+parity/report/metamorphic/performance checks. The archive-account timestamp
+edge remains in the month-close summary, but the earlier staged checks omit it
+so the oracle can distinguish replay-lineage failures from archive-timestamp
+failures.
+
+This pass also reweighted the two localization contracts:
+
+- `v3.localization.module_ownership`: `3.0` -> `7.0` points.
+- `v3.localization.runtime_compatibility_boundary`: `2.0` -> `5.0` points.
+
+That change is intentionally aligned with the public SWE-benchmark lessons:
+hard software benchmarks should reward repo-scale localization, durable module
+boundaries, and maintainable fixes, not only fixture-by-fixture output matching.
+
+Verification after this pass:
+
+- `python -m pytest -q tests\test_stage22_ruleledger_v3.py` -> `17 passed`.
+- `python -m pytest -q tests\test_prompt_rendering.py` -> `22 passed`.
+- `python -m pytest -q` -> `179 passed`.
+
+The sanity run
+`20260605T075802-ruleledger_v3_sanity-v3_sanity_measured_17_diagnostic_architecture`
+completed all four implementations, all four schema-enforced judges, scoring,
+aggregate outputs, HTML report, PDF report, CSV, SQLite, and Stage 11
+validation. Implementation and judge phases both completed with `4/4 ok, 0
+failed`, and final validation passed.
+
+| Cell | Reasoning | Hidden Correctness | Hidden Tests | Judge | Minimality | Quality |
+|---|---:|---:|---:|---:|---:|---:|
+| V3S0 | low | `0.395833` | `0.424343` | `0.496131` | `1.000000` | `0.503732` |
+| V3S1 | medium | `0.701389` | `0.731701` | `0.697500` | `0.919000` | `0.698381` |
+| V3S2 | high | `0.527778` | `0.551922` | `0.650000` | `0.812750` | `0.597938` |
+| V3S3 | xhigh | `1.000000` | `1.000000` | `0.982500` | `0.738500` | `0.988305` |
+
+This was the strongest single-run xhigh signal so far: xhigh passed all `74`
+hidden language executions and earned full hidden points, while low/medium/high
+remained separated below it.
+
+The follow-up consistency run
+`20260605T083601-ruleledger_v3_full-v3_full_measured_04_diagnostic_architecture`
+completed all twelve implementations, all twelve schema-enforced judges,
+scoring, aggregate outputs, HTML report, PDF report, CSV, SQLite, and Stage 11
+validation. Implementation and judge phases both completed with `12/12 ok, 0
+failed`, and final validation passed.
+
+| Reasoning | Quality Mean | Quality Range | Hidden Correctness Mean | Judge Mean |
+|---|---:|---:|---:|---:|
+| low | `0.387463` | `0.344917`-`0.448239` | `0.335648` | `0.370000` |
+| medium | `0.915884` | `0.883936`-`0.939197` | `0.925926` | `0.864167` |
+| high | `0.754673` | `0.531262`-`0.959582` | `0.802083` | `0.489167` |
+| xhigh | `0.735043` | `0.608272`-`0.968476` | `0.708333` | `0.750000` |
+
+This repeat disproves the single-run optimism. The staged incident and
+architecture reweighting can elicit a perfect xhigh run, but medium is still
+the most consistent cell and wins the mean. High and xhigh are both high
+variance: each produced near-perfect or perfect implementations in one repeat,
+but each also fell into the partial replay-family failure cluster.
+
+The current benchmark is therefore not done. It cleanly separates low from the
+rest and it can expose xhigh-style complete synthesis, but it does not yet make
+that synthesis reliable across repeats. The next hypothesis should focus less
+on adding hidden bulk and more on reducing stochastic broad-refactor misses:
+make the visible incident ask agents to construct and validate one canonical
+replay model across staged views, or add a visible self-check protocol that
+rewards higher-reasoning agents for reconciling summaries, CSV reports, parity,
+digests, and module ownership before finalizing.

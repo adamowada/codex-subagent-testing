@@ -231259,7 +231259,7 @@
         "python"
       ],
       "operation": "v2_performance_digest",
-      "points": 3.5,
+      "points": 2.5,
       "rule_ids": [
         "BT-004",
         "CV-002",

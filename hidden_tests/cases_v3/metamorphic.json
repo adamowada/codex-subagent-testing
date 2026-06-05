@@ -1671,7 +1671,7 @@
         "python"
       ],
       "operation": "v2_metamorphic",
-      "points": 3.0,
+      "points": 2.0,
       "rule_ids": [
         "OR-001",
         "OR-002",

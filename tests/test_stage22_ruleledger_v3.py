@@ -373,6 +373,31 @@ def test_v3_hidden_cases_include_integrated_incident_pressure() -> None:
     _, cases = load_cases(CASES_V3_DIR)
     cases_by_id = {case["id"]: case for case in cases}
 
+    before_corrections = cases_by_id["v3.reasoning.integrated_incident_lineage_before_corrections"]
+    assert before_corrections["operation"] == "v2_reduce_and_summarize"
+    assert before_corrections["input"]["business_as_of"] == "2026-09-06T00:00:00Z"
+    assert before_corrections["input"]["audit_as_of"] == "2026-09-06T00:00:00Z"
+    assert len(before_corrections["input"]["raw_events"]) == 17
+    assert before_corrections["expected"][0]["accountId"] == "acct_inc_10"
+    assert before_corrections["expected"][0]["usage"] == 16
+    assert before_corrections["expected"][0]["totalPaidCents"] == 19900
+    assert before_corrections["expected"][0]["invoiceIds"] == ["inv_inc_original"]
+    assert before_corrections["expected"][0]["mergedFromAccountIds"] == [
+        "acct_inc_A",
+        "acct_inc_2",
+    ]
+
+    invoice_correction = cases_by_id["v3.reasoning.integrated_incident_invoice_correction_account"]
+    assert invoice_correction["operation"] == "v2_reduce_and_summarize"
+    assert invoice_correction["input"]["business_as_of"] == "2026-09-09T12:00:00Z"
+    assert invoice_correction["input"]["audit_as_of"] == "2026-09-09T12:00:00Z"
+    assert len(invoice_correction["expected"]) == 1
+    assert invoice_correction["expected"][0]["usage"] == 22
+    assert invoice_correction["expected"][0]["plan"] == "pro"
+    assert invoice_correction["expected"][0]["seats"] == 6
+    assert invoice_correction["expected"][0]["totalPaidCents"] == 24900
+    assert invoice_correction["expected"][0]["invoiceIds"] == ["inv_inc_corrected"]
+
     month_close = cases_by_id["v3.reasoning.integrated_incident_month_close_summary"]
     assert month_close["operation"] == "v2_reduce_and_summarize"
     assert month_close["input"]["business_as_of"] == "2026-09-12T00:00:00Z"
@@ -388,6 +413,22 @@ def test_v3_hidden_cases_include_integrated_incident_pressure() -> None:
         "acct_inc_2",
     ]
     assert month_close["expected"][1]["lastEventAt"] == "0001-01-02T00:00:00.000Z"
+
+    voided_usage = cases_by_id["v3.evolution.integrated_incident_voided_usage_account"]
+    assert voided_usage["operation"] == "v2_reduce_and_summarize"
+    assert voided_usage["input"]["audit_as_of"] == "2026-09-11T12:00:00Z"
+    assert len(voided_usage["expected"]) == 1
+    assert voided_usage["expected"][0]["usage"] == 9
+    assert voided_usage["expected"][0]["seats"] == 6
+    assert voided_usage["expected"][0]["lastEventAt"] == "2026-09-11T00:00:00.000Z"
+
+    final_account = cases_by_id["v3.evolution.integrated_incident_final_account"]
+    assert final_account["operation"] == "v2_reduce_and_summarize"
+    assert final_account["input"]["audit_as_of"] == "2026-09-13T00:00:00Z"
+    assert len(final_account["expected"]) == 1
+    assert final_account["expected"][0]["usage"] == 9
+    assert final_account["expected"][0]["seats"] == 8
+    assert final_account["expected"][0]["lastEventAt"] == "2026-09-12T00:00:00.000Z"
 
     final_parity = cases_by_id["v3.evolution.integrated_incident_final_parity"]
     assert final_parity["operation"] == "v2_parity"

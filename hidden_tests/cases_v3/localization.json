@@ -20,7 +20,7 @@
         "python"
       ],
       "operation": "v3_architecture_contract",
-      "points": 3.0,
+      "points": 7.0,
       "rule_ids": [
         "LC-010",
         "PY-001",
@@ -40,7 +40,7 @@
         "python"
       ],
       "operation": "v3_runtime_compatibility_contract",
-      "points": 2.0,
+      "points": 5.0,
       "rule_ids": [
         "LC-010",
         "PY-001",

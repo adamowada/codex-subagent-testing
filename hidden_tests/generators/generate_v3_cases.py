@@ -222,7 +222,7 @@ def localization_cases() -> list[dict[str, Any]]:
             ["LC-010", "PY-001", "TS-001"],
             "v3_architecture_contract",
             {},
-            points=3.0,
+            points=7.0,
         ),
         evaluated_case(
             "v3.localization.runtime_compatibility_boundary",
@@ -230,7 +230,7 @@ def localization_cases() -> list[dict[str, Any]]:
             ["LC-010", "PY-001", "TS-001"],
             "v3_runtime_compatibility_contract",
             {},
-            points=2.0,
+            points=5.0,
         ),
     ]
 
@@ -612,7 +612,7 @@ def multi_view_replay_events() -> list[dict[str, Any]]:
     ]
 
 
-def integrated_incident_events(*, noise_accounts: int = 0) -> list[dict[str, Any]]:
+def integrated_incident_events(*, noise_accounts: int = 0, include_archive: bool = True) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = [
         {
             "id": "evt_inc_dest_open",
@@ -781,6 +781,9 @@ def integrated_incident_events(*, noise_accounts: int = 0) -> list[dict[str, Any
         },
     ]
 
+    if not include_archive:
+        events = [event for event in events if event["account_id"] != "acct_inc_archive"]
+
     for account_index in range(noise_accounts):
         account_id = f"acct_inc_noise_{account_index:04d}"
         events.append(
@@ -946,6 +949,30 @@ def reasoning_ladder_cases() -> list[dict[str, Any]]:
             points=3.0,
         ),
         evaluated_case(
+            "v3.reasoning.integrated_incident_lineage_before_corrections",
+            "fail_to_pass",
+            ["BT-004", "BT-005", "MG-002", "MG-005", "OR-001"],
+            "v2_reduce_and_summarize",
+            {
+                "raw_events": integrated_incident_events(include_archive=False),
+                "business_as_of": "2026-09-06T00:00:00Z",
+                "audit_as_of": "2026-09-06T00:00:00Z",
+            },
+            points=1.5,
+        ),
+        evaluated_case(
+            "v3.reasoning.integrated_incident_invoice_correction_account",
+            "localization",
+            ["BT-004", "BT-005", "CV-002", "MG-005", "PY-001"],
+            "v2_reduce_and_summarize",
+            {
+                "raw_events": integrated_incident_events(include_archive=False),
+                "business_as_of": "2026-09-09T12:00:00Z",
+                "audit_as_of": "2026-09-09T12:00:00Z",
+            },
+            points=1.5,
+        ),
+        evaluated_case(
             "v3.reasoning.integrated_incident_month_close_summary",
             "fail_to_pass",
             ["BT-004", "BT-005", "CV-001", "CV-002", "MG-005", "RP-001"],
@@ -955,7 +982,7 @@ def reasoning_ladder_cases() -> list[dict[str, Any]]:
                 "business_as_of": "2026-09-12T00:00:00Z",
                 "audit_as_of": "2026-09-09T12:00:00Z",
             },
-            points=3.5,
+            points=2.0,
         ),
     ]
 
@@ -1204,6 +1231,30 @@ def evolution_cases() -> list[dict[str, Any]]:
             points=3.0,
         ),
         evaluated_case(
+            "v3.evolution.integrated_incident_voided_usage_account",
+            "evolution",
+            ["BT-004", "CV-002", "CV-006", "MG-005"],
+            "v2_reduce_and_summarize",
+            {
+                "raw_events": integrated_incident_events(include_archive=False),
+                "business_as_of": "2026-09-11T12:00:00Z",
+                "audit_as_of": "2026-09-11T12:00:00Z",
+            },
+            points=2.0,
+        ),
+        evaluated_case(
+            "v3.evolution.integrated_incident_final_account",
+            "evolution",
+            ["BT-004", "CV-002", "CV-006", "MG-005"],
+            "v2_reduce_and_summarize",
+            {
+                "raw_events": integrated_incident_events(include_archive=False),
+                "business_as_of": "2026-09-13T00:00:00Z",
+                "audit_as_of": "2026-09-13T00:00:00Z",
+            },
+            points=2.0,
+        ),
+        evaluated_case(
             "v3.evolution.integrated_incident_final_parity",
             "evolution",
             ["BT-004", "CV-002", "CV-006", "MG-005", "RP-001", "RP-006"],
@@ -1213,7 +1264,7 @@ def evolution_cases() -> list[dict[str, Any]]:
                 "business_as_of": "2026-09-13T00:00:00Z",
                 "audit_as_of": "2026-09-13T00:00:00Z",
             },
-            points=4.0,
+            points=2.5,
         ),
     ]
 
@@ -1349,7 +1400,7 @@ def metamorphic_cases() -> list[dict[str, Any]]:
                 "business_as_of": "2026-09-13T00:00:00Z",
                 "audit_as_of": "2026-09-13T00:00:00Z",
             },
-            points=3.0,
+            points=2.0,
         ),
     ]
 
@@ -1513,7 +1564,7 @@ def performance_cases() -> list[dict[str, Any]]:
                 "business_as_of": "2026-09-13T00:00:00Z",
                 "audit_as_of": "2026-09-13T00:00:00Z",
             },
-            points=3.5,
+            points=2.5,
             timeout_seconds={"typescript": 120, "python": 120},
         ),
     ]
@@ -1644,7 +1695,7 @@ def parity_cases() -> list[dict[str, Any]]:
                 "business_as_of": "2026-09-13T00:00:00Z",
                 "audit_as_of": "2026-09-13T00:00:00Z",
             },
-            points=2.5,
+            points=1.5,
         ),
     ]
 
