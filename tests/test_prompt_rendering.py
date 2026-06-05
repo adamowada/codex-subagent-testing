@@ -145,6 +145,8 @@ def test_v3_prompt_uses_issue_brief_and_reasoning_ladder_docs() -> None:
     assert "docs/ruleledger_v3_architecture.md" in prompt
     assert "larger starter surface" in prompt
     assert "one giant bypass file" in prompt
+    assert "reconcile the implementation as one replay model" in prompt
+    assert "Avoid a single-surface fix" in prompt
     assert "root_sandbox: danger-full-access" in prompt
 
 

@@ -52,7 +52,11 @@ def test_v3_template_exposes_issue_and_architecture_docs() -> None:
     assert "Preserve all v1 and v2 public APIs" in issue
     assert "near-linear account aggregation" in issue
     assert "Recent Support Escalations" in issue
+    assert "Resolution Standard" in issue
     assert "not a complete truth table" in issue_flat
+    assert "one canonical replay model" in issue_flat
+    assert "Before finalizing, reconcile the incident shape end to end" in issue_flat
+    assert "without creating another split-brain runtime path" in issue_flat
     assert "Month-Close Reconciliation Drift" in issue
     assert "Backfill Import Drift" in issue
     assert "same imported ledger" in issue_flat

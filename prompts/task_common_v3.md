@@ -9,6 +9,11 @@ catalog. Infer the general rule system behind the examples, especially where
 audit cutoffs, business-effective cutoffs, corrections, voids, duplicate event
 IDs, account merges, and reporting interact.
 
+Before finalizing, reconcile the implementation as one replay model across the
+surfaces the brief names: summaries, CSV reports, TypeScript/Python parity,
+replay digests, billing, and module ownership. Avoid a single-surface fix that
+passes one symptom while leaving a separate code path for the next view.
+
 Read these visible files before editing:
 
 - `README.md`

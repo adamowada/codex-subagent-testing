@@ -1050,3 +1050,73 @@ make the visible incident ask agents to construct and validate one canonical
 replay model across staged views, or add a visible self-check protocol that
 rewards higher-reasoning agents for reconciling summaries, CSV reports, parity,
 digests, and module ownership before finalizing.
+
+## Checkpoint: Resolution-Standard Prompt Calibration
+
+The next pass kept the hidden suite and scoring fixed, but changed the visible
+task contract to make cross-surface synthesis explicit. The v3 issue brief now
+has a `Resolution Standard` section: a credible fix should be explainable as
+one canonical replay model that drives summaries, CSV reports,
+TypeScript/Python parity, replay digests, billing, and module ownership. The
+shared v3 prompt also reminds measured agents not to finish after a
+single-surface fix.
+
+This is intentionally a prompt/template calibration rather than hidden-case
+bulk. It tests whether higher reasoning levels can use the narrative incident
+as a system-design problem, while lower reasoning levels still tend to patch
+visible symptoms or one compatibility runtime path.
+
+Verification after this pass:
+
+- `python -m pytest -q tests\test_stage22_ruleledger_v3.py tests\test_prompt_rendering.py`
+  -> `39 passed`.
+- `python -m pytest -q` -> `179 passed`.
+
+The sanity run
+`20260605T095840-ruleledger_v3_sanity-v3_sanity_measured_18_resolution_standard`
+completed all four implementations, all four schema-enforced judges, scoring,
+aggregate outputs, HTML report, PDF report, CSV, SQLite, and Stage 11
+validation. Implementation and judge phases both completed with `4/4 ok, 0
+failed`, and final validation passed.
+
+| Cell | Reasoning | Hidden Correctness | Hidden Tests | Judge | Minimality | Quality |
+|---|---:|---:|---:|---:|---:|---:|
+| V3S0 | low | `0.253472` | `0.217926` | `0.255000` | `1.000000` | `0.272836` |
+| V3S1 | medium | `0.444444` | `0.472954` | `0.515000` | `0.839750` | `0.527381` |
+| V3S2 | high | `0.864583` | `0.850730` | `0.795000` | `0.794250` | `0.839352` |
+| V3S3 | xhigh | `0.989583` | `0.992857` | `0.935000` | `0.668500` | `0.970546` |
+
+The single-run ladder was clean: quality, hidden correctness, weighted hidden
+score, and judge score all increased from low to medium to high to xhigh.
+Xhigh saturated six of seven hidden categories, missing only a pass-to-pass
+tail.
+
+The follow-up consistency run
+`20260605T105342-ruleledger_v3_full-v3_full_measured_05_resolution_standard`
+completed all twelve implementations, all twelve schema-enforced judges,
+scoring, aggregate outputs, HTML report, PDF report, CSV, SQLite, and Stage 11
+validation. Implementation and judge phases both completed with `12/12 ok, 0
+failed`, and final validation passed.
+
+| Reasoning | Quality Mean | Quality Range | Hidden Correctness Mean | Hidden Tests Mean | Judge Mean |
+|---|---:|---:|---:|---:|---:|
+| low | `0.466340` | `0.447895`-`0.482239` | `0.344907` | `0.379806` | `0.441905` |
+| medium | `0.563777` | `0.256661`-`0.862509` | `0.519676` | `0.522109` | `0.527500` |
+| high | `0.786453` | `0.698562`-`0.957141` | `0.792824` | `0.815579` | `0.782758` |
+| xhigh | `0.861792` | `0.716220`-`0.988775` | `0.885417` | `0.888720` | `0.865000` |
+
+This is the first multi-repeat v3 result that shows the intended
+low/medium/high/xhigh mean ladder across aggregate quality, hidden
+correctness, weighted hidden score, and judge score. Xhigh produced the only
+perfect hidden run in the repeat set and led the hidden category means for
+evolution, fail-to-pass, pass-to-pass, metamorphic, parity, and performance,
+while high and xhigh both satisfied the architecture/localization pressure in
+all repeats.
+
+Residual risks remain. The sample is only three repeats per reasoning level,
+medium is still high variance, and xhigh spends far more implementation tokens
+than the lower reasoning cells. But the calibration objective for an initial
+v3 reasoning-differentiation benchmark is now met: the task has enough
+cross-surface ambiguity and repo-scale pressure to distinguish the four
+reasoning levels on repeated measured runs without changing hidden cases after
+the final prompt calibration.

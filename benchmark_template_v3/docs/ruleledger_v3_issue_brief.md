@@ -60,6 +60,23 @@ truth table. Expect future views to combine audit cutoffs, business-effective
 cutoffs, duplicate event IDs, corrections, voids, account merges, and reporting
 in ways that are not all enumerated in the public examples.
 
+## Resolution Standard
+
+Do not stop after making one visible surface look correct. A credible v3 fix
+should be explainable as one canonical replay model that drives point-in-time
+summaries, CSV reports, TypeScript/Python parity checks, and replay digests.
+Before finalizing, reconcile the incident shape end to end: strict import
+normalization, deterministic replay ordering, audit-visible versus
+business-effective cutoffs, correction and void target resolution, merge
+lineage, exact billing, and report serialization should agree rather than live
+in separate patches.
+
+If a rule seems necessary for only one screen, first check whether that rule
+belongs in normalization, replay, billing, or reporting so every public surface
+inherits the same behavior. This is not a request to reconstruct private
+fixtures; it is the expected way to resolve the visible incident reports
+without creating another split-brain runtime path.
+
 ## Recent Support Escalations
 
 Support has stopped filing isolated rule tickets for this work. The recent
