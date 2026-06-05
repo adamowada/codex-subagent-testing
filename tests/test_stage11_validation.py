@@ -391,6 +391,31 @@ def test_stage11_accepts_score_alias_in_parsed_judge_json(
     assert checks["judge_json"]["status"] == "passed"
 
 
+def test_stage11_flags_batch_metadata_matrix_drift(
+    config: dict,
+    runs: list[dict],
+    tmp_path: Path,
+) -> None:
+    selected = runs[:2]
+    _write_experiment_shell(tmp_path, config, runs, selected)
+    batch = json.loads((tmp_path / "batch_metadata.json").read_text(encoding="utf-8"))
+    batch["freeze_manifest"]["selected_matrix_sha256"] = "wrong"
+    _write_json(tmp_path / "batch_metadata.json", batch)
+
+    payload = validate_stage11(
+        config_path=CONFIG_PATH,
+        repo_root=REPO_ROOT,
+        experiment_dir=tmp_path,
+        selected_runs=selected,
+        require_report_outputs=False,
+        preflight_result=_preflight_payload(),
+    )
+
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert checks["experiment_metadata"]["status"] == "failed"
+    assert "batch_metadata.freeze_manifest.selected_matrix_sha256" in checks["experiment_metadata"]["details"]
+
+
 def _write_experiment_shell(
     experiment_dir: Path,
     config: dict,

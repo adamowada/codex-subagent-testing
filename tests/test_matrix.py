@@ -23,6 +23,7 @@ RULELEDGER_V2_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.y
 RULELEDGER_V2_EXPERIMENT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_experiment.yaml"
 RULELEDGER_V3_SANITY_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_sanity.yaml"
 RULELEDGER_V3_EXPERIMENT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_experiment.yaml"
+RULELEDGER_V3_PAPER_50_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_paper_50.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -241,6 +242,21 @@ def test_ruleledger_v3_full_config_expands_to_consistency_matrix() -> None:
     assert {run["root"]["sandbox"] for run in runs} == {"danger-full-access"}
     assert summary["by_spark_mode"] == {"none": 12}
     assert summary["by_topology"] == {"solo": 12}
+
+
+def test_ruleledger_v3_paper_config_expands_to_fifty_repeats_per_reasoning_level() -> None:
+    config = load_experiment_config(RULELEDGER_V3_PAPER_50_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert len(runs) == 200
+    assert runs[0]["run_id"] == "V3P0_r01"
+    assert runs[-1]["run_id"] == "V3P3_r50"
+    assert summary["by_cell"] == {"V3P0": 50, "V3P1": 50, "V3P2": 50, "V3P3": 50}
+    assert summary["by_root_reasoning"] == {"high": 50, "low": 50, "medium": 50, "xhigh": 50}
+    assert summary["by_benchmark_version"] == {"ruleledger_v3": 200}
+    assert summary["by_spark_mode"] == {"none": 200}
+    assert summary["by_topology"] == {"solo": 200}
 
 
 def test_c4_topology_resolves_to_eighteen_spark_leaves(config: dict) -> None:
