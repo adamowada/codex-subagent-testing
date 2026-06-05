@@ -914,3 +914,65 @@ ledger that combines the month-close and backfill symptoms in the same
 scenario, then checks summaries, reports, parity/digest, and architecture
 boundaries from that shared replay. The goal is to reward durable synthesis of
 the whole incident, not local patching of individually named behaviors.
+
+## Checkpoint: Integrated Incident Fixture
+
+The next pass added a generated v3 hidden fixture family centered on one
+integrated month-close/backfill incident ledger. The shared ledger combines
+duplicate event IDs, source-to-mid-to-destination account merges, post-merge
+source events, corrections, voids, audit/business cutoff drift, CSV quoting,
+archive timestamps, and a 10,019-event digest variant with unrelated account
+noise. The fixture is reused across reasoning-ladder summary, final parity,
+metamorphic replay-equivalence, parity report, and performance digest cases so
+the hidden suite can test whether an implementation discovers one durable
+replay model instead of patching isolated examples.
+
+Verification after this pass:
+
+- `python -m pytest -q tests\test_stage22_ruleledger_v3.py` -> `17 passed`.
+- `python -m pytest -q tests\test_prompt_rendering.py` -> `22 passed`.
+- `python -m pytest -q` -> `179 passed`.
+
+The sanity run
+`20260605T070934-ruleledger_v3_sanity-v3_sanity_measured_16_integrated_incident`
+completed all four implementations, all four schema-enforced judges, scoring,
+aggregate outputs, HTML report, PDF report, CSV, SQLite, and Stage 11
+validation. Implementation and judge phases both completed with `4/4 ok, 0
+failed`, and final validation passed.
+
+| Cell | Reasoning | Hidden Correctness | Hidden Tests | Judge | Minimality | Quality |
+|---|---:|---:|---:|---:|---:|---:|
+| V3S0 | low | `0.548387` | `0.527914` | `0.585658` | `1.000000` | `0.573680` |
+| V3S1 | medium | `0.540323` | `0.542566` | `0.572877` | `1.000000` | `0.566836` |
+| V3S2 | high | `0.431452` | `0.407729` | `0.407500` | `1.000000` | `0.476018` |
+| V3S3 | xhigh | `0.512097` | `0.539308` | `0.582500` | `0.713250` | `0.546238` |
+
+This disproves the integrated-fixture hypothesis in its current form. The new
+fixture made the suite harder, but it did not produce a reasoning ladder. Low,
+medium, and xhigh clustered around `41/66` hidden assertions passed, while high
+passed `37/66`. The integrated incident slices were especially revealing:
+
+- Low and medium passed only the month-close summary slice in both languages.
+- High and xhigh failed every integrated incident slice, including the
+  month-close summary.
+- All four cells failed the final parity, replay-equivalence, parity report,
+  and 10k digest slices in both TypeScript and Python.
+
+The implementation diffs explain part of the inversion. Low, medium, and high
+patched the two compatibility runtime files directly. Xhigh performed the
+architecture-aware move the brief was trying to elicit, spreading logic across
+normalization, replay, billing, reporting, and runtime shims, and the judge
+rewarded that maintainability. But the semantic hidden oracle still found the
+refactor only about half correct, and the larger patch paid a minimality
+penalty. In other words, the benchmark is now eliciting a more sophisticated
+xhigh strategy, but hidden scoring is too all-or-nothing on the integrated
+incident for that strategy to translate into quality separation.
+
+Next hypothesis: stop adding larger opaque fixtures. The next pass should make
+the integrated incident more diagnostic and graded: split the long incident
+into staged assertions that reveal whether the implementation handles
+localization, canonical lineage, cutoff visibility, correction/void precedence,
+reporting, and digest stability separately, while preserving a final integrated
+case for synthesis. The visible brief should still be narrative, but the hidden
+suite needs enough partial-credit surface to distinguish "found the right
+architecture but missed one semantic edge" from "patched one runtime symptom."

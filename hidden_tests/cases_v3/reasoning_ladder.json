@@ -918,6 +918,254 @@
         "MG-005",
         "RP-001"
       ]
+    },
+    {
+      "category": "fail_to_pass",
+      "expected": [
+        {
+          "accountId": "acct_inc_10",
+          "closedAt": null,
+          "couponActive": true,
+          "couponCode": "MONTH,CLOSE",
+          "currency": "USD",
+          "features": [
+            "dashboard",
+            "exports",
+            "priority_support",
+            "rules"
+          ],
+          "invoiceIds": [
+            "inv_inc_corrected"
+          ],
+          "lastEventAt": "2026-09-05T00:00:00.000Z",
+          "lastInvoiceId": "inv_inc_corrected",
+          "lastPeriodEnd": "2026-10-01T00:00:00.000Z",
+          "lastPeriodStart": "2026-09-01T00:00:00.000Z",
+          "mergedFromAccountIds": [
+            "acct_inc_A",
+            "acct_inc_2"
+          ],
+          "overLimit": false,
+          "plan": "pro",
+          "seats": 6,
+          "status": "active",
+          "totalPaidCents": 24900,
+          "usage": 22,
+          "usageLimit": 10000
+        },
+        {
+          "accountId": "acct_inc_archive",
+          "closedAt": null,
+          "couponActive": false,
+          "couponCode": null,
+          "currency": "USD",
+          "features": [
+            "dashboard",
+            "exports"
+          ],
+          "invoiceIds": [
+            "inv_inc_archive"
+          ],
+          "lastEventAt": "0001-01-02T00:00:00.000Z",
+          "lastInvoiceId": "inv_inc_archive",
+          "lastPeriodEnd": "0001-02-01T00:00:00.000Z",
+          "lastPeriodStart": "0001-01-01T00:00:00.000Z",
+          "mergedFromAccountIds": [],
+          "overLimit": false,
+          "plan": "starter",
+          "seats": 1,
+          "status": "active",
+          "totalPaidCents": 0,
+          "usage": 0,
+          "usageLimit": 1000
+        }
+      ],
+      "id": "v3.reasoning.integrated_incident_month_close_summary",
+      "input": {
+        "audit_as_of": "2026-09-09T12:00:00Z",
+        "business_as_of": "2026-09-12T00:00:00Z",
+        "raw_events": [
+          {
+            "account_id": "acct_inc_10",
+            "id": "evt_inc_dest_open",
+            "plan": "starter",
+            "quantity": 1,
+            "timestamp": "2026-09-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_inc_2",
+            "id": "evt_inc_mid_open",
+            "plan": "pro",
+            "quantity": 2,
+            "timestamp": "2026-09-01T00:00:01Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_inc_A",
+            "id": "evt_inc_source_open",
+            "plan": "enterprise",
+            "quantity": 3,
+            "timestamp": "2026-09-01T00:00:02Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_inc_archive",
+            "id": "evt_inc_archive_open",
+            "plan": "starter",
+            "quantity": 1,
+            "timestamp": "0001-01-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_inc_archive",
+            "amount_cents": 1200,
+            "currency": "usd",
+            "id": "evt_inc_archive_invoice",
+            "invoice_id": "inv_inc_archive",
+            "period_end": "0001-02-01T00:00:00Z",
+            "period_start": "0001-01-01T00:00:00Z",
+            "timestamp": "0001-01-02T00:00:00Z",
+            "type": "invoice_issued"
+          },
+          {
+            "account_id": "acct_inc_10",
+            "amount_cents": 0,
+            "currency": "usd",
+            "id": "evt_inc_dest_currency",
+            "timestamp": "2026-09-01T01:00:00Z",
+            "type": "payment_succeeded"
+          },
+          {
+            "account_id": "acct_inc_A",
+            "id": "evt_inc_source_usage",
+            "recorded_at": "2026-09-02T00:00:00Z",
+            "sequence": 0,
+            "timestamp": "2026-09-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 12
+          },
+          {
+            "account_id": "acct_inc_A",
+            "id": "evt_inc_source_usage",
+            "recorded_at": "2026-09-02T00:05:00Z",
+            "sequence": 9,
+            "timestamp": "2026-09-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 99
+          },
+          {
+            "account_id": "acct_inc_A",
+            "amount_cents": 19900,
+            "currency": "usd",
+            "id": "evt_inc_source_invoice",
+            "invoice_id": "inv_inc_original",
+            "period_end": "2026-10-01T00:00:00Z",
+            "period_start": "2026-09-01T00:00:00Z",
+            "timestamp": "2026-09-02T02:00:00Z",
+            "type": "payment_succeeded"
+          },
+          {
+            "account_id": "acct_inc_A",
+            "coupon": "month,close",
+            "expires_at": "2026-10-01T00:00:00Z",
+            "id": "evt_inc_source_coupon",
+            "timestamp": "2026-09-02T03:00:00Z",
+            "type": "coupon_applied"
+          },
+          {
+            "account_id": "acct_inc_2",
+            "id": "evt_inc_merge_source_mid",
+            "merge_from_account_id": "acct_inc_A",
+            "timestamp": "2026-09-03T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_inc_2",
+            "id": "evt_inc_mid_usage",
+            "timestamp": "2026-09-04T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 4
+          },
+          {
+            "account_id": "acct_inc_10",
+            "id": "evt_inc_merge_mid_dest",
+            "merge_from_account_id": "acct_inc_2",
+            "timestamp": "2026-09-05T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_inc_A",
+            "correction_of": "evt_inc_source_usage",
+            "effective_at": "2026-09-02T00:00:00Z",
+            "id": "evt_inc_correct_usage",
+            "recorded_at": "2026-09-07T00:00:00Z",
+            "timestamp": "2026-09-07T00:00:00Z",
+            "type": "event_corrected",
+            "usage": 18
+          },
+          {
+            "account_id": "acct_inc_A",
+            "amount_cents": 24900,
+            "correction_of": "evt_inc_source_invoice",
+            "currency": "usd",
+            "effective_at": "2026-09-02T02:00:00Z",
+            "id": "evt_inc_correct_invoice",
+            "invoice_id": "inv_inc_corrected",
+            "period_end": "2026-10-01T00:00:00Z",
+            "period_start": "2026-09-01T00:00:00Z",
+            "recorded_at": "2026-09-08T00:00:00Z",
+            "timestamp": "2026-09-08T00:00:00Z",
+            "type": "event_corrected"
+          },
+          {
+            "account_id": "acct_inc_10",
+            "effective_at": "2026-09-04T00:00:00Z",
+            "id": "evt_inc_late_plan",
+            "plan": "pro",
+            "recorded_at": "2026-09-09T00:00:00Z",
+            "timestamp": "2026-09-09T00:00:00Z",
+            "type": "plan_changed"
+          },
+          {
+            "account_id": "acct_inc_A",
+            "effective_at": "2026-09-02T00:00:00Z",
+            "id": "evt_inc_void_usage_correction",
+            "recorded_at": "2026-09-10T00:00:00Z",
+            "timestamp": "2026-09-10T00:00:00Z",
+            "type": "event_voided",
+            "voided_event_id": "evt_inc_correct_usage"
+          },
+          {
+            "account_id": "acct_inc_A",
+            "id": "evt_inc_source_late_usage",
+            "timestamp": "2026-09-11T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 5
+          },
+          {
+            "account_id": "acct_inc_10",
+            "id": "evt_inc_dest_seat_delta",
+            "seat_delta": 2,
+            "timestamp": "2026-09-12T00:00:00Z",
+            "type": "seat_delta_recorded"
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_reduce_and_summarize",
+      "points": 3.5,
+      "rule_ids": [
+        "BT-004",
+        "BT-005",
+        "CV-001",
+        "CV-002",
+        "MG-005",
+        "RP-001"
+      ]
     }
   ],
   "generated_at": "2026-05-29T00:00:00.000Z",

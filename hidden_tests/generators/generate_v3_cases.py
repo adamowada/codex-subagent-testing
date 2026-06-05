@@ -612,6 +612,214 @@ def multi_view_replay_events() -> list[dict[str, Any]]:
     ]
 
 
+def integrated_incident_events(*, noise_accounts: int = 0) -> list[dict[str, Any]]:
+    events: list[dict[str, Any]] = [
+        {
+            "id": "evt_inc_dest_open",
+            "account_id": "acct_inc_10",
+            "type": "account_opened",
+            "timestamp": "2026-09-01T00:00:00Z",
+            "plan": "starter",
+            "quantity": 1,
+        },
+        {
+            "id": "evt_inc_mid_open",
+            "account_id": "acct_inc_2",
+            "type": "account_opened",
+            "timestamp": "2026-09-01T00:00:01Z",
+            "plan": "pro",
+            "quantity": 2,
+        },
+        {
+            "id": "evt_inc_source_open",
+            "account_id": "acct_inc_A",
+            "type": "account_opened",
+            "timestamp": "2026-09-01T00:00:02Z",
+            "plan": "enterprise",
+            "quantity": 3,
+        },
+        {
+            "id": "evt_inc_archive_open",
+            "account_id": "acct_inc_archive",
+            "type": "account_opened",
+            "timestamp": "0001-01-01T00:00:00Z",
+            "plan": "starter",
+            "quantity": 1,
+        },
+        {
+            "id": "evt_inc_archive_invoice",
+            "account_id": "acct_inc_archive",
+            "type": "invoice_issued",
+            "timestamp": "0001-01-02T00:00:00Z",
+            "amount_cents": 1200,
+            "currency": "usd",
+            "invoice_id": "inv_inc_archive",
+            "period_start": "0001-01-01T00:00:00Z",
+            "period_end": "0001-02-01T00:00:00Z",
+        },
+        {
+            "id": "evt_inc_dest_currency",
+            "account_id": "acct_inc_10",
+            "type": "payment_succeeded",
+            "timestamp": "2026-09-01T01:00:00Z",
+            "amount_cents": 0,
+            "currency": "usd",
+        },
+        {
+            "id": "evt_inc_source_usage",
+            "account_id": "acct_inc_A",
+            "type": "usage_recorded",
+            "timestamp": "2026-09-02T00:00:00Z",
+            "recorded_at": "2026-09-02T00:00:00Z",
+            "sequence": 0,
+            "usage": 12,
+        },
+        {
+            "id": "evt_inc_source_usage",
+            "account_id": "acct_inc_A",
+            "type": "usage_recorded",
+            "timestamp": "2026-09-02T00:00:00Z",
+            "recorded_at": "2026-09-02T00:05:00Z",
+            "sequence": 9,
+            "usage": 99,
+        },
+        {
+            "id": "evt_inc_source_invoice",
+            "account_id": "acct_inc_A",
+            "type": "payment_succeeded",
+            "timestamp": "2026-09-02T02:00:00Z",
+            "amount_cents": 19900,
+            "currency": "usd",
+            "invoice_id": "inv_inc_original",
+            "period_start": "2026-09-01T00:00:00Z",
+            "period_end": "2026-10-01T00:00:00Z",
+        },
+        {
+            "id": "evt_inc_source_coupon",
+            "account_id": "acct_inc_A",
+            "type": "coupon_applied",
+            "timestamp": "2026-09-02T03:00:00Z",
+            "coupon": "month,close",
+            "expires_at": "2026-10-01T00:00:00Z",
+        },
+        {
+            "id": "evt_inc_merge_source_mid",
+            "account_id": "acct_inc_2",
+            "type": "account_merged",
+            "timestamp": "2026-09-03T00:00:00Z",
+            "merge_from_account_id": "acct_inc_A",
+        },
+        {
+            "id": "evt_inc_mid_usage",
+            "account_id": "acct_inc_2",
+            "type": "usage_recorded",
+            "timestamp": "2026-09-04T00:00:00Z",
+            "usage": 4,
+        },
+        {
+            "id": "evt_inc_merge_mid_dest",
+            "account_id": "acct_inc_10",
+            "type": "account_merged",
+            "timestamp": "2026-09-05T00:00:00Z",
+            "merge_from_account_id": "acct_inc_2",
+        },
+        {
+            "id": "evt_inc_correct_usage",
+            "account_id": "acct_inc_A",
+            "type": "event_corrected",
+            "timestamp": "2026-09-07T00:00:00Z",
+            "recorded_at": "2026-09-07T00:00:00Z",
+            "effective_at": "2026-09-02T00:00:00Z",
+            "correction_of": "evt_inc_source_usage",
+            "usage": 18,
+        },
+        {
+            "id": "evt_inc_correct_invoice",
+            "account_id": "acct_inc_A",
+            "type": "event_corrected",
+            "timestamp": "2026-09-08T00:00:00Z",
+            "recorded_at": "2026-09-08T00:00:00Z",
+            "effective_at": "2026-09-02T02:00:00Z",
+            "correction_of": "evt_inc_source_invoice",
+            "amount_cents": 24900,
+            "currency": "usd",
+            "invoice_id": "inv_inc_corrected",
+            "period_start": "2026-09-01T00:00:00Z",
+            "period_end": "2026-10-01T00:00:00Z",
+        },
+        {
+            "id": "evt_inc_late_plan",
+            "account_id": "acct_inc_10",
+            "type": "plan_changed",
+            "timestamp": "2026-09-09T00:00:00Z",
+            "recorded_at": "2026-09-09T00:00:00Z",
+            "effective_at": "2026-09-04T00:00:00Z",
+            "plan": "pro",
+        },
+        {
+            "id": "evt_inc_void_usage_correction",
+            "account_id": "acct_inc_A",
+            "type": "event_voided",
+            "timestamp": "2026-09-10T00:00:00Z",
+            "recorded_at": "2026-09-10T00:00:00Z",
+            "effective_at": "2026-09-02T00:00:00Z",
+            "voided_event_id": "evt_inc_correct_usage",
+        },
+        {
+            "id": "evt_inc_source_late_usage",
+            "account_id": "acct_inc_A",
+            "type": "usage_recorded",
+            "timestamp": "2026-09-11T00:00:00Z",
+            "usage": 5,
+        },
+        {
+            "id": "evt_inc_dest_seat_delta",
+            "account_id": "acct_inc_10",
+            "type": "seat_delta_recorded",
+            "timestamp": "2026-09-12T00:00:00Z",
+            "seat_delta": 2,
+        },
+    ]
+
+    for account_index in range(noise_accounts):
+        account_id = f"acct_inc_noise_{account_index:04d}"
+        events.append(
+            {
+                "id": f"evt_inc_noise_open_{account_index:04d}",
+                "account_id": account_id,
+                "type": "account_opened",
+                "timestamp": "2026-09-01T00:00:00Z",
+                "plan": "starter" if account_index % 2 else "free",
+                "quantity": 1 + (account_index % 3),
+            }
+        )
+        for usage_index in range(8):
+            events.append(
+                {
+                    "id": f"evt_inc_noise_usage_{account_index:04d}_{usage_index:02d}",
+                    "account_id": account_id,
+                    "type": "usage_recorded",
+                    "timestamp": f"2026-09-{2 + usage_index:02d}T00:00:00Z",
+                    "usage": (account_index + usage_index) % 13,
+                }
+            )
+        events.append(
+            {
+                "id": f"evt_inc_noise_invoice_{account_index:04d}",
+                "account_id": account_id,
+                "type": "invoice_issued",
+                "timestamp": "2026-09-10T00:00:00Z",
+                "amount_cents": 1200 if account_index % 2 else 0,
+                "currency": "usd",
+                "invoice_id": f"inv_inc_noise_{account_index:04d}",
+                "period_start": "2026-09-01T00:00:00Z",
+                "period_end": "2026-10-01T00:00:00Z",
+            }
+        )
+
+    return events
+
+
 def reasoning_ladder_cases() -> list[dict[str, Any]]:
     raw_events = [
         {
@@ -736,6 +944,18 @@ def reasoning_ladder_cases() -> list[dict[str, Any]]:
                 "audit_as_of": "2026-08-10T12:00:00Z",
             },
             points=3.0,
+        ),
+        evaluated_case(
+            "v3.reasoning.integrated_incident_month_close_summary",
+            "fail_to_pass",
+            ["BT-004", "BT-005", "CV-001", "CV-002", "MG-005", "RP-001"],
+            "v2_reduce_and_summarize",
+            {
+                "raw_events": integrated_incident_events(),
+                "business_as_of": "2026-09-12T00:00:00Z",
+                "audit_as_of": "2026-09-09T12:00:00Z",
+            },
+            points=3.5,
         ),
     ]
 
@@ -983,6 +1203,18 @@ def evolution_cases() -> list[dict[str, Any]]:
             },
             points=3.0,
         ),
+        evaluated_case(
+            "v3.evolution.integrated_incident_final_parity",
+            "evolution",
+            ["BT-004", "CV-002", "CV-006", "MG-005", "RP-001", "RP-006"],
+            "v2_parity",
+            {
+                "raw_events": integrated_incident_events(),
+                "business_as_of": "2026-09-13T00:00:00Z",
+                "audit_as_of": "2026-09-13T00:00:00Z",
+            },
+            points=4.0,
+        ),
     ]
 
 
@@ -1095,6 +1327,29 @@ def metamorphic_cases() -> list[dict[str, Any]]:
                 "audit_as_of": "2026-08-12T00:00:00Z",
             },
             points=2.5,
+        ),
+        evaluated_case(
+            "v3.metamorphic.integrated_incident_replay_equivalence",
+            "metamorphic",
+            ["OR-001", "OR-002", "CV-001", "CV-002", "MG-005", "PY-001"],
+            "v2_metamorphic",
+            {
+                "baseline": integrated_incident_events(),
+                "variants": [
+                    {
+                        "name": "reverse_import_order",
+                        "raw_events": list(reversed(integrated_incident_events())),
+                    },
+                    {
+                        "name": "unrelated_backfill_noise",
+                        "raw_events": integrated_incident_events(noise_accounts=3),
+                    },
+                ],
+                "target_account_id": "acct_inc_10",
+                "business_as_of": "2026-09-13T00:00:00Z",
+                "audit_as_of": "2026-09-13T00:00:00Z",
+            },
+            points=3.0,
         ),
     ]
 
@@ -1248,6 +1503,19 @@ def performance_cases() -> list[dict[str, Any]]:
             points=3.0,
             timeout_seconds={"typescript": 90, "python": 90},
         ),
+        evaluated_case(
+            "v3.performance.integrated_incident_digest_10k",
+            "performance",
+            ["BT-004", "CV-002", "MG-005", "OR-001", "RP-002"],
+            "v2_performance_digest",
+            {
+                "raw_events": integrated_incident_events(noise_accounts=1000),
+                "business_as_of": "2026-09-13T00:00:00Z",
+                "audit_as_of": "2026-09-13T00:00:00Z",
+            },
+            points=3.5,
+            timeout_seconds={"typescript": 120, "python": 120},
+        ),
     ]
 
 
@@ -1365,7 +1633,19 @@ def parity_cases() -> list[dict[str, Any]]:
                 "audit_as_of": "2026-05-05T00:00:00Z",
             },
             points=2.0,
-        )
+        ),
+        evaluated_case(
+            "v3.parity.integrated_incident_summary_report",
+            "parity",
+            ["BT-004", "CV-002", "MG-005", "RP-001", "RP-006", "PY-001"],
+            "v2_parity",
+            {
+                "raw_events": integrated_incident_events(),
+                "business_as_of": "2026-09-13T00:00:00Z",
+                "audit_as_of": "2026-09-13T00:00:00Z",
+            },
+            points=2.5,
+        ),
     ]
 
 

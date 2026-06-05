@@ -369,6 +369,59 @@ def test_v3_hidden_cases_include_multi_view_replay_pressure() -> None:
     }
 
 
+def test_v3_hidden_cases_include_integrated_incident_pressure() -> None:
+    _, cases = load_cases(CASES_V3_DIR)
+    cases_by_id = {case["id"]: case for case in cases}
+
+    month_close = cases_by_id["v3.reasoning.integrated_incident_month_close_summary"]
+    assert month_close["operation"] == "v2_reduce_and_summarize"
+    assert month_close["input"]["business_as_of"] == "2026-09-12T00:00:00Z"
+    assert month_close["input"]["audit_as_of"] == "2026-09-09T12:00:00Z"
+    assert len(month_close["input"]["raw_events"]) == 19
+    assert month_close["expected"][0]["accountId"] == "acct_inc_10"
+    assert month_close["expected"][0]["usage"] == 22
+    assert month_close["expected"][0]["seats"] == 6
+    assert month_close["expected"][0]["totalPaidCents"] == 24900
+    assert month_close["expected"][0]["couponCode"] == "MONTH,CLOSE"
+    assert month_close["expected"][0]["mergedFromAccountIds"] == [
+        "acct_inc_A",
+        "acct_inc_2",
+    ]
+    assert month_close["expected"][1]["lastEventAt"] == "0001-01-02T00:00:00.000Z"
+
+    final_parity = cases_by_id["v3.evolution.integrated_incident_final_parity"]
+    assert final_parity["operation"] == "v2_parity"
+    assert final_parity["input"]["audit_as_of"] == "2026-09-13T00:00:00Z"
+    assert final_parity["expected"]["summaries"][0]["usage"] == 9
+    assert final_parity["expected"]["summaries"][0]["seats"] == 8
+    assert final_parity["expected"]["summaries"][0]["totalPaidCents"] == 24900
+    assert '"MONTH,CLOSE"' in final_parity["expected"]["report"]
+    assert "acct_inc_archive,active,starter" in final_parity["expected"]["report"]
+
+    metamorphic = cases_by_id["v3.metamorphic.integrated_incident_replay_equivalence"]
+    assert metamorphic["operation"] == "v2_metamorphic"
+    assert metamorphic["expected"]["baseline"][0]["usage"] == 9
+    assert {
+        variant["name"]: variant["equivalent"]
+        for variant in metamorphic["expected"]["variants"]
+    } == {
+        "reverse_import_order": True,
+        "unrelated_backfill_noise": True,
+    }
+
+    digest = cases_by_id["v3.performance.integrated_incident_digest_10k"]
+    assert digest["operation"] == "v2_performance_digest"
+    assert len(digest["input"]["raw_events"]) == 10019
+    assert digest["expected"]["summaryCount"] == 1002
+    assert digest["expected"]["totalPaidCents"] == 24900
+    assert digest["expected"]["totalUsage"] == 48024
+
+    parity = cases_by_id["v3.parity.integrated_incident_summary_report"]
+    assert parity["operation"] == "v2_parity"
+    assert parity["expected"]["summaries"] == final_parity["expected"]["summaries"]
+    assert parity["expected"]["report"] == final_parity["expected"]["report"]
+
+
 def test_v3_performance_case_is_large_enough_to_exercise_algorithmic_shape() -> None:
     payload = json.loads((CASES_V3_DIR / "performance.json").read_text(encoding="utf-8"))
     event_counts = [
