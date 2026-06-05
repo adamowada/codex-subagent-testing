@@ -62,27 +62,34 @@ in ways that are not all enumerated in the public examples.
 
 ## Recent Support Escalations
 
-- Import validation still needs to reject malformed optional date fields instead
-  of letting host libraries coerce them into plausible-looking values.
-- CSV output must remain byte-stable across languages and hosts. Use a single
-  deterministic ordering and escaping contract for every report path.
-- Support views increasingly involve source and destination identifiers after
-  account lineage changes. Corrections and voids should target the original
-  event identity first, then flow through whatever lineage is visible for the
-  requested view.
-- Business-effective and audit-visible cutoffs are separate dimensions. Do not
-  collapse them into one timestamp; decide which facts are known before deciding
-  which facts belong in the business view.
-- Correction and void operations compose. A robust replay pass should handle
-  operations against ordinary events and lineage-changing events without
-  depending on the order or wording of a particular ticket.
-- Billing compatibility still depends on exact integer money math. Avoid
-  floating-point shortcuts for prorations, credits, charges, quantities, or
-  old/new plan transitions.
-- Archival timestamp normalization should preserve the represented UTC instant
-  across supported year ranges instead of relying on host constructor quirks.
-- Support now compares the same imported ledger through point-in-time
-  summaries, CSV reports, parity checks, and replay digests. These surfaces
-  should derive from one canonical replay model; do not fix a summary path while
-  leaving reporting, duplicate handling, or audit/business cutoff behavior to a
-  separate path-specific interpretation.
+Support has stopped filing isolated rule tickets for this work. The recent
+escalations read more like incident reports, and the examples below are not a
+complete truth table.
+
+### Month-Close Reconciliation Drift
+
+Finance says a customer looks correct in the account summary dashboard until
+the same imported ledger is reviewed through CSV exports, parity checks, and
+replay fingerprints. The mismatch appears after several accounts were folded
+together and later support actions were entered against identifiers that the
+operator saw in the older account history. Some of those actions were visible
+to audit before they belonged in the business view for the requested close
+date. Other actions were themselves retracted after review.
+
+The business ask is to make those surfaces tell one story. A fix that special
+cases the summary screen but leaves reporting or parity on a separate replay
+path will come back as another reconciliation incident.
+
+### Backfill Import Drift
+
+Data operations is backfilling older ledgers from customer archives. A few rows
+look harmless in one host runtime but land differently in another: optional
+invoice dates are not always real dates, older timestamps must keep their
+represented instant, and large seat-count changes have exposed cent-level
+rounding drift. The same backfill also made CSV rows move between machines
+after account identifiers were imported in a mix of human and system formats.
+
+The migration team wants one boring import and reporting contract that works
+the same way in TypeScript and Python. Normalize records strictly, keep money
+math exact, and make replay/report output deterministic enough that a byte
+comparison is meaningful.

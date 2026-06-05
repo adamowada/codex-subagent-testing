@@ -865,3 +865,52 @@ without listing every underlying rule family as a bullet. Hidden cases should
 then emphasize whether the implementation discovers a canonical replay model
 and preserves the intended module boundary, not whether it patched the already
 named domains one at a time.
+
+## Checkpoint: Incident Narrative Brief Calibration
+
+The next pass kept hidden cases and scoring fixed, but rewrote the visible
+`Recent Support Escalations` section into two narrative incident reports:
+`Month-Close Reconciliation Drift` and `Backfill Import Drift`. The old brief
+still named each rule family directly, so medium-reasoning runs could patch the
+listed domains one at a time. The revised brief describes cross-surface
+symptoms across summaries, CSV exports, parity checks, replay fingerprints,
+audit/business visibility, source-history identifiers, import validation,
+timestamp handling, exact money math, and deterministic reporting without
+presenting them as a checklist or complete truth table.
+
+Verification after this pass:
+
+- `python -m pytest -q tests\test_stage22_ruleledger_v3.py tests\test_prompt_rendering.py`
+  -> `38 passed`.
+- `python -m pytest -q` -> `178 passed`.
+
+The follow-up sanity run
+`20260605T060728-ruleledger_v3_sanity-v3_sanity_measured_15_incident_brief`
+completed all four implementations, all four schema-enforced judges, scoring,
+aggregate outputs, HTML report, PDF report, CSV, SQLite, and Stage 11
+validation. Implementation and judge phases both completed with `4/4 ok, 0
+failed`, and final validation passed.
+
+| Cell | Reasoning | Hidden Correctness | Judge | Minimality | Quality |
+|---|---:|---:|---:|---:|---:|
+| V3S0 | low | `0.291262` | `0.370000` | `1.000000` | `0.347031` |
+| V3S1 | medium | `0.650485` | `0.607500` | `1.000000` | `0.738893` |
+| V3S2 | high | `0.985437` | `0.897500` | `0.804500` | `0.964303` |
+| V3S3 | xhigh | `0.601942` | `0.782500` | `0.680500` | `0.743536` |
+
+This is useful movement but not completion. The narrative brief knocked low
+down hard and prevented the previous medium plateau from saturating the hidden
+behavioral categories. High inferred the canonical replay shape almost
+completely, missing only one compatibility tail in TypeScript. Xhigh consumed
+the most implementation tokens and received a stronger judge score than medium,
+but it missed the same evolution/metamorphic/reasoning-chain family that has
+caused prior high/xhigh variance.
+
+Next hypothesis: the visible ambiguity is now closer to the desired shape, but
+the hidden suite still lets one strong non-xhigh run solve almost everything
+while xhigh remains stochastic. The next benchmark hardening should add one
+integrated incident fixture rather than another isolated rule case: a long
+ledger that combines the month-close and backfill symptoms in the same
+scenario, then checks summaries, reports, parity/digest, and architecture
+boundaries from that shared replay. The goal is to reward durable synthesis of
+the whole incident, not local patching of individually named behaviors.

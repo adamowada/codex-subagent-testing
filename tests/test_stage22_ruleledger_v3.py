@@ -44,6 +44,7 @@ def test_v3_plan_records_public_benchmark_design_basis() -> None:
 def test_v3_template_exposes_issue_and_architecture_docs() -> None:
     readme = (TEMPLATE_V3 / "README.md").read_text(encoding="utf-8")
     issue = (TEMPLATE_V3 / "docs" / "ruleledger_v3_issue_brief.md").read_text(encoding="utf-8")
+    issue_flat = " ".join(issue.split())
     architecture = (TEMPLATE_V3 / "docs" / "ruleledger_v3_architecture.md").read_text(encoding="utf-8")
 
     assert "docs/ruleledger_v3_issue_brief.md" in readme
@@ -51,16 +52,16 @@ def test_v3_template_exposes_issue_and_architecture_docs() -> None:
     assert "Preserve all v1 and v2 public APIs" in issue
     assert "near-linear account aggregation" in issue
     assert "Recent Support Escalations" in issue
-    assert "malformed optional date fields" in issue
-    assert "deterministic ordering and escaping contract" in issue
-    assert "source and destination identifiers" in issue
-    assert "Business-effective and audit-visible cutoffs" in issue
-    assert "Correction and void operations compose" in issue
-    assert "lineage-changing events" in issue
-    assert "exact integer money math" in issue
-    assert "Archival timestamp normalization" in issue
-    assert "same imported ledger through point-in-time" in issue
-    assert "one canonical replay model" in issue
+    assert "not a complete truth table" in issue_flat
+    assert "Month-Close Reconciliation Drift" in issue
+    assert "Backfill Import Drift" in issue
+    assert "same imported ledger" in issue_flat
+    assert "CSV exports, parity checks, and replay fingerprints" in issue_flat
+    assert "identifiers that the operator saw in the older account history" in issue_flat
+    assert "visible to audit before they belonged in the business view" in issue_flat
+    assert "optional invoice dates are not always real dates" in issue_flat
+    assert "cent-level rounding drift" in issue_flat
+    assert "byte comparison is meaningful" in issue_flat
     assert "src/replay.ts" in architecture
     assert "ruleledger/replay.py" in architecture
 
