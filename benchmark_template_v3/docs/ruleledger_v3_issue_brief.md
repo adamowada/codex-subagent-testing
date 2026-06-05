@@ -62,37 +62,25 @@ in ways that are not all enumerated in the public examples.
 
 ## Recent Support Escalations
 
-- A malformed optional invoice period timestamp should fail normalization. Do
-  not let host date libraries silently roll values like a February 30 period end
-  into a different valid date.
-- CSV report row order must be byte-stable across languages and hosts. Sort
-  account IDs by plain deterministic string order, not by locale-aware collation
-  or natural numeric grouping.
-- Corrections and voids recorded against a source account after an account merge
-  still target the original event. If the corrected or voided event contributes
-  value that the destination inherited through the merge, the destination view
-  and report row should reflect the visible operation.
-- When support asks for separate business and audit cutoffs, do not collapse
-  them into one timestamp. Audit visibility decides which late corrections and
-  voids are known; business visibility decides which effective facts belong in
-  the view. Once a correction or void is audit-visible, apply it to the
-  original target event before replaying merge lineage, even through multiple
-  merge hops.
-- If a void references a correction event, treat it as a void of the original
-  corrected fact. The support team uses this to retract a bad correction rather
-  than to resurrect whichever value happened to be present before the
-  correction was recorded.
-- Back-office corrections may also target merge records. A corrected merge
-  should replay lineage from the corrected source account; if that correction
-  is voided, the original merge fact is voided rather than falling back to the
-  mistaken source account.
-- Finance has seen high-seat downgrades drift by a cent when implementations
-  use floating-point prorations. V2's exact millisecond proration and
-  half-away-from-zero rounding apply equally to credits, charges, upgrades, and
-  downgrades, even when the seat count is large.
-- Archival imports may contain four-digit years before 0100. Timestamp
-  normalization should preserve the represented UTC instant instead of letting
-  host date constructors remap years like 0001 to a modern century.
+- Import validation still needs to reject malformed optional date fields instead
+  of letting host libraries coerce them into plausible-looking values.
+- CSV output must remain byte-stable across languages and hosts. Use a single
+  deterministic ordering and escaping contract for every report path.
+- Support views increasingly involve source and destination identifiers after
+  account lineage changes. Corrections and voids should target the original
+  event identity first, then flow through whatever lineage is visible for the
+  requested view.
+- Business-effective and audit-visible cutoffs are separate dimensions. Do not
+  collapse them into one timestamp; decide which facts are known before deciding
+  which facts belong in the business view.
+- Correction and void operations compose. A robust replay pass should handle
+  operations against ordinary events and lineage-changing events without
+  depending on the order or wording of a particular ticket.
+- Billing compatibility still depends on exact integer money math. Avoid
+  floating-point shortcuts for prorations, credits, charges, quantities, or
+  old/new plan transitions.
+- Archival timestamp normalization should preserve the represented UTC instant
+  across supported year ranges instead of relying on host constructor quirks.
 - Support now compares the same imported ledger through point-in-time
   summaries, CSV reports, parity checks, and replay digests. These surfaces
   should derive from one canonical replay model; do not fix a summary path while

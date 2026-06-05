@@ -51,14 +51,14 @@ def test_v3_template_exposes_issue_and_architecture_docs() -> None:
     assert "Preserve all v1 and v2 public APIs" in issue
     assert "near-linear account aggregation" in issue
     assert "Recent Support Escalations" in issue
-    assert "malformed optional invoice period timestamp" in issue
-    assert "plain deterministic string order" in issue
-    assert "source account after an account merge" in issue
-    assert "separate business and audit cutoffs" in issue
-    assert "void references a correction event" in issue
-    assert "Back-office corrections may also target merge records" in issue
-    assert "high-seat downgrades" in issue
-    assert "four-digit years before 0100" in issue
+    assert "malformed optional date fields" in issue
+    assert "deterministic ordering and escaping contract" in issue
+    assert "source and destination identifiers" in issue
+    assert "Business-effective and audit-visible cutoffs" in issue
+    assert "Correction and void operations compose" in issue
+    assert "lineage-changing events" in issue
+    assert "exact integer money math" in issue
+    assert "Archival timestamp normalization" in issue
     assert "same imported ledger through point-in-time" in issue
     assert "one canonical replay model" in issue
     assert "src/replay.ts" in architecture

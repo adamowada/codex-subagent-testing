@@ -769,3 +769,54 @@ from issue-style ambiguity, or replace some older small chain fixtures with
 multi-view families that all point at the same underlying abstraction. Adding
 more isolated hidden cases is unlikely to fix the medium/high/xhigh ordering on
 its own.
+
+## Checkpoint: Ambiguous Support Brief Calibration
+
+The next pass held hidden cases and scoring fixed, but made the visible v3
+support brief less concrete. The old `Recent Support Escalations` section was
+too close to a hidden-case checklist: it named exact timestamp examples, exact
+void/correction shapes, corrected merge records, and high-seat downgrade
+arithmetic. The revised brief still exposes the same domains, but frames them
+as broader support themes:
+
+- malformed optional date fields;
+- deterministic CSV ordering and escaping;
+- source/destination identifiers after lineage changes;
+- separate business-effective and audit-visible cutoffs;
+- composed correction and void operations;
+- exact integer money math;
+- archival timestamp preservation;
+- one canonical replay model across summaries, reports, parity, and digests.
+
+Verification after this pass:
+
+- `python -m pytest -q tests\test_stage22_ruleledger_v3.py tests\test_prompt_rendering.py`
+  -> `38 passed`.
+- `python -m pytest -q` -> `178 passed`.
+
+The follow-up sanity run
+`20260605T034428-ruleledger_v3_sanity-v3_sanity_measured_14_ambiguous_brief`
+completed all four implementations, schema-enforced judges, scoring, aggregate
+outputs, HTML report, PDF report, CSV, SQLite, and Stage 11 validation.
+
+| Cell | Reasoning | Hidden Correctness | Judge | Minimality | Quality |
+|---|---:|---:|---:|---:|---:|
+| V3S0 | low | `0.616505` | `0.640000` | `1.000000` | `0.729052` |
+| V3S1 | medium | `0.509709` | `0.655000` | `0.884750` | `0.675497` |
+| V3S2 | high | `0.587379` | `0.690000` | `0.787000` | `0.719099` |
+| V3S3 | xhigh | `0.985437` | `0.930000` | `0.679500` | `0.967703` |
+
+This is the clearest xhigh-vs-rest separation so far under the v3 benchmark:
+xhigh nearly saturated hidden correctness and received the strongest judge
+score despite a larger patch. The full ladder is still not proven, because the
+lower three cells are nonmonotonic (`low` slightly above `high`, both above
+`medium`). The lower-level ordering appears sensitive to which partial runtime
+patch happens to land, while xhigh is the only cell that inferred enough of the
+general replay model to pass almost everything.
+
+Next hypothesis: before adding another hidden fixture, run repeats of the
+ambiguous-brief configuration or add an aggregate separation metric that
+explicitly rewards category saturation and judge-confirmed completeness. If
+xhigh remains consistently isolated at the top while lower levels remain noisy,
+the benchmark may be differentiating "complete reasoning" from partial patching
+but not reliably ordering the three partial-reasoning modes.
