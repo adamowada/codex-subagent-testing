@@ -245,6 +245,573 @@
         "OR-003",
         "PY-001"
       ]
+    },
+    {
+      "category": "metamorphic",
+      "expected": {
+        "baseline": [
+          {
+            "accountId": "acct_mv_dest",
+            "closedAt": null,
+            "couponActive": true,
+            "couponCode": "LEDGER,VIEW",
+            "currency": "USD",
+            "features": [
+              "dashboard",
+              "exports"
+            ],
+            "invoiceIds": [
+              "inv_mv_corrected"
+            ],
+            "lastEventAt": "2026-08-10T00:00:00.000Z",
+            "lastInvoiceId": "inv_mv_corrected",
+            "lastPeriodEnd": "2026-09-01T00:00:00.000Z",
+            "lastPeriodStart": "2026-08-01T00:00:00.000Z",
+            "mergedFromAccountIds": [
+              "acct_mv_source",
+              "acct_mv_mid"
+            ],
+            "overLimit": false,
+            "plan": "starter",
+            "seats": 9,
+            "status": "active",
+            "totalPaidCents": 0,
+            "usage": 8,
+            "usageLimit": 1000
+          }
+        ],
+        "variants": [
+          {
+            "equivalent": true,
+            "name": "reverse_import_order",
+            "value": [
+              {
+                "accountId": "acct_mv_dest",
+                "closedAt": null,
+                "couponActive": true,
+                "couponCode": "LEDGER,VIEW",
+                "currency": "USD",
+                "features": [
+                  "dashboard",
+                  "exports"
+                ],
+                "invoiceIds": [
+                  "inv_mv_corrected"
+                ],
+                "lastEventAt": "2026-08-10T00:00:00.000Z",
+                "lastInvoiceId": "inv_mv_corrected",
+                "lastPeriodEnd": "2026-09-01T00:00:00.000Z",
+                "lastPeriodStart": "2026-08-01T00:00:00.000Z",
+                "mergedFromAccountIds": [
+                  "acct_mv_source",
+                  "acct_mv_mid"
+                ],
+                "overLimit": false,
+                "plan": "starter",
+                "seats": 9,
+                "status": "active",
+                "totalPaidCents": 0,
+                "usage": 8,
+                "usageLimit": 1000
+              }
+            ]
+          },
+          {
+            "equivalent": true,
+            "name": "unrelated_ledger_noise",
+            "value": [
+              {
+                "accountId": "acct_mv_dest",
+                "closedAt": null,
+                "couponActive": true,
+                "couponCode": "LEDGER,VIEW",
+                "currency": "USD",
+                "features": [
+                  "dashboard",
+                  "exports"
+                ],
+                "invoiceIds": [
+                  "inv_mv_corrected"
+                ],
+                "lastEventAt": "2026-08-10T00:00:00.000Z",
+                "lastInvoiceId": "inv_mv_corrected",
+                "lastPeriodEnd": "2026-09-01T00:00:00.000Z",
+                "lastPeriodStart": "2026-08-01T00:00:00.000Z",
+                "mergedFromAccountIds": [
+                  "acct_mv_source",
+                  "acct_mv_mid"
+                ],
+                "overLimit": false,
+                "plan": "starter",
+                "seats": 9,
+                "status": "active",
+                "totalPaidCents": 0,
+                "usage": 8,
+                "usageLimit": 1000
+              }
+            ]
+          }
+        ]
+      },
+      "id": "v3.metamorphic.multi_view_replay_equivalence",
+      "input": {
+        "audit_as_of": "2026-08-12T00:00:00Z",
+        "baseline": [
+          {
+            "account_id": "acct_mv_dest",
+            "id": "evt_mv_dest_open",
+            "plan": "starter",
+            "quantity": 2,
+            "timestamp": "2026-08-01T00:00:00Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_mv_mid",
+            "id": "evt_mv_mid_open",
+            "plan": "pro",
+            "quantity": 1,
+            "timestamp": "2026-08-01T00:00:01Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_mv_source",
+            "id": "evt_mv_source_open",
+            "plan": "enterprise",
+            "quantity": 4,
+            "timestamp": "2026-08-01T00:00:02Z",
+            "type": "account_opened"
+          },
+          {
+            "account_id": "acct_mv_dest",
+            "amount_cents": 0,
+            "currency": "usd",
+            "id": "evt_mv_dest_currency",
+            "timestamp": "2026-08-01T01:00:00Z",
+            "type": "payment_succeeded"
+          },
+          {
+            "account_id": "acct_mv_source",
+            "id": "evt_mv_source_usage",
+            "recorded_at": "2026-08-02T00:00:00Z",
+            "sequence": 0,
+            "timestamp": "2026-08-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 11
+          },
+          {
+            "account_id": "acct_mv_source",
+            "id": "evt_mv_source_usage",
+            "recorded_at": "2026-08-02T00:05:00Z",
+            "sequence": 9,
+            "timestamp": "2026-08-02T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 99
+          },
+          {
+            "account_id": "acct_mv_source",
+            "amount_cents": 19900,
+            "currency": "usd",
+            "id": "evt_mv_source_invoice",
+            "invoice_id": "inv_mv_original",
+            "period_end": "2026-09-01T00:00:00Z",
+            "period_start": "2026-08-01T00:00:00Z",
+            "timestamp": "2026-08-02T02:00:00Z",
+            "type": "invoice_issued"
+          },
+          {
+            "account_id": "acct_mv_mid",
+            "id": "evt_mv_merge_source_mid",
+            "merge_from_account_id": "acct_mv_source",
+            "timestamp": "2026-08-03T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_mv_mid",
+            "id": "evt_mv_mid_usage",
+            "timestamp": "2026-08-04T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 5
+          },
+          {
+            "account_id": "acct_mv_dest",
+            "id": "evt_mv_merge_mid_dest",
+            "merge_from_account_id": "acct_mv_mid",
+            "timestamp": "2026-08-05T00:00:00Z",
+            "type": "account_merged"
+          },
+          {
+            "account_id": "acct_mv_dest",
+            "coupon": "ledger,view",
+            "expires_at": "2026-09-01T00:00:00Z",
+            "id": "evt_mv_dest_coupon",
+            "timestamp": "2026-08-06T00:00:00Z",
+            "type": "coupon_applied"
+          },
+          {
+            "account_id": "acct_mv_source",
+            "correction_of": "evt_mv_source_usage",
+            "effective_at": "2026-08-02T00:00:00Z",
+            "id": "evt_mv_correct_usage",
+            "recorded_at": "2026-08-07T00:00:00Z",
+            "timestamp": "2026-08-07T00:00:00Z",
+            "type": "event_corrected",
+            "usage": 17
+          },
+          {
+            "account_id": "acct_mv_source",
+            "amount_cents": 24900,
+            "correction_of": "evt_mv_source_invoice",
+            "currency": "usd",
+            "effective_at": "2026-08-02T02:00:00Z",
+            "id": "evt_mv_correct_invoice",
+            "invoice_id": "inv_mv_corrected",
+            "period_end": "2026-09-01T00:00:00Z",
+            "period_start": "2026-08-01T00:00:00Z",
+            "recorded_at": "2026-08-08T00:00:00Z",
+            "timestamp": "2026-08-08T00:00:00Z",
+            "type": "event_corrected"
+          },
+          {
+            "account_id": "acct_mv_source",
+            "id": "evt_mv_source_late_usage",
+            "timestamp": "2026-08-09T00:00:00Z",
+            "type": "usage_recorded",
+            "usage": 3
+          },
+          {
+            "account_id": "acct_mv_dest",
+            "id": "evt_mv_dest_seat_delta",
+            "seat_delta": 2,
+            "timestamp": "2026-08-10T00:00:00Z",
+            "type": "seat_delta_recorded"
+          },
+          {
+            "account_id": "acct_mv_source",
+            "effective_at": "2026-08-02T00:00:00Z",
+            "id": "evt_mv_void_usage_correction",
+            "recorded_at": "2026-08-11T00:00:00Z",
+            "timestamp": "2026-08-11T00:00:00Z",
+            "type": "event_voided",
+            "voided_event_id": "evt_mv_correct_usage"
+          }
+        ],
+        "business_as_of": "2026-08-12T00:00:00Z",
+        "target_account_id": "acct_mv_dest",
+        "variants": [
+          {
+            "name": "reverse_import_order",
+            "raw_events": [
+              {
+                "account_id": "acct_mv_source",
+                "effective_at": "2026-08-02T00:00:00Z",
+                "id": "evt_mv_void_usage_correction",
+                "recorded_at": "2026-08-11T00:00:00Z",
+                "timestamp": "2026-08-11T00:00:00Z",
+                "type": "event_voided",
+                "voided_event_id": "evt_mv_correct_usage"
+              },
+              {
+                "account_id": "acct_mv_dest",
+                "id": "evt_mv_dest_seat_delta",
+                "seat_delta": 2,
+                "timestamp": "2026-08-10T00:00:00Z",
+                "type": "seat_delta_recorded"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "id": "evt_mv_source_late_usage",
+                "timestamp": "2026-08-09T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 3
+              },
+              {
+                "account_id": "acct_mv_source",
+                "amount_cents": 24900,
+                "correction_of": "evt_mv_source_invoice",
+                "currency": "usd",
+                "effective_at": "2026-08-02T02:00:00Z",
+                "id": "evt_mv_correct_invoice",
+                "invoice_id": "inv_mv_corrected",
+                "period_end": "2026-09-01T00:00:00Z",
+                "period_start": "2026-08-01T00:00:00Z",
+                "recorded_at": "2026-08-08T00:00:00Z",
+                "timestamp": "2026-08-08T00:00:00Z",
+                "type": "event_corrected"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "correction_of": "evt_mv_source_usage",
+                "effective_at": "2026-08-02T00:00:00Z",
+                "id": "evt_mv_correct_usage",
+                "recorded_at": "2026-08-07T00:00:00Z",
+                "timestamp": "2026-08-07T00:00:00Z",
+                "type": "event_corrected",
+                "usage": 17
+              },
+              {
+                "account_id": "acct_mv_dest",
+                "coupon": "ledger,view",
+                "expires_at": "2026-09-01T00:00:00Z",
+                "id": "evt_mv_dest_coupon",
+                "timestamp": "2026-08-06T00:00:00Z",
+                "type": "coupon_applied"
+              },
+              {
+                "account_id": "acct_mv_dest",
+                "id": "evt_mv_merge_mid_dest",
+                "merge_from_account_id": "acct_mv_mid",
+                "timestamp": "2026-08-05T00:00:00Z",
+                "type": "account_merged"
+              },
+              {
+                "account_id": "acct_mv_mid",
+                "id": "evt_mv_mid_usage",
+                "timestamp": "2026-08-04T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 5
+              },
+              {
+                "account_id": "acct_mv_mid",
+                "id": "evt_mv_merge_source_mid",
+                "merge_from_account_id": "acct_mv_source",
+                "timestamp": "2026-08-03T00:00:00Z",
+                "type": "account_merged"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "amount_cents": 19900,
+                "currency": "usd",
+                "id": "evt_mv_source_invoice",
+                "invoice_id": "inv_mv_original",
+                "period_end": "2026-09-01T00:00:00Z",
+                "period_start": "2026-08-01T00:00:00Z",
+                "timestamp": "2026-08-02T02:00:00Z",
+                "type": "invoice_issued"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "id": "evt_mv_source_usage",
+                "recorded_at": "2026-08-02T00:05:00Z",
+                "sequence": 9,
+                "timestamp": "2026-08-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 99
+              },
+              {
+                "account_id": "acct_mv_source",
+                "id": "evt_mv_source_usage",
+                "recorded_at": "2026-08-02T00:00:00Z",
+                "sequence": 0,
+                "timestamp": "2026-08-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 11
+              },
+              {
+                "account_id": "acct_mv_dest",
+                "amount_cents": 0,
+                "currency": "usd",
+                "id": "evt_mv_dest_currency",
+                "timestamp": "2026-08-01T01:00:00Z",
+                "type": "payment_succeeded"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "id": "evt_mv_source_open",
+                "plan": "enterprise",
+                "quantity": 4,
+                "timestamp": "2026-08-01T00:00:02Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_mv_mid",
+                "id": "evt_mv_mid_open",
+                "plan": "pro",
+                "quantity": 1,
+                "timestamp": "2026-08-01T00:00:01Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_mv_dest",
+                "id": "evt_mv_dest_open",
+                "plan": "starter",
+                "quantity": 2,
+                "timestamp": "2026-08-01T00:00:00Z",
+                "type": "account_opened"
+              }
+            ]
+          },
+          {
+            "name": "unrelated_ledger_noise",
+            "raw_events": [
+              {
+                "account_id": "acct_mv_dest",
+                "id": "evt_mv_dest_open",
+                "plan": "starter",
+                "quantity": 2,
+                "timestamp": "2026-08-01T00:00:00Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_mv_mid",
+                "id": "evt_mv_mid_open",
+                "plan": "pro",
+                "quantity": 1,
+                "timestamp": "2026-08-01T00:00:01Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "id": "evt_mv_source_open",
+                "plan": "enterprise",
+                "quantity": 4,
+                "timestamp": "2026-08-01T00:00:02Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_mv_dest",
+                "amount_cents": 0,
+                "currency": "usd",
+                "id": "evt_mv_dest_currency",
+                "timestamp": "2026-08-01T01:00:00Z",
+                "type": "payment_succeeded"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "id": "evt_mv_source_usage",
+                "recorded_at": "2026-08-02T00:00:00Z",
+                "sequence": 0,
+                "timestamp": "2026-08-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 11
+              },
+              {
+                "account_id": "acct_mv_source",
+                "id": "evt_mv_source_usage",
+                "recorded_at": "2026-08-02T00:05:00Z",
+                "sequence": 9,
+                "timestamp": "2026-08-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 99
+              },
+              {
+                "account_id": "acct_mv_source",
+                "amount_cents": 19900,
+                "currency": "usd",
+                "id": "evt_mv_source_invoice",
+                "invoice_id": "inv_mv_original",
+                "period_end": "2026-09-01T00:00:00Z",
+                "period_start": "2026-08-01T00:00:00Z",
+                "timestamp": "2026-08-02T02:00:00Z",
+                "type": "invoice_issued"
+              },
+              {
+                "account_id": "acct_mv_mid",
+                "id": "evt_mv_merge_source_mid",
+                "merge_from_account_id": "acct_mv_source",
+                "timestamp": "2026-08-03T00:00:00Z",
+                "type": "account_merged"
+              },
+              {
+                "account_id": "acct_mv_mid",
+                "id": "evt_mv_mid_usage",
+                "timestamp": "2026-08-04T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 5
+              },
+              {
+                "account_id": "acct_mv_dest",
+                "id": "evt_mv_merge_mid_dest",
+                "merge_from_account_id": "acct_mv_mid",
+                "timestamp": "2026-08-05T00:00:00Z",
+                "type": "account_merged"
+              },
+              {
+                "account_id": "acct_mv_dest",
+                "coupon": "ledger,view",
+                "expires_at": "2026-09-01T00:00:00Z",
+                "id": "evt_mv_dest_coupon",
+                "timestamp": "2026-08-06T00:00:00Z",
+                "type": "coupon_applied"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "correction_of": "evt_mv_source_usage",
+                "effective_at": "2026-08-02T00:00:00Z",
+                "id": "evt_mv_correct_usage",
+                "recorded_at": "2026-08-07T00:00:00Z",
+                "timestamp": "2026-08-07T00:00:00Z",
+                "type": "event_corrected",
+                "usage": 17
+              },
+              {
+                "account_id": "acct_mv_source",
+                "amount_cents": 24900,
+                "correction_of": "evt_mv_source_invoice",
+                "currency": "usd",
+                "effective_at": "2026-08-02T02:00:00Z",
+                "id": "evt_mv_correct_invoice",
+                "invoice_id": "inv_mv_corrected",
+                "period_end": "2026-09-01T00:00:00Z",
+                "period_start": "2026-08-01T00:00:00Z",
+                "recorded_at": "2026-08-08T00:00:00Z",
+                "timestamp": "2026-08-08T00:00:00Z",
+                "type": "event_corrected"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "id": "evt_mv_source_late_usage",
+                "timestamp": "2026-08-09T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 3
+              },
+              {
+                "account_id": "acct_mv_dest",
+                "id": "evt_mv_dest_seat_delta",
+                "seat_delta": 2,
+                "timestamp": "2026-08-10T00:00:00Z",
+                "type": "seat_delta_recorded"
+              },
+              {
+                "account_id": "acct_mv_source",
+                "effective_at": "2026-08-02T00:00:00Z",
+                "id": "evt_mv_void_usage_correction",
+                "recorded_at": "2026-08-11T00:00:00Z",
+                "timestamp": "2026-08-11T00:00:00Z",
+                "type": "event_voided",
+                "voided_event_id": "evt_mv_correct_usage"
+              },
+              {
+                "account_id": "acct_mv_noise",
+                "id": "evt_mv_noise_open",
+                "plan": "free",
+                "timestamp": "2026-08-01T00:00:00Z",
+                "type": "account_opened"
+              },
+              {
+                "account_id": "acct_mv_noise",
+                "id": "evt_mv_noise_usage",
+                "timestamp": "2026-08-02T00:00:00Z",
+                "type": "usage_recorded",
+                "usage": 500
+              }
+            ]
+          }
+        ]
+      },
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v2_metamorphic",
+      "points": 2.5,
+      "rule_ids": [
+        "OR-001",
+        "OR-002",
+        "CV-001",
+        "CV-002",
+        "MG-005",
+        "PY-001"
+      ]
     }
   ],
   "generated_at": "2026-05-29T00:00:00.000Z",

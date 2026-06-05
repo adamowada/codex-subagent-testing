@@ -717,3 +717,55 @@ outperformed high in this repeat. The next improvement should target the
 medium/high instability directly, likely by replacing or reinforcing the older
 chain cases with multi-view reasoning cases that reward systematic replay
 modeling rather than isolated fixture luck.
+
+## Checkpoint: Multi-View Replay Pressure
+
+The next pass added a same-ledger, multi-view pressure family instead of another
+concrete arithmetic tail. The visible v3 issue brief now says support compares
+the same imported ledger through point-in-time summaries, CSV reports, parity
+checks, and replay digests, and that those surfaces should share one canonical
+replay model. The hidden generator uses one ledger with duplicate event IDs,
+multi-hop merges, late source-account corrections, a correction void, and
+report-sensitive CSV fields, then checks it through:
+
+- `v3.reasoning.multi_view_before_void_summary`, a summary view before the
+  correction void is audit-visible;
+- `v3.evolution.multi_view_after_void_parity`, a summary-plus-report view after
+  the correction void is audit-visible;
+- `v3.metamorphic.multi_view_replay_equivalence`, replay equivalence under
+  reversed import order and unrelated ledger noise.
+
+Verification after this pass:
+
+- `python -m pytest -q tests\test_stage22_ruleledger_v3.py` -> `16 passed`.
+- Starter hidden-runner baseline -> `30/119` points, `19/56` language cases,
+  no runner errors.
+- `python -m pytest -q` -> `178 passed`.
+
+The follow-up sanity run
+`20260605T024652-ruleledger_v3_sanity-v3_sanity_measured_13_multiview`
+completed all four implementations, schema-enforced judges, scoring, aggregate
+outputs, HTML report, PDF report, CSV, SQLite, and Stage 11 validation.
+
+| Cell | Reasoning | Hidden Correctness | Judge | Minimality | Quality |
+|---|---:|---:|---:|---:|---:|
+| V3S0 | low | `0.533981` | `0.612500` | `1.000000` | `0.621741` |
+| V3S1 | medium | `0.912621` | `0.785000` | `1.000000` | `0.909010` |
+| V3S2 | high | `0.888350` | `0.670000` | `1.000000` | `0.841575` |
+| V3S3 | xhigh | `0.766990` | `0.850000` | `0.731250` | `0.842432` |
+
+The new multi-view cases separated low from the rest: low failed all six
+language executions, while medium, high, and xhigh passed all six. That confirms
+the pressure family is fair and useful, but it did not solve adjacent
+reasoning-level separation. Medium still finished first, and high/xhigh were
+nearly tied. Xhigh passed the new multi-view family but missed older small
+bitemporal chain/cutoff cases, while medium solved those with a smaller runtime
+patch.
+
+Next hypothesis: the current benchmark still has too much reward for concrete
+fixture-style patching. The next pass should either generalize/reduce the
+over-concrete support bullets so measured agents must infer the replay model
+from issue-style ambiguity, or replace some older small chain fixtures with
+multi-view families that all point at the same underlying abstraction. Adding
+more isolated hidden cases is unlikely to fix the medium/high/xhigh ordering on
+its own.

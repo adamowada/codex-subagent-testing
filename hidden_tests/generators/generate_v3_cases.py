@@ -470,6 +470,148 @@ def corrected_merge_record_events() -> list[dict[str, Any]]:
     ]
 
 
+def multi_view_replay_events() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "evt_mv_dest_open",
+            "account_id": "acct_mv_dest",
+            "type": "account_opened",
+            "timestamp": "2026-08-01T00:00:00Z",
+            "plan": "starter",
+            "quantity": 2,
+        },
+        {
+            "id": "evt_mv_mid_open",
+            "account_id": "acct_mv_mid",
+            "type": "account_opened",
+            "timestamp": "2026-08-01T00:00:01Z",
+            "plan": "pro",
+            "quantity": 1,
+        },
+        {
+            "id": "evt_mv_source_open",
+            "account_id": "acct_mv_source",
+            "type": "account_opened",
+            "timestamp": "2026-08-01T00:00:02Z",
+            "plan": "enterprise",
+            "quantity": 4,
+        },
+        {
+            "id": "evt_mv_dest_currency",
+            "account_id": "acct_mv_dest",
+            "type": "payment_succeeded",
+            "timestamp": "2026-08-01T01:00:00Z",
+            "amount_cents": 0,
+            "currency": "usd",
+        },
+        {
+            "id": "evt_mv_source_usage",
+            "account_id": "acct_mv_source",
+            "type": "usage_recorded",
+            "timestamp": "2026-08-02T00:00:00Z",
+            "recorded_at": "2026-08-02T00:00:00Z",
+            "sequence": 0,
+            "usage": 11,
+        },
+        {
+            "id": "evt_mv_source_usage",
+            "account_id": "acct_mv_source",
+            "type": "usage_recorded",
+            "timestamp": "2026-08-02T00:00:00Z",
+            "recorded_at": "2026-08-02T00:05:00Z",
+            "sequence": 9,
+            "usage": 99,
+        },
+        {
+            "id": "evt_mv_source_invoice",
+            "account_id": "acct_mv_source",
+            "type": "invoice_issued",
+            "timestamp": "2026-08-02T02:00:00Z",
+            "amount_cents": 19900,
+            "currency": "usd",
+            "invoice_id": "inv_mv_original",
+            "period_start": "2026-08-01T00:00:00Z",
+            "period_end": "2026-09-01T00:00:00Z",
+        },
+        {
+            "id": "evt_mv_merge_source_mid",
+            "account_id": "acct_mv_mid",
+            "type": "account_merged",
+            "timestamp": "2026-08-03T00:00:00Z",
+            "merge_from_account_id": "acct_mv_source",
+        },
+        {
+            "id": "evt_mv_mid_usage",
+            "account_id": "acct_mv_mid",
+            "type": "usage_recorded",
+            "timestamp": "2026-08-04T00:00:00Z",
+            "usage": 5,
+        },
+        {
+            "id": "evt_mv_merge_mid_dest",
+            "account_id": "acct_mv_dest",
+            "type": "account_merged",
+            "timestamp": "2026-08-05T00:00:00Z",
+            "merge_from_account_id": "acct_mv_mid",
+        },
+        {
+            "id": "evt_mv_dest_coupon",
+            "account_id": "acct_mv_dest",
+            "type": "coupon_applied",
+            "timestamp": "2026-08-06T00:00:00Z",
+            "coupon": "ledger,view",
+            "expires_at": "2026-09-01T00:00:00Z",
+        },
+        {
+            "id": "evt_mv_correct_usage",
+            "account_id": "acct_mv_source",
+            "type": "event_corrected",
+            "timestamp": "2026-08-07T00:00:00Z",
+            "recorded_at": "2026-08-07T00:00:00Z",
+            "effective_at": "2026-08-02T00:00:00Z",
+            "correction_of": "evt_mv_source_usage",
+            "usage": 17,
+        },
+        {
+            "id": "evt_mv_correct_invoice",
+            "account_id": "acct_mv_source",
+            "type": "event_corrected",
+            "timestamp": "2026-08-08T00:00:00Z",
+            "recorded_at": "2026-08-08T00:00:00Z",
+            "effective_at": "2026-08-02T02:00:00Z",
+            "correction_of": "evt_mv_source_invoice",
+            "amount_cents": 24900,
+            "currency": "usd",
+            "invoice_id": "inv_mv_corrected",
+            "period_start": "2026-08-01T00:00:00Z",
+            "period_end": "2026-09-01T00:00:00Z",
+        },
+        {
+            "id": "evt_mv_source_late_usage",
+            "account_id": "acct_mv_source",
+            "type": "usage_recorded",
+            "timestamp": "2026-08-09T00:00:00Z",
+            "usage": 3,
+        },
+        {
+            "id": "evt_mv_dest_seat_delta",
+            "account_id": "acct_mv_dest",
+            "type": "seat_delta_recorded",
+            "timestamp": "2026-08-10T00:00:00Z",
+            "seat_delta": 2,
+        },
+        {
+            "id": "evt_mv_void_usage_correction",
+            "account_id": "acct_mv_source",
+            "type": "event_voided",
+            "timestamp": "2026-08-11T00:00:00Z",
+            "recorded_at": "2026-08-11T00:00:00Z",
+            "effective_at": "2026-08-02T00:00:00Z",
+            "voided_event_id": "evt_mv_correct_usage",
+        },
+    ]
+
+
 def reasoning_ladder_cases() -> list[dict[str, Any]]:
     raw_events = [
         {
@@ -580,6 +722,18 @@ def reasoning_ladder_cases() -> list[dict[str, Any]]:
                 "raw_events": corrected_merge_record_events(),
                 "business_as_of": "2026-07-07T00:00:00Z",
                 "audit_as_of": "2026-07-05T12:00:00Z",
+            },
+            points=3.0,
+        ),
+        evaluated_case(
+            "v3.reasoning.multi_view_before_void_summary",
+            "fail_to_pass",
+            ["BT-004", "BT-005", "CV-001", "CV-002", "MG-005", "RP-001"],
+            "v2_reduce_and_summarize",
+            {
+                "raw_events": multi_view_replay_events(),
+                "business_as_of": "2026-08-12T00:00:00Z",
+                "audit_as_of": "2026-08-10T12:00:00Z",
             },
             points=3.0,
         ),
@@ -817,6 +971,18 @@ def evolution_cases() -> list[dict[str, Any]]:
             },
             points=3.0,
         ),
+        evaluated_case(
+            "v3.evolution.multi_view_after_void_parity",
+            "evolution",
+            ["BT-004", "CV-002", "CV-006", "MG-005", "RP-001", "RP-006"],
+            "v2_parity",
+            {
+                "raw_events": multi_view_replay_events(),
+                "business_as_of": "2026-08-12T00:00:00Z",
+                "audit_as_of": "2026-08-12T00:00:00Z",
+            },
+            points=3.0,
+        ),
     ]
 
 
@@ -890,7 +1056,46 @@ def metamorphic_cases() -> list[dict[str, Any]]:
                 "as_of": "2026-01-15T00:00:00Z",
             },
             points=2.0,
-        )
+        ),
+        evaluated_case(
+            "v3.metamorphic.multi_view_replay_equivalence",
+            "metamorphic",
+            ["OR-001", "OR-002", "CV-001", "CV-002", "MG-005", "PY-001"],
+            "v2_metamorphic",
+            {
+                "baseline": multi_view_replay_events(),
+                "variants": [
+                    {
+                        "name": "reverse_import_order",
+                        "raw_events": list(reversed(multi_view_replay_events())),
+                    },
+                    {
+                        "name": "unrelated_ledger_noise",
+                        "raw_events": [
+                            *multi_view_replay_events(),
+                            {
+                                "id": "evt_mv_noise_open",
+                                "account_id": "acct_mv_noise",
+                                "type": "account_opened",
+                                "timestamp": "2026-08-01T00:00:00Z",
+                                "plan": "free",
+                            },
+                            {
+                                "id": "evt_mv_noise_usage",
+                                "account_id": "acct_mv_noise",
+                                "type": "usage_recorded",
+                                "timestamp": "2026-08-02T00:00:00Z",
+                                "usage": 500,
+                            },
+                        ],
+                    },
+                ],
+                "target_account_id": "acct_mv_dest",
+                "business_as_of": "2026-08-12T00:00:00Z",
+                "audit_as_of": "2026-08-12T00:00:00Z",
+            },
+            points=2.5,
+        ),
     ]
 
 

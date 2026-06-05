@@ -93,3 +93,8 @@ in ways that are not all enumerated in the public examples.
 - Archival imports may contain four-digit years before 0100. Timestamp
   normalization should preserve the represented UTC instant instead of letting
   host date constructors remap years like 0001 to a modern century.
+- Support now compares the same imported ledger through point-in-time
+  summaries, CSV reports, parity checks, and replay digests. These surfaces
+  should derive from one canonical replay model; do not fix a summary path while
+  leaving reporting, duplicate handling, or audit/business cutoff behavior to a
+  separate path-specific interpretation.

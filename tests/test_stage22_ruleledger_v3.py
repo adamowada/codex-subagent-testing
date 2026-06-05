@@ -59,6 +59,8 @@ def test_v3_template_exposes_issue_and_architecture_docs() -> None:
     assert "Back-office corrections may also target merge records" in issue
     assert "high-seat downgrades" in issue
     assert "four-digit years before 0100" in issue
+    assert "same imported ledger through point-in-time" in issue
+    assert "one canonical replay model" in issue
     assert "src/replay.ts" in architecture
     assert "ruleledger/replay.py" in architecture
 
@@ -330,6 +332,40 @@ def test_v3_hidden_cases_include_corrected_merge_record_pressure() -> None:
     assert after_void["expected"]["summaries"][0]["mergedFromAccountIds"] == []
     assert "acct_cm_final,active,starter,0,USD,2,2" in after_void["expected"]["report"]
     assert "acct_cm_true,active,enterprise,19900,USD,3,17" in after_void["expected"]["report"]
+
+
+def test_v3_hidden_cases_include_multi_view_replay_pressure() -> None:
+    _, cases = load_cases(CASES_V3_DIR)
+    cases_by_id = {case["id"]: case for case in cases}
+
+    before_void = cases_by_id["v3.reasoning.multi_view_before_void_summary"]
+    assert before_void["operation"] == "v2_reduce_and_summarize"
+    assert before_void["input"]["audit_as_of"] == "2026-08-10T12:00:00Z"
+    assert before_void["expected"][0]["accountId"] == "acct_mv_dest"
+    assert before_void["expected"][0]["usage"] == 25
+    assert before_void["expected"][0]["invoiceIds"] == ["inv_mv_corrected"]
+    assert before_void["expected"][0]["mergedFromAccountIds"] == [
+        "acct_mv_source",
+        "acct_mv_mid",
+    ]
+
+    after_void = cases_by_id["v3.evolution.multi_view_after_void_parity"]
+    assert after_void["operation"] == "v2_parity"
+    assert after_void["input"]["audit_as_of"] == "2026-08-12T00:00:00Z"
+    assert after_void["expected"]["summaries"][0]["usage"] == 8
+    assert "acct_mv_dest,active,starter,0,USD,9,8" in after_void["expected"]["report"]
+    assert '"LEDGER,VIEW"' in after_void["expected"]["report"]
+
+    metamorphic = cases_by_id["v3.metamorphic.multi_view_replay_equivalence"]
+    assert metamorphic["operation"] == "v2_metamorphic"
+    assert metamorphic["expected"]["baseline"][0]["usage"] == 8
+    assert {
+        variant["name"]: variant["equivalent"]
+        for variant in metamorphic["expected"]["variants"]
+    } == {
+        "reverse_import_order": True,
+        "unrelated_ledger_noise": True,
+    }
 
 
 def test_v3_performance_case_is_large_enough_to_exercise_algorithmic_shape() -> None:

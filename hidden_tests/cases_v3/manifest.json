@@ -16,9 +16,9 @@
       "sha256": "196151d660df824b66027ce5c2133b9e53a82b15eb7a01cd49be21fb5a7a430d"
     },
     "evolution.json": {
-      "case_count": 6,
-      "points": 13.5,
-      "sha256": "d934fae19c805b94caf2e48830382b1908533561c0dde9716874197740d8417f"
+      "case_count": 7,
+      "points": 16.5,
+      "sha256": "83a6e15da2c3438161f3bcb9ee26191c20ad735889c6384afd0db0a95d00dce7"
     },
     "localization.json": {
       "case_count": 2,
@@ -26,9 +26,9 @@
       "sha256": "d4cdfbd74b49e6248e833c0107b24859995fc8bc917fcdf8849149c79144d475"
     },
     "metamorphic.json": {
-      "case_count": 1,
-      "points": 2.0,
-      "sha256": "6f4d96ce64adff135705cde16a96bdd38c9979002a9384f90a61de4653798e71"
+      "case_count": 2,
+      "points": 4.5,
+      "sha256": "d2c5a0808856087b8db8ea3fd82540410e7ff6c265d0209b1b5a02fd5657662e"
     },
     "parity.json": {
       "case_count": 2,
@@ -41,9 +41,9 @@
       "sha256": "d05955db0fd25945ba1b2c9f8c494a339bcbd3e7814562b813cbc19bdbea0e2b"
     },
     "reasoning_ladder.json": {
-      "case_count": 5,
-      "points": 12.0,
-      "sha256": "a25da07377c4d1402da8f56e71612f09859b0ca830c6993e3f719ec2eaf9b9e3"
+      "case_count": 6,
+      "points": 15.0,
+      "sha256": "0469db0ca70a809895db7d5e5a12e75ea0d6f3bbfed4ef40760d81970f79e33d"
     }
   },
   "generated_at": "2026-05-29T00:00:00.000Z",
