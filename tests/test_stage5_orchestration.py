@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from harness.codex_runner import ProcessResult, build_implementation_command, build_judge_command
+from harness.codex_runner import build_single_model_command
 from harness.jsonl_usage import parse_usage_events, summarize_usage
 from harness.matrix import expand_experiment_matrix, load_experiment_config
 from harness.orchestrator import (
@@ -208,6 +209,25 @@ def test_judge_command_is_read_only_xhigh(runs: list[dict]) -> None:
     assert command[schema_index + 1] == "judge_evidence/judge_output.schema.json"
     assert "model_reasoning_effort=xhigh" in command
     assert command[-1] == "judge prompt"
+
+
+def test_single_model_command_disables_nested_agent_depth() -> None:
+    command = build_single_model_command(
+        "codex",
+        model="gpt-5.3-codex-spark",
+        reasoning="xhigh",
+        sandbox="read-only",
+        prompt="leaf prompt",
+    )
+
+    assert command[:4] == ["codex", "--ask-for-approval", "never", "exec"]
+    assert "--json" in command
+    assert "--model" in command
+    assert "gpt-5.3-codex-spark" in command
+    assert "model_reasoning_effort=xhigh" in command
+    assert "agents.max_depth=1" in command
+    assert "agents.max_threads=1" in command
+    assert command[-1] == "leaf prompt"
 
 
 def test_judge_phase_failed_when_final_response_is_not_json() -> None:

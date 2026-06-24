@@ -128,6 +128,36 @@ def build_judge_command(codex_bin: str, run: Mapping[str, Any], prompt: str) -> 
     ]
 
 
+def build_single_model_command(
+    codex_bin: str,
+    *,
+    model: str,
+    reasoning: str,
+    sandbox: str,
+    prompt: str,
+) -> list[str]:
+    return [
+        codex_bin,
+        "--ask-for-approval",
+        "never",
+        "exec",
+        "--json",
+        "--cd",
+        "<run_worktree>",
+        "--sandbox",
+        sandbox,
+        "--model",
+        model,
+        "-c",
+        f"model_reasoning_effort={reasoning}",
+        "-c",
+        "agents.max_depth=1",
+        "-c",
+        "agents.max_threads=1",
+        prompt,
+    ]
+
+
 def materialize_worktree_command(command: list[str], worktree: Path) -> list[str]:
     return [str(worktree) if part == "<run_worktree>" else part for part in command]
 
