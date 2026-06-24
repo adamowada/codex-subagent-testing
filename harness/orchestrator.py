@@ -944,9 +944,7 @@ def run_staged_spark_implementation(
     plan_value = _final_response_value(plan_record.get("final_response"))
     for assignment in STAGED_SPARK_LEAF_ASSIGNMENTS:
         leaf_dir = stage_root / assignment["id"]
-        leaf_worktree = worktree.parent / "leaf_worktrees" / assignment["id"]
-        if leaf_worktree.exists():
-            shutil.rmtree(leaf_worktree)
+        leaf_worktree = _staged_leaf_worktree(worktree.parent / "leaf_worktrees", assignment["id"])
         copy_benchmark_template(_run_benchmark_path(repo_root, run, "template_path"), leaf_worktree)
         baseline_sha = initialize_git_baseline(leaf_worktree)
         _write_json(
@@ -1154,6 +1152,20 @@ def _run_staged_codex_stage(
     }
     _write_json(stage_dir / "stage-record.json", record)
     return record
+
+
+def _staged_leaf_worktree(parent: Path, leaf_id: str) -> Path:
+    parent.mkdir(parents=True, exist_ok=True)
+    candidate = parent / leaf_id
+    if not candidate.exists():
+        return candidate
+    timestamp = iso_now().replace(":", "").replace("-", "")
+    suffix = 1
+    while True:
+        candidate = parent / f"{leaf_id}-{timestamp}-{suffix:02d}"
+        if not candidate.exists():
+            return candidate
+        suffix += 1
 
 
 def _staged_planning_prompt(rendered_prompt: str, run: Mapping[str, Any]) -> str:
