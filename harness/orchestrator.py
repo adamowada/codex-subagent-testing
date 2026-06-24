@@ -1099,13 +1099,19 @@ def _run_staged_codex_stage(
     stage_dir.mkdir(parents=True, exist_ok=True)
     prompt_path = stage_dir / "prompt.md"
     prompt_path.write_text(prompt, encoding="utf-8")
+    workspace_prompt_path = worktree / f".codex_staged_{stage_id}_prompt.md"
+    workspace_prompt_path.write_text(prompt, encoding="utf-8")
+    command_prompt = (
+        f"Read the complete staged instructions from `{workspace_prompt_path.name}` in the current workspace, "
+        "then follow them exactly. Do not invoke nested Codex or external AI."
+    )
     command = materialize_worktree_command(
         build_single_model_command(
             codex_bin,
             model=model,
             reasoning=reasoning,
             sandbox=sandbox,
-            prompt=prompt,
+            prompt=command_prompt,
         ),
         worktree,
     )
@@ -1119,6 +1125,10 @@ def _run_staged_codex_stage(
         timeout_seconds=timeout_seconds,
         command_display=display_command,
     )
+    try:
+        workspace_prompt_path.unlink()
+    except OSError:
+        pass
     write_process_result(stage_dir / "wall_time.json", result)
     final_response = extract_final_response(stage_dir / "events.jsonl")
     event_summary = summarize_codex_events(stage_dir / "events.jsonl")
