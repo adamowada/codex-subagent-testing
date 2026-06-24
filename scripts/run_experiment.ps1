@@ -9,6 +9,7 @@ param(
     [int]$BatchSequence = 0,
     [string]$BatchStartedAt = "",
     [string]$BatchNotes = "",
+    [string]$WorkspaceRoot = "",
     [string]$Resume = "",
     [string[]]$RunId = @(),
     [int]$RepeatFrom = 0,
@@ -49,6 +50,9 @@ if ($BatchStartedAt) {
 }
 if ($BatchNotes) {
     $ArgsList += @("--batch-notes", $BatchNotes)
+}
+if ($WorkspaceRoot) {
+    $ArgsList += @("--workspace-root", $WorkspaceRoot)
 }
 if ($Resume) {
     $ArgsList += @("--resume", $Resume)

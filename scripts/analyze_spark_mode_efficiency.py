@@ -101,16 +101,34 @@ def read_results(experiment_dir: Path, *, source: str) -> list[dict[str, Any]]:
 def build_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     group_summaries = summarize_groups(rows, cohort_key=lambda row: str(row.get("cohort") or "unknown"))
     phase_group_summaries = summarize_groups(rows, cohort_key=_phase_cohort)
+    xhigh_combined_rows = [
+        row
+        for row in rows
+        if (
+            str(row.get("root_reasoning")) == "xhigh"
+            and str(row.get("source")) in {"historical", "main", "xhigh_extension"}
+        )
+    ]
+    xhigh_combined_groups = summarize_groups(xhigh_combined_rows, cohort_key=_xhigh_combined_cohort)
     return {
         "schema_version": 1,
         "row_count": len(rows),
         "groups": group_summaries,
         "phase_groups": phase_group_summaries,
+        "xhigh_combined_groups": xhigh_combined_groups,
         "direct_vs_proposal": direct_proposal_deltas(group_summaries, cohort="spark_assisted"),
         "main_direct_vs_proposal": direct_proposal_deltas(phase_group_summaries, cohort="main_spark_assisted"),
         "pilot_direct_vs_proposal": direct_proposal_deltas(phase_group_summaries, cohort="pilot_spark_assisted"),
+        "xhigh_combined_direct_vs_proposal": direct_proposal_deltas(
+            xhigh_combined_groups,
+            cohort="xhigh_combined_spark_assisted",
+        ),
         "bridge_vs_historical": bridge_deltas(group_summaries),
         "main_spark_vs_historical": spark_historical_deltas(phase_group_summaries),
+        "xhigh_combined_spark_vs_historical": spark_historical_deltas(
+            xhigh_combined_groups,
+            spark_cohort="xhigh_combined_spark_assisted",
+        ),
         "sources": sorted({str(row.get("source")) for row in rows}),
     }
 
@@ -196,11 +214,15 @@ def direct_proposal_deltas(groups: list[dict[str, Any]], *, cohort: str) -> list
     return deltas
 
 
-def spark_historical_deltas(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def spark_historical_deltas(
+    groups: list[dict[str, Any]],
+    *,
+    spark_cohort: str = "main_spark_assisted",
+) -> list[dict[str, Any]]:
     by_key = {(group["cohort"], group["root_reasoning"], group["mode"]): group for group in groups}
     deltas = []
     for group in groups:
-        if group["cohort"] != "main_spark_assisted":
+        if group["cohort"] != spark_cohort:
             continue
         historical = by_key.get(("historical_solo", group["root_reasoning"], "solo"))
         if not historical:
@@ -306,6 +328,12 @@ def render_markdown(summary: dict[str, Any]) -> str:
     main_groups = [group for group in summary["phase_groups"] if group["cohort"] == "main_spark_assisted"]
     lines.extend(["", "## Official Main Spark-Assisted Summary", ""])
     _append_group_table(lines, main_groups)
+    xhigh_groups = [
+        group for group in summary["xhigh_combined_groups"] if group["cohort"] == "xhigh_combined_spark_assisted"
+    ]
+    if xhigh_groups:
+        lines.extend(["", "## Combined Xhigh Main Plus Extension Summary", ""])
+        _append_group_table(lines, xhigh_groups)
     lines.extend(["", "## Pooled Proposal Minus Direct", ""])
     if summary["direct_vs_proposal"]:
         _append_direct_delta_table(lines, summary["direct_vs_proposal"])
@@ -316,6 +344,9 @@ def render_markdown(summary: dict[str, Any]) -> str:
         _append_direct_delta_table(lines, summary["main_direct_vs_proposal"])
     else:
         lines.append("No complete direct/proposal pairs available.")
+    if summary["xhigh_combined_direct_vs_proposal"]:
+        lines.extend(["", "## Combined Xhigh Proposal Minus Direct", ""])
+        _append_direct_delta_table(lines, summary["xhigh_combined_direct_vs_proposal"])
     lines.extend(["", "## Bridge Minus Historical", ""])
     if summary["bridge_vs_historical"]:
         lines.append("| Reasoning | Bridge quality | Historical quality | Delta |")
@@ -351,6 +382,9 @@ def render_markdown(summary: dict[str, Any]) -> str:
             )
     else:
         lines.append("No main Spark/historical pairs available.")
+    if summary["xhigh_combined_spark_vs_historical"]:
+        lines.extend(["", "## Combined Xhigh Spark Minus Historical", ""])
+        _append_spark_historical_delta_table(lines, summary["xhigh_combined_spark_vs_historical"])
     return "\n".join(lines) + "\n"
 
 
@@ -389,6 +423,25 @@ def _append_direct_delta_table(lines: list[str], deltas: list[dict[str, Any]]) -
         )
 
 
+def _append_spark_historical_delta_table(lines: list[str], deltas: list[dict[str, Any]]) -> None:
+    lines.append(
+        "| Reasoning | Mode | Spark quality | Historical quality | Quality delta | Spark total tokens | Historical total tokens |"
+    )
+    lines.append("|---|---|---:|---:|---:|---:|---:|")
+    for item in deltas:
+        lines.append(
+            "| {reasoning} | {mode} | {spark_quality} | {historical_quality} | {delta} | {spark_tokens} | {historical_tokens} |".format(
+                reasoning=item["root_reasoning"],
+                mode=item["mode"],
+                spark_quality=_fmt(item["main_quality_mean"]),
+                historical_quality=_fmt(item["historical_quality_mean"]),
+                delta=_fmt(item["quality_mean_delta_main_minus_historical"]),
+                spark_tokens=_fmt(item["main_total_impl_tokens_mean"], decimals=0),
+                historical_tokens=_fmt(item["historical_total_impl_tokens_mean"], decimals=0),
+            )
+        )
+
+
 def _cohort(row: dict[str, Any]) -> str:
     cell_id = str(row.get("cell_id") or "")
     spark_mode = str(row.get("spark_mode") or "none")
@@ -404,8 +457,15 @@ def _cohort(row: dict[str, Any]) -> str:
 def _phase_cohort(row: dict[str, Any]) -> str:
     cohort = str(row.get("cohort") or _cohort(row))
     source = str(row.get("source") or "")
-    if cohort == "spark_assisted" and source in {"main", "pilot"}:
+    if cohort == "spark_assisted" and source in {"main", "pilot", "xhigh_extension"}:
         return f"{source}_spark_assisted"
+    return cohort
+
+
+def _xhigh_combined_cohort(row: dict[str, Any]) -> str:
+    cohort = str(row.get("cohort") or _cohort(row))
+    if cohort == "spark_assisted" and str(row.get("source")) in {"main", "xhigh_extension"}:
+        return "xhigh_combined_spark_assisted"
     return cohort
 
 
@@ -418,6 +478,8 @@ def _analysis_mode(row: dict[str, Any]) -> str:
 
 def _experiment_source(path: Path) -> str:
     name = path.name.lower()
+    if "xhigh_extension" in name:
+        return "xhigh_extension"
     if "pilot" in name:
         return "pilot"
     if "main" in name:

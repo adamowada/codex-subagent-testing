@@ -8,6 +8,7 @@ Configs:
 
 - Pilot: `configs/spark_mode_efficiency_pilot.yaml`
 - Main: `configs/spark_mode_efficiency_main.yaml`
+- Xhigh extension: `configs/spark_mode_efficiency_xhigh_extension.yaml`
 
 Concurrency target:
 
@@ -34,6 +35,17 @@ locked Git object files.
 
 `073733e` added `scripts/analyze_spark_mode_efficiency.py` for derived
 historical baseline, bridge, pilot, and main summaries.
+
+`efe4089` added the first final white paper and phase-aware analysis.
+
+The xhigh extension added:
+
+- `configs/spark_mode_efficiency_xhigh_extension.yaml`.
+- Analysis support for combining main xhigh plus extension xhigh runs while
+  excluding pilot xhigh rows from the 20-vs-20 comparison.
+- `-WorkspaceRoot` support in `scripts/run_experiment.ps1` and failed
+  implementation refresh support for moving reruns to the active workspace
+  root, which avoids Windows path-length failures during repair.
 
 ## Pilot Runs
 
@@ -112,12 +124,48 @@ Main repair:
 - Main PDF:
   `runs/20260624T053702-spark_mode_efficiency_main-main/report/report.pdf`
 
+## Xhigh Extension
+
+Dry run:
+
+- Directory:
+  `runs/20260624T105934-spark_mode_efficiency_xhigh_extension-xhigh_extension_dry_run`
+- Result: preflight passed and selected 30 runs: 15 xhigh direct and 15 xhigh
+  proposal.
+
+Measured extension:
+
+- Directory:
+  `runs/20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension`
+- Command:
+  `.\scripts\run_experiment.ps1 -Config configs/spark_mode_efficiency_xhigh_extension.yaml -Jobs 5 -JudgeJobs 4 -ExperimentName xhigh_extension -StudyId spark-mode-efficiency -BatchId xhigh-extension -BatchSequence 3`
+- Result: initial run completed 30 implementations and judges, but validation
+  warned because judge JSON parse failures were preserved. Five proposal runs
+  also hit the Codex usage limit during implementation and scored zero until
+  repair.
+
+Extension repair:
+
+- First resume exposed a Windows path-length failure while refreshing the five
+  failed proposal worktrees.
+- The harness was updated so failed implementation refresh can move to the
+  active workspace root, and `scripts/run_experiment.ps1` now exposes
+  `-WorkspaceRoot`.
+- After the usage-limit reset, the repair command succeeded:
+  `.\scripts\run_experiment.ps1 -Config configs/spark_mode_efficiency_xhigh_extension.yaml -Jobs 5 -JudgeJobs 4 -WorkspaceRoot C:\cstws -Resume 20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension -RerunFailed`
+- Final validation status: `passed`.
+- Extension rows: 30.
+- Extension report:
+  `runs/20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension/report/report.html`
+- Extension PDF:
+  `runs/20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension/report/report.pdf`
+
 ## Analysis and Reporting
 
 Final analysis command:
 
 ```powershell
-python scripts\analyze_spark_mode_efficiency.py --experiment-dir runs\20260624T023048-spark_mode_efficiency_pilot-pilot --experiment-dir runs\20260624T053702-spark_mode_efficiency_main-main --output-dir runs\analysis\spark_mode_efficiency_final
+python scripts\analyze_spark_mode_efficiency.py --experiment-dir runs\20260624T023048-spark_mode_efficiency_pilot-pilot --experiment-dir runs\20260624T053702-spark_mode_efficiency_main-main --experiment-dir runs\20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension --output-dir runs\analysis\spark_mode_efficiency_final
 ```
 
 Final analysis artifacts:
@@ -127,7 +175,7 @@ Final analysis artifacts:
 - `runs/analysis/spark_mode_efficiency_final/phase_summary.csv`
 - `runs/analysis/spark_mode_efficiency_final/summary.md`
 
-Rows analyzed: 264.
+Rows analyzed: 294.
 
 White paper:
 
@@ -138,5 +186,9 @@ Headline result:
 - Direct edit is the better default for Spark leaves.
 - Direct edit wins quality and implementation-token efficiency at low, medium,
   and high root reasoning.
-- Xhigh proposal narrowly beats xhigh direct on quality and uses fewer GPT and
-  total implementation tokens, but spends more Spark tokens.
+- In the 20-run-per-mode xhigh comparison, direct is slightly higher quality:
+  `0.733897` versus `0.714206`.
+- Xhigh proposal uses fewer GPT and total implementation tokens than xhigh
+  direct, but spends more Spark tokens.
+- Both combined xhigh Spark-assisted modes trail the historical 50-run xhigh
+  GPT-only mean (`0.755057`).

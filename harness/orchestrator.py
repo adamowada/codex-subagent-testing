@@ -243,6 +243,7 @@ def run(args: argparse.Namespace) -> int:
             repo_root=repo_root,
             experiment_dir=experiment_dir,
             run=run_record,
+            workspace_root=workspace_root,
             codex_bin=codex_bin,
             rerun_failed=args.rerun_failed,
             status=status,
@@ -692,6 +693,7 @@ def run_implementation_and_tests(
     repo_root: Path,
     experiment_dir: Path,
     run: Mapping[str, Any],
+    workspace_root: Path,
     codex_bin: str,
     rerun_failed: bool,
     status: StatusWriter,
@@ -705,6 +707,14 @@ def run_implementation_and_tests(
     implementation_reran = False
     if should_run_phase(state, "implemented", run_dir / "events.jsonl", rerun_failed):
         if rerun_failed and _phase_failed(state, "implemented"):
+            refresh_worktree = worktree_directory(experiment_dir, run, workspace_root)
+            if refresh_worktree != worktree and worktree.exists():
+                archived_original = _archive_path(worktree)
+                _append_log(
+                    log_path,
+                    f"{run['run_id']} archived previous worktree to {archived_original} before workspace-root refresh",
+                )
+            worktree = refresh_worktree
             archived_worktree = refresh_run_worktree(
                 repo_root=repo_root,
                 run_dir=run_dir,
