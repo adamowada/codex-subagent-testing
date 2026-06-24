@@ -50,6 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = build_summary(rows)
     (output_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     write_summary_csv(output_dir / "summary.csv", summary["groups"])
+    write_summary_csv(output_dir / "phase_summary.csv", summary["phase_groups"])
     (output_dir / "summary.md").write_text(render_markdown(summary), encoding="utf-8")
     print(f"Wrote Spark mode analysis to {output_dir}")
     print(f"Rows analyzed: {summary['row_count']}")
@@ -98,27 +99,39 @@ def read_results(experiment_dir: Path, *, source: str) -> list[dict[str, Any]]:
 
 
 def build_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
-    for row in rows:
-        key = (
-            str(row.get("cohort") or "unknown"),
-            str(row.get("root_reasoning") or "unknown"),
-            str(row.get("analysis_mode") or "unknown"),
-        )
-        groups[key].append(row)
-
-    group_summaries = [
-        summarize_group(cohort=cohort, reasoning=reasoning, mode=mode, rows=group_rows)
-        for (cohort, reasoning, mode), group_rows in sorted(groups.items())
-    ]
+    group_summaries = summarize_groups(rows, cohort_key=lambda row: str(row.get("cohort") or "unknown"))
+    phase_group_summaries = summarize_groups(rows, cohort_key=_phase_cohort)
     return {
         "schema_version": 1,
         "row_count": len(rows),
         "groups": group_summaries,
-        "direct_vs_proposal": direct_proposal_deltas(group_summaries),
+        "phase_groups": phase_group_summaries,
+        "direct_vs_proposal": direct_proposal_deltas(group_summaries, cohort="spark_assisted"),
+        "main_direct_vs_proposal": direct_proposal_deltas(phase_group_summaries, cohort="main_spark_assisted"),
+        "pilot_direct_vs_proposal": direct_proposal_deltas(phase_group_summaries, cohort="pilot_spark_assisted"),
         "bridge_vs_historical": bridge_deltas(group_summaries),
+        "main_spark_vs_historical": spark_historical_deltas(phase_group_summaries),
         "sources": sorted({str(row.get("source")) for row in rows}),
     }
+
+
+def summarize_groups(
+    rows: list[dict[str, Any]],
+    *,
+    cohort_key: Any,
+) -> list[dict[str, Any]]:
+    groups: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        key = (
+            str(cohort_key(row) or "unknown"),
+            str(row.get("root_reasoning") or "unknown"),
+            str(row.get("analysis_mode") or "unknown"),
+        )
+        groups[key].append(row)
+    return [
+        summarize_group(cohort=cohort, reasoning=reasoning, mode=mode, rows=group_rows)
+        for (cohort, reasoning, mode), group_rows in sorted(groups.items())
+    ]
 
 
 def summarize_group(*, cohort: str, reasoning: str, mode: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -146,10 +159,10 @@ def summarize_group(*, cohort: str, reasoning: str, mode: str, rows: list[dict[s
     }
 
 
-def direct_proposal_deltas(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def direct_proposal_deltas(groups: list[dict[str, Any]], *, cohort: str) -> list[dict[str, Any]]:
     by_reasoning: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
     for group in groups:
-        if group["cohort"] != "spark_assisted":
+        if group["cohort"] != cohort:
             continue
         by_reasoning[group["root_reasoning"]][group["mode"]] = group
 
@@ -181,6 +194,43 @@ def direct_proposal_deltas(groups: list[dict[str, Any]]) -> list[dict[str, Any]]
             }
         )
     return deltas
+
+
+def spark_historical_deltas(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_key = {(group["cohort"], group["root_reasoning"], group["mode"]): group for group in groups}
+    deltas = []
+    for group in groups:
+        if group["cohort"] != "main_spark_assisted":
+            continue
+        historical = by_key.get(("historical_solo", group["root_reasoning"], "solo"))
+        if not historical:
+            continue
+        deltas.append(
+            {
+                "root_reasoning": group["root_reasoning"],
+                "mode": group["mode"],
+                "main_quality_mean": group["quality"]["mean"],
+                "historical_quality_mean": historical["quality"]["mean"],
+                "quality_mean_delta_main_minus_historical": _delta_mean(group, historical, "quality"),
+                "main_gpt55_tokens_mean": group["gpt55_implementation_tokens"]["mean"],
+                "historical_gpt55_tokens_mean": historical["gpt55_implementation_tokens"]["mean"],
+                "gpt55_token_mean_delta_main_minus_historical": _delta_mean(
+                    group,
+                    historical,
+                    "gpt55_implementation_tokens",
+                ),
+                "main_total_impl_tokens_mean": group["implementation_tokens"]["mean"],
+                "historical_total_impl_tokens_mean": historical["implementation_tokens"]["mean"],
+                "total_impl_token_mean_delta_main_minus_historical": _delta_mean(
+                    group,
+                    historical,
+                    "implementation_tokens",
+                ),
+                "main_quality_per_total_token_mean": group["quality_per_total_impl_token"]["mean"],
+                "historical_quality_per_total_token_mean": historical["quality_per_total_impl_token"]["mean"],
+            }
+        )
+    return sorted(deltas, key=lambda item: (item["root_reasoning"], item["mode"]))
 
 
 def bridge_deltas(groups: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -249,38 +299,21 @@ def render_markdown(summary: dict[str, Any]) -> str:
         "",
         f"Rows analyzed: {summary['row_count']}",
         "",
-        "## Group Summary",
+        "## Pooled Group Summary",
         "",
-        "| Cohort | Reasoning | Mode | Runs | Quality mean | GPT tokens mean | Spark tokens mean | Quality/GPT token |",
-        "|---|---|---|---:|---:|---:|---:|---:|",
     ]
-    for group in summary["groups"]:
-        lines.append(
-            "| {cohort} | {reasoning} | {mode} | {runs} | {quality} | {gpt} | {spark} | {eff} |".format(
-                cohort=group["cohort"],
-                reasoning=group["root_reasoning"],
-                mode=group["mode"],
-                runs=group["runs"],
-                quality=_fmt(group["quality"]["mean"]),
-                gpt=_fmt(group["gpt55_implementation_tokens"]["mean"], decimals=0),
-                spark=_fmt(group["spark_implementation_tokens"]["mean"], decimals=0),
-                eff=_fmt(group["quality_per_gpt55_impl_token"]["mean"], decimals=10),
-            )
-        )
-    lines.extend(["", "## Proposal Minus Direct", ""])
+    _append_group_table(lines, summary["groups"])
+    main_groups = [group for group in summary["phase_groups"] if group["cohort"] == "main_spark_assisted"]
+    lines.extend(["", "## Official Main Spark-Assisted Summary", ""])
+    _append_group_table(lines, main_groups)
+    lines.extend(["", "## Pooled Proposal Minus Direct", ""])
     if summary["direct_vs_proposal"]:
-        lines.append("| Reasoning | Quality delta | GPT token delta | Spark token delta | Efficiency delta |")
-        lines.append("|---|---:|---:|---:|---:|")
-        for item in summary["direct_vs_proposal"]:
-            lines.append(
-                "| {reasoning} | {quality} | {gpt} | {spark} | {eff} |".format(
-                    reasoning=item["root_reasoning"],
-                    quality=_fmt(item["quality_mean_delta_proposal_minus_direct"]),
-                    gpt=_fmt(item["gpt55_token_mean_delta_proposal_minus_direct"], decimals=0),
-                    spark=_fmt(item["spark_token_mean_delta_proposal_minus_direct"], decimals=0),
-                    eff=_fmt(item["quality_per_gpt55_token_delta_proposal_minus_direct"], decimals=10),
-                )
-            )
+        _append_direct_delta_table(lines, summary["direct_vs_proposal"])
+    else:
+        lines.append("No complete direct/proposal pairs available.")
+    lines.extend(["", "## Main Proposal Minus Direct", ""])
+    if summary["main_direct_vs_proposal"]:
+        _append_direct_delta_table(lines, summary["main_direct_vs_proposal"])
     else:
         lines.append("No complete direct/proposal pairs available.")
     lines.extend(["", "## Bridge Minus Historical", ""])
@@ -298,7 +331,62 @@ def render_markdown(summary: dict[str, Any]) -> str:
             )
     else:
         lines.append("No bridge/historical pairs available.")
+    lines.extend(["", "## Main Spark Minus Historical", ""])
+    if summary["main_spark_vs_historical"]:
+        lines.append(
+            "| Reasoning | Mode | Main quality | Historical quality | Quality delta | Main total tokens | Historical total tokens |"
+        )
+        lines.append("|---|---|---:|---:|---:|---:|---:|")
+        for item in summary["main_spark_vs_historical"]:
+            lines.append(
+                "| {reasoning} | {mode} | {main_quality} | {historical_quality} | {delta} | {main_tokens} | {historical_tokens} |".format(
+                    reasoning=item["root_reasoning"],
+                    mode=item["mode"],
+                    main_quality=_fmt(item["main_quality_mean"]),
+                    historical_quality=_fmt(item["historical_quality_mean"]),
+                    delta=_fmt(item["quality_mean_delta_main_minus_historical"]),
+                    main_tokens=_fmt(item["main_total_impl_tokens_mean"], decimals=0),
+                    historical_tokens=_fmt(item["historical_total_impl_tokens_mean"], decimals=0),
+                )
+            )
+    else:
+        lines.append("No main Spark/historical pairs available.")
     return "\n".join(lines) + "\n"
+
+
+def _append_group_table(lines: list[str], groups: list[dict[str, Any]]) -> None:
+    lines.append(
+        "| Cohort | Reasoning | Mode | Runs | Quality mean | GPT tokens mean | Spark tokens mean | Quality/GPT token |"
+    )
+    lines.append("|---|---|---|---:|---:|---:|---:|---:|")
+    for group in groups:
+        lines.append(
+            "| {cohort} | {reasoning} | {mode} | {runs} | {quality} | {gpt} | {spark} | {eff} |".format(
+                cohort=group["cohort"],
+                reasoning=group["root_reasoning"],
+                mode=group["mode"],
+                runs=group["runs"],
+                quality=_fmt(group["quality"]["mean"]),
+                gpt=_fmt(group["gpt55_implementation_tokens"]["mean"], decimals=0),
+                spark=_fmt(group["spark_implementation_tokens"]["mean"], decimals=0),
+                eff=_fmt(group["quality_per_gpt55_impl_token"]["mean"], decimals=10),
+            )
+        )
+
+
+def _append_direct_delta_table(lines: list[str], deltas: list[dict[str, Any]]) -> None:
+    lines.append("| Reasoning | Quality delta | GPT token delta | Spark token delta | Efficiency delta |")
+    lines.append("|---|---:|---:|---:|---:|")
+    for item in deltas:
+        lines.append(
+            "| {reasoning} | {quality} | {gpt} | {spark} | {eff} |".format(
+                reasoning=item["root_reasoning"],
+                quality=_fmt(item["quality_mean_delta_proposal_minus_direct"]),
+                gpt=_fmt(item["gpt55_token_mean_delta_proposal_minus_direct"], decimals=0),
+                spark=_fmt(item["spark_token_mean_delta_proposal_minus_direct"], decimals=0),
+                eff=_fmt(item["quality_per_gpt55_token_delta_proposal_minus_direct"], decimals=10),
+            )
+        )
 
 
 def _cohort(row: dict[str, Any]) -> str:
@@ -311,6 +399,14 @@ def _cohort(row: dict[str, Any]) -> str:
     if spark_mode in {"direct", "proposal"}:
         return "spark_assisted"
     return "other"
+
+
+def _phase_cohort(row: dict[str, Any]) -> str:
+    cohort = str(row.get("cohort") or _cohort(row))
+    source = str(row.get("source") or "")
+    if cohort == "spark_assisted" and source in {"main", "pilot"}:
+        return f"{source}_spark_assisted"
+    return cohort
 
 
 def _analysis_mode(row: dict[str, Any]) -> str:

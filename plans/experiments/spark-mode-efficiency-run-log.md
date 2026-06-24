@@ -77,25 +77,66 @@ Second pilot resume:
   `runs/20260624T023048-spark_mode_efficiency_pilot-pilot`
 - Result: staged Spark implementation artifacts regenerated and exact
   per-model usage recorded.
-- Remaining issue: staged judge reruns hit a Codex usage limit. The judge phase
-  is failed for staged cells, and staged judge contribution is currently zero.
-- Required next action: after the usage-limit reset, run the pilot again with
-  `-Resume 20260624T023048-spark_mode_efficiency_pilot-pilot -RerunFailed` to
-  rerun failed staged judges and the one failed staged implementation
-  (`SME7_proposal_r02`).
+- Remaining issue at that checkpoint: staged judge reruns hit a Codex usage
+  limit, and `SME7_proposal_r02` still needed implementation repair.
 
-## Current Pilot Status
+Final pilot repair:
 
-As of the second pilot resume:
+- Directory:
+  `runs/20260624T023048-spark_mode_efficiency_pilot-pilot`
+- Result: failed implementation and judge phases were rerun successfully.
+- Final validation status: `passed`.
+- Pilot rows: 24.
 
-- GPT-only bridge runs completed and scored.
-- 15 of 16 staged Spark implementation runs completed and scored from public
-  and hidden evidence.
-- `SME7_proposal_r02` hit usage limit during root integration and remains an
-  implementation failure until rerun.
-- All staged judge runs hit usage limit during judge rerun and remain failed
-  until rerun.
-- Pilot validation status is `warning`, not final-passed.
+## Main Run
 
-Do not treat the pilot as finalized until failed staged implementation/judge
-phases are rerun after the usage-limit reset.
+Initial main run:
+
+- Directory:
+  `runs/20260624T053702-spark_mode_efficiency_main-main`
+- Command:
+  `.\scripts\run_experiment.ps1 -Config configs/spark_mode_efficiency_main.yaml -Jobs 5 -JudgeJobs 4 -ExperimentName main -StudyId spark-mode-efficiency -BatchId main -BatchSequence 2`
+- Result: all 40 implementation runs completed, but 19 judge outputs failed
+  JSON parsing and were preserved as failed judged phases.
+- Validation status at this checkpoint: `warning`.
+
+Main repair:
+
+- Command:
+  `.\scripts\run_experiment.ps1 -Config configs/spark_mode_efficiency_main.yaml -Jobs 5 -JudgeJobs 4 -Resume 20260624T053702-spark_mode_efficiency_main-main -RerunFailed`
+- Result: failed judged phases reran successfully.
+- Final validation status: `passed`.
+- Main rows: 40.
+- Main report:
+  `runs/20260624T053702-spark_mode_efficiency_main-main/report/report.html`
+- Main PDF:
+  `runs/20260624T053702-spark_mode_efficiency_main-main/report/report.pdf`
+
+## Analysis and Reporting
+
+Final analysis command:
+
+```powershell
+python scripts\analyze_spark_mode_efficiency.py --experiment-dir runs\20260624T023048-spark_mode_efficiency_pilot-pilot --experiment-dir runs\20260624T053702-spark_mode_efficiency_main-main --output-dir runs\analysis\spark_mode_efficiency_final
+```
+
+Final analysis artifacts:
+
+- `runs/analysis/spark_mode_efficiency_final/summary.json`
+- `runs/analysis/spark_mode_efficiency_final/summary.csv`
+- `runs/analysis/spark_mode_efficiency_final/phase_summary.csv`
+- `runs/analysis/spark_mode_efficiency_final/summary.md`
+
+Rows analyzed: 264.
+
+White paper:
+
+- `papers/spark-mode-efficiency-white-paper.md`
+
+Headline result:
+
+- Direct edit is the better default for Spark leaves.
+- Direct edit wins quality and implementation-token efficiency at low, medium,
+  and high root reasoning.
+- Xhigh proposal narrowly beats xhigh direct on quality and uses fewer GPT and
+  total implementation tokens, but spends more Spark tokens.
