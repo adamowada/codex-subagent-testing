@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "overall_assessment",
+    "correctness_score",
+    "parity_score",
+    "maintainability_score",
+    "test_evidence_score",
+    "risk_flags",
+    "strengths",
+    "weaknesses",
+    "notes"
+  ],
+  "properties": {
+    "overall_assessment": {
+      "type": "string",
+      "enum": ["pass", "partial", "fail", "infrastructure_failure"]
+    },
+    "correctness_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "parity_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "maintainability_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "test_evidence_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "weaknesses": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,2 @@
+account_id,status,plan,total_paid_cents,currency,seats,usage,usage_limit,over_limit,coupon_code,coupon_active,invoice_ids,last_invoice_id,last_period_start,last_period_end,merged_from_account_ids,closed_at,last_event_at
+acct_v2,active,pro,4900,USD,4,25,10000,false,SAVE10,true,inv_100,inv_100,2026-01-01T00:00:00.000Z,2026-02-01T00:00:00.000Z,acct_legacy,,2026-01-06T00:00:00.000Z

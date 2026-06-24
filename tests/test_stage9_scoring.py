@@ -114,6 +114,58 @@ def test_missing_and_malformed_artifacts_score_as_zero_with_warnings(tmp_path: P
     assert any("scoring weights sum to 1.200000" in warning for warning in score["warnings"])
 
 
+def test_implementation_infrastructure_failure_forces_zero_quality(tmp_path: Path) -> None:
+    run = _run({"hidden_tests": 1.0})
+    _write_json(tmp_path / "typecheck.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "public_ts.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "public_py.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "hidden-results.json", {"summary": {"score": 1.0}})
+    _write_json(tmp_path / "judge.json", {"parsed": False})
+    _write_json(tmp_path / "usage.json", {"totals": {"implementation_tokens": 0}})
+    _write_json(tmp_path / "wall_time.json", {"elapsed_seconds": 1})
+    _write_json(tmp_path / "judge.wall_time.json", {"elapsed_seconds": 1})
+    _write_json(tmp_path / "state.json", {"phases": {"implemented": {"status": "failed"}}})
+    (tmp_path / "diff-numstat.txt").write_text("", encoding="utf-8")
+
+    score = compute_run_score(tmp_path, run)
+
+    assert score["component_scores"]["hidden_tests"] == 1.0
+    assert score["quality_score"] == 0.0
+    assert score["status"] == "failed"
+    assert any("quality_score forced to 0.0" in warning for warning in score["warnings"])
+
+
+def test_final_response_contract_failure_does_not_force_zero_quality(tmp_path: Path) -> None:
+    run = _run({"hidden_tests": 1.0})
+    _write_json(tmp_path / "typecheck.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "public_ts.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "public_py.meta.json", {"returncode": 0, "timed_out": False})
+    _write_json(tmp_path / "hidden-results.json", {"summary": {"score": 1.0}})
+    _write_json(tmp_path / "judge.json", {"parsed": False})
+    _write_json(tmp_path / "usage.json", {"totals": {"implementation_tokens": 0}})
+    _write_json(tmp_path / "wall_time.json", {"elapsed_seconds": 1})
+    _write_json(tmp_path / "judge.wall_time.json", {"elapsed_seconds": 1})
+    _write_json(
+        tmp_path / "state.json",
+        {
+            "phases": {
+                "implemented": {
+                    "status": "completed",
+                    "data": {"final_response_errors": ["final response did not parse as strict JSON"]},
+                }
+            }
+        },
+    )
+    (tmp_path / "diff-numstat.txt").write_text("", encoding="utf-8")
+
+    score = compute_run_score(tmp_path, run)
+
+    assert score["component_scores"]["hidden_tests"] == 1.0
+    assert score["quality_score"] == 1.0
+    assert score["status"] == "passed"
+    assert not any("quality_score forced to 0.0" in warning for warning in score["warnings"])
+
+
 def test_minimality_component_uses_configured_loc_threshold(tmp_path: Path) -> None:
     run = _run(
         {"minimality": 1.0},
@@ -183,6 +235,31 @@ def test_v2_score_splits_hidden_correctness_parity_and_performance(tmp_path: Pat
     assert score["performance_summary"]["pass_rate"] == 0.5
     assert score["performance_summary"]["timeout_rate"] == 0.5
     assert score["quality_score"] == 0.65
+
+
+def test_judge_score_accepts_score_alias_from_json_judge(tmp_path: Path) -> None:
+    run = _run({"hidden_correctness": 0.5, "judge": 0.5})
+    for name in ("typecheck.meta.json", "public_ts.meta.json", "public_py.meta.json"):
+        _write_json(tmp_path / name, {"returncode": 0, "timed_out": False})
+    _write_json(
+        tmp_path / "hidden-results.json",
+        {
+            "summary": {"point_score": 0.4},
+            "categories": {},
+            "cases": [],
+        },
+    )
+    _write_json(tmp_path / "judge.json", {"parsed": True, "value": {"score": 0.8}})
+    _write_json(tmp_path / "usage.json", {"totals": {"implementation_tokens": 100}})
+    _write_json(tmp_path / "wall_time.json", {"elapsed_seconds": 60})
+    _write_json(tmp_path / "judge.wall_time.json", {"elapsed_seconds": 15})
+    _write_json(tmp_path / "state.json", {"phases": {}})
+    (tmp_path / "diff-numstat.txt").write_text("25\t0\tsrc/index.ts\n", encoding="utf-8")
+
+    score = compute_run_score(tmp_path, run)
+
+    assert score["component_scores"]["judge"] == 0.8
+    assert score["quality_score"] == 0.6
 
 
 def test_unweighted_gate_failures_keep_v2_status_partial(tmp_path: Path) -> None:

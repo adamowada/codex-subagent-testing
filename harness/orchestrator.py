@@ -30,14 +30,17 @@ from harness.codex_runner import (
     ProcessResult,
     build_implementation_command,
     build_judge_command,
+    codex_events_have_failure,
     command_for_display,
     extract_final_response,
+    implementation_final_response_errors,
     iso_now,
     materialize_worktree_command,
     resolve_codex_bin,
     resolve_npm_bin,
     run_logged_command,
     run_process_to_files,
+    summarize_codex_events,
     write_process_result,
 )
 from harness.jsonl_usage import summarize_usage, write_usage_summary
@@ -144,12 +147,18 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def run(args: argparse.Namespace) -> int:
-    repo_root = Path(args.repo_root).resolve()
+    repo_root = Path(getattr(args, "repo_root", REPO_ROOT)).resolve()
     config_path = _resolve_path(args.config, repo_root)
     runs_root = _resolve_path(args.runs_root, repo_root)
     config = load_experiment_config(config_path)
     all_runs = expand_experiment_matrix(config)
-    selected_runs = select_runs(all_runs, pilot=args.pilot, run_ids=args.run_id)
+    selected_runs = select_runs(
+        all_runs,
+        pilot=args.pilot,
+        run_ids=args.run_id,
+        repeat_from=args.repeat_from,
+        repeat_to=args.repeat_to,
+    )
     if not selected_runs:
         raise OrchestrationError("no runs selected")
 
@@ -336,10 +345,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument("--experiment-name", help="Optional suffix for a new experiment directory.")
+    parser.add_argument("--study-id", help="Stable study identifier for batched repeat accumulation.")
+    parser.add_argument("--batch-id", help="Stable batch identifier recorded in batch_metadata.json.")
+    parser.add_argument("--batch-sequence", type=int, help="Optional 1-based batch sequence number.")
+    parser.add_argument("--batch-started-at", help="Optional externally supplied batch start timestamp.")
+    parser.add_argument("--batch-notes", default="", help="Optional operator notes for this batch.")
     parser.add_argument("--resume", help="Existing experiment directory to resume.")
     parser.add_argument("--jobs", type=int, default=None, help="Implementation job parallelism.")
     parser.add_argument("--judge-jobs", type=int, default=None, help="Judge job parallelism.")
     parser.add_argument("--run-id", action="append", help="Specific run ID to include. May be repeated.")
+    parser.add_argument("--repeat-from", type=int, help="First repeat index to include, inclusive.")
+    parser.add_argument("--repeat-to", type=int, help="Last repeat index to include, inclusive.")
     parser.add_argument("--pilot", action="store_true", help="Run the two-run pilot subset.")
     parser.add_argument("--rerun-failed", action="store_true", help="Rerun failed Codex phases.")
     parser.add_argument("--no-report", action="store_true", help="Skip experiment-level report output generation.")
@@ -356,6 +372,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         parser.error("--jobs must be positive")
     if args.judge_jobs <= 0:
         parser.error("--judge-jobs must be positive")
+    if args.repeat_from is not None and args.repeat_from <= 0:
+        parser.error("--repeat-from must be positive")
+    if args.repeat_to is not None and args.repeat_to <= 0:
+        parser.error("--repeat-to must be positive")
+    if args.repeat_from is not None and args.repeat_to is not None and args.repeat_to < args.repeat_from:
+        parser.error("--repeat-to must be greater than or equal to --repeat-from")
     return args
 
 
@@ -364,6 +386,8 @@ def select_runs(
     *,
     pilot: bool = False,
     run_ids: list[str] | None = None,
+    repeat_from: int | None = None,
+    repeat_to: int | None = None,
 ) -> list[dict[str, Any]]:
     if run_ids:
         wanted = set(run_ids)
@@ -371,15 +395,35 @@ def select_runs(
         missing = sorted(wanted - {run["run_id"] for run in selected})
         if missing:
             raise OrchestrationError(f"unknown run id(s): {', '.join(missing)}")
-        return selected
+        return _filter_repeat_range(selected, repeat_from=repeat_from, repeat_to=repeat_to)
 
     if not pilot:
-        return list(runs)
+        return _filter_repeat_range(list(runs), repeat_from=repeat_from, repeat_to=repeat_to)
 
     selected = select_pilot_runs(runs)
     if not selected:
         raise OrchestrationError("pilot selection requires at least one configured run")
-    return list(selected)
+    return _filter_repeat_range(list(selected), repeat_from=repeat_from, repeat_to=repeat_to)
+
+
+def _filter_repeat_range(
+    runs: list[dict[str, Any]],
+    *,
+    repeat_from: int | None,
+    repeat_to: int | None,
+) -> list[dict[str, Any]]:
+    if repeat_from is None and repeat_to is None:
+        return runs
+    start = repeat_from if repeat_from is not None else 1
+    end = repeat_to if repeat_to is not None else max(int(run.get("repeat_index", 0)) for run in runs)
+    selected = [
+        run
+        for run in runs
+        if start <= int(run.get("repeat_index", 0)) <= end
+    ]
+    if not selected:
+        raise OrchestrationError(f"repeat range selected no runs: {start}-{end}")
+    return selected
 
 
 def resolve_experiment_dir(
@@ -431,6 +475,7 @@ def write_experiment_metadata(
         "schema_version": 1,
         "created_at": iso_now(),
         "config_path": str(config_path),
+        "batch_metadata_path": "batch_metadata.json",
         "pilot": bool(args.pilot),
         "dry_run": bool(args.dry_run),
         "jobs": args.jobs,
@@ -442,12 +487,119 @@ def write_experiment_metadata(
         "matrix_summary": summarize_matrix(selected_runs),
         "config_sha256": _json_sha256(config),
     }
+    batch_payload = build_batch_metadata(
+        experiment_dir=experiment_dir,
+        config_path=config_path,
+        config=config,
+        selected_runs=selected_runs,
+        args=args,
+        workspace_root=workspace_root,
+        all_runs=all_runs,
+    )
+    payload["batch"] = {
+        "study_id": batch_payload["study"]["id"],
+        "batch_id": batch_payload["batch"]["id"],
+        "batch_sequence": batch_payload["batch"].get("sequence"),
+    }
+    _write_json(experiment_dir / "batch_metadata.json", batch_payload)
     _write_json(experiment_dir / "experiment-metadata.json", payload)
     _write_json(experiment_dir / "experiment_metadata.json", payload)
     _write_json(experiment_dir / "config.resolved.json", config)
     _write_json(experiment_dir / "resolved_config.json", config)
     _write_json(experiment_dir / "matrix.json", selected_runs)
     _write_json(experiment_dir / "matrix-summary.json", summarize_matrix(selected_runs))
+
+
+def build_batch_metadata(
+    *,
+    experiment_dir: Path,
+    config_path: Path,
+    config: Mapping[str, Any],
+    selected_runs: list[dict[str, Any]],
+    args: argparse.Namespace,
+    workspace_root: Path | None = None,
+    all_runs: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    repo_root = Path(getattr(args, "repo_root", REPO_ROOT)).resolve()
+    paths = config.get("paths", {}) if isinstance(config.get("paths"), Mapping) else {}
+    prompt_templates = paths.get("prompt_templates", {}) if isinstance(paths.get("prompt_templates"), Mapping) else {}
+    benchmark = benchmark_metadata(config)
+    experiment = config.get("experiment", {}) if isinstance(config.get("experiment"), Mapping) else {}
+    experiment_id = str(experiment.get("id") or "experiment")
+    batch_id = getattr(args, "batch_id", None) or experiment_dir.name
+    study_id = getattr(args, "study_id", None) or experiment_id
+    batch_started_at = getattr(args, "batch_started_at", None) or iso_now()
+    scoring_path = _resolve_optional_repo_path(benchmark.get("scoring_path"), repo_root)
+    template_path = _resolve_optional_repo_path(benchmark.get("template_path"), repo_root)
+    hidden_cases_path = _resolve_optional_repo_path(benchmark.get("hidden_cases_path"), repo_root)
+    judge_schema_path = repo_root / "prompts" / "judge_output.schema.json"
+
+    return {
+        "schema_version": 1,
+        "created_at": iso_now(),
+        "study": {
+            "id": study_id,
+            "description": "Batched repeat accumulation for one frozen benchmark study.",
+        },
+        "batch": {
+            "id": batch_id,
+            "sequence": getattr(args, "batch_sequence", None),
+            "started_at": batch_started_at,
+            "notes": getattr(args, "batch_notes", "") or "",
+            "experiment_dir": str(experiment_dir),
+            "selected_run_count": len(selected_runs),
+            "repeat_filter": {
+                "from": getattr(args, "repeat_from", None),
+                "to": getattr(args, "repeat_to", None),
+            },
+            "workspace_root": str(workspace_root) if workspace_root is not None else None,
+        },
+        "pooling_requirements": _batch_pooling_requirements(),
+        "freeze_manifest": {
+            "repo": _repo_state(repo_root),
+            "config_path": _relative_or_str(config_path, repo_root),
+            "config_sha256": _json_sha256(config),
+            "full_matrix_sha256": _json_sha256(all_runs if all_runs is not None else selected_runs),
+            "selected_matrix_sha256": _json_sha256(selected_runs),
+            "benchmark": benchmark,
+            "benchmark_template": _path_hash_record(template_path, repo_root),
+            "hidden_cases": _path_hash_record(hidden_cases_path, repo_root),
+            "hidden_manifest": _path_hash_record(
+                hidden_cases_path / "manifest.json" if hidden_cases_path is not None else None,
+                repo_root,
+            ),
+            "scoring": _path_hash_record(scoring_path, repo_root),
+            "prompt_templates": {
+                str(name): _path_hash_record(_resolve_optional_repo_path(value, repo_root), repo_root)
+                for name, value in sorted(prompt_templates.items())
+            },
+            "judge_output_schema": _path_hash_record(judge_schema_path if judge_schema_path.exists() else None, repo_root),
+            "models": config.get("models", {}),
+            "judge": config.get("judge", {}),
+            "timeouts": config.get("timeouts", {}),
+            "failure_policy": {
+                "rerun_failed": bool(getattr(args, "rerun_failed", False)),
+                "dry_run": bool(getattr(args, "dry_run", False)),
+                "pilot": bool(getattr(args, "pilot", False)),
+            },
+        },
+    }
+
+
+def _batch_pooling_requirements() -> list[str]:
+    return [
+        "same benchmark template tree hash",
+        "same hidden cases tree hash and hidden manifest hash",
+        "same prompt template hashes",
+        "same scoring config hash and scoring semantics",
+        "same judge prompt, output schema, model, and reasoning setting",
+        "same implementation model identifiers and reasoning settings",
+        "same timeout, rerun, and failure-handling policy",
+        "same full expanded matrix hash; selected matrix hashes may differ only by planned non-overlapping repeat ranges",
+        "same harness commit or explicitly documented harness/scoring compatibility",
+        "record per-batch run order, timestamps, Codex/preflight metadata, and any platform drift",
+        "analyze pooled results and per-batch results before making combined claims",
+    ]
 
 
 def validate_resume_target(
@@ -585,8 +737,16 @@ def run_implementation_and_tests(
             command_display=display_command,
         )
         write_process_result(run_dir / "wall_time.json", result)
-        final_response = extract_final_response(run_dir / "events.jsonl")
+        events_path = run_dir / "events.jsonl"
+        final_response = extract_final_response(events_path)
+        event_summary = summarize_codex_events(events_path)
+        final_response_errors = implementation_final_response_errors(final_response)
         _write_json(run_dir / "final_response.json", final_response)
+        implementation_failed = (
+            result.returncode != 0
+            or result.timed_out
+            or codex_events_have_failure(event_summary)
+        )
         phase_data = {
             "returncode": result.returncode,
             "timed_out": result.timed_out,
@@ -594,13 +754,15 @@ def run_implementation_and_tests(
             "stdout_path": result.stdout_path,
             "stderr_path": result.stderr_path,
             "final_response_parsed": final_response.get("parsed"),
+            "codex_event_summary": event_summary,
+            "final_response_errors": final_response_errors,
         }
         if archived_to is not None:
             phase_data["previous_artifacts_archived_to"] = archived_to
         mark_phase(
             run_dir,
             "implemented",
-            "completed" if result.returncode == 0 and not result.timed_out else "failed",
+            "failed" if implementation_failed else "completed",
             phase_data,
         )
         _append_log(
@@ -747,8 +909,11 @@ def run_judge(
         command_display=display_command,
     )
     write_process_result(run_dir / "judge.wall_time.json", result)
-    judge_json = extract_final_response(run_dir / "judge.events.jsonl")
+    judge_events_path = run_dir / "judge.events.jsonl"
+    judge_json = extract_final_response(judge_events_path)
+    event_summary = summarize_codex_events(judge_events_path)
     _write_json(run_dir / "judge.json", judge_json)
+    judge_failed = judge_phase_failed(result, event_summary, judge_json)
     phase_data = {
         "returncode": result.returncode,
         "timed_out": result.timed_out,
@@ -756,6 +921,7 @@ def run_judge(
         "stdout_path": result.stdout_path,
         "stderr_path": result.stderr_path,
         "parsed": judge_json.get("parsed"),
+        "codex_event_summary": event_summary,
     }
     if archived_to is not None:
         phase_data["previous_artifacts_archived_to"] = archived_to
@@ -764,7 +930,7 @@ def run_judge(
     mark_phase(
         run_dir,
         "judged",
-        "completed" if result.returncode == 0 and not result.timed_out and judge_json.get("parsed") else "failed",
+        "failed" if judge_failed else "completed",
         phase_data,
     )
     _append_log(
@@ -776,6 +942,19 @@ def run_judge(
         ),
     )
     status.update_run(str(run["run_id"]), phase="judged")
+
+
+def judge_phase_failed(
+    result: ProcessResult,
+    event_summary: Mapping[str, Any],
+    judge_json: Mapping[str, Any],
+) -> bool:
+    return (
+        result.returncode != 0
+        or result.timed_out
+        or codex_events_have_failure(event_summary)
+        or judge_json.get("parsed") is False
+    )
 
 
 def parse_usage_and_score(
@@ -1224,7 +1403,9 @@ def load_state(run_dir: Path) -> dict[str, Any]:
             "updated_at": iso_now(),
             "phases": {phase: {"status": "pending"} for phase in STATE_PHASES},
         }
-    return _read_json(path)
+    state = _read_json(path)
+    state.setdefault("schema_version", 1)
+    return state
 
 
 def _phase_updated_at(state: Mapping[str, Any], phase: str) -> str | None:
@@ -1333,6 +1514,11 @@ def prepare_judge_evidence(run_dir: Path, worktree: Path) -> None:
         shutil.copy2(source, target)
         copied.append(name)
 
+    schema_source = REPO_ROOT / "prompts" / "judge_output.schema.json"
+    schema_target = evidence_dir / "judge_output.schema.json"
+    shutil.copy2(schema_source, schema_target)
+    copied.append(schema_target.name)
+
     _write_json(
         evidence_dir / "evidence-manifest.json",
         {
@@ -1426,6 +1612,12 @@ def _resolve_path(path_value: str | os.PathLike[str], repo_root: Path) -> Path:
     return repo_root / path
 
 
+def _resolve_optional_repo_path(value: Any, repo_root: Path) -> Path | None:
+    if not isinstance(value, str) or not value:
+        return None
+    return _resolve_path(value, repo_root)
+
+
 def _pythonpath_env(repo_root: Path) -> dict[str, str]:
     env = dict(os.environ)
     existing = env.get("PYTHONPATH")
@@ -1451,6 +1643,73 @@ def _safe_name(value: str) -> str:
 def _json_sha256(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _path_hash_record(path: Path | None, repo_root: Path) -> dict[str, Any]:
+    if path is None:
+        return {"path": "", "exists": False, "sha256": ""}
+    record: dict[str, Any] = {
+        "path": _relative_or_str(path, repo_root),
+        "exists": path.exists(),
+    }
+    if not path.exists():
+        record["sha256"] = ""
+    elif path.is_dir():
+        record["kind"] = "tree"
+        record["sha256"] = _tree_sha256(path)
+    else:
+        record["kind"] = "file"
+        record["sha256"] = _file_sha256(path)
+    return record
+
+
+def _tree_sha256(root: Path) -> str:
+    digest = hashlib.sha256()
+    files = sorted(path for path in root.rglob("*") if path.is_file())
+    for path in files:
+        relative = path.relative_to(root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(_file_sha256(path).encode("ascii"))
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _relative_or_str(path: Path, repo_root: Path) -> str:
+    try:
+        return path.resolve().relative_to(repo_root.resolve()).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _repo_state(repo_root: Path) -> dict[str, Any]:
+    head = _git_output(repo_root, ["git", "rev-parse", "HEAD"])
+    branch = _git_output(repo_root, ["git", "branch", "--show-current"])
+    status = _git_output(repo_root, ["git", "status", "--short"])
+    return {
+        "head": head,
+        "branch": branch,
+        "dirty": bool(status),
+        "status_short_sha256": hashlib.sha256(status.encode("utf-8")).hexdigest() if status else "",
+    }
+
+
+def _git_output(repo_root: Path, command: list[str]) -> str:
+    try:
+        completed = subprocess.run(command, cwd=repo_root, text=True, capture_output=True, check=False)
+    except OSError:
+        return ""
+    if completed.returncode != 0:
+        return ""
+    return completed.stdout.strip()
 
 
 def _format_artifact_errors(title: str, errors: Iterable[str]) -> str:

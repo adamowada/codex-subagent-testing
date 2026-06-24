@@ -360,6 +360,62 @@ def test_stage11_warns_when_malformed_judge_output_is_scored(
     assert "scored as zero" in checks["judge_json"]["data"]["warnings"][0]
 
 
+def test_stage11_accepts_score_alias_in_parsed_judge_json(
+    config: dict,
+    runs: list[dict],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    selected = [runs[0]]
+    _write_experiment_shell(tmp_path, config, runs, selected)
+    _write_run_artifacts(tmp_path, selected[0], quality=0.8)
+    run_dir = tmp_path / "runs" / "C0_r01"
+    _write_json(run_dir / "judge.json", {"parsed": True, "value": {"score": 0.8}})
+    score = json.loads((run_dir / "score.json").read_text(encoding="utf-8"))
+    score["component_scores"]["judge"] = 0.8
+    score["warnings"] = []
+    _write_json(run_dir / "score.json", score)
+
+    monkeypatch.setenv("CODEX_REPORT_PDF_RENDERER", "minimal")
+    write_results_outputs(tmp_path, selected)
+
+    payload = validate_stage11(
+        config_path=CONFIG_PATH,
+        repo_root=REPO_ROOT,
+        experiment_dir=tmp_path,
+        selected_runs=selected,
+        preflight_result=_preflight_payload(),
+    )
+
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert checks["judge_json"]["status"] == "passed"
+
+
+def test_stage11_flags_batch_metadata_matrix_drift(
+    config: dict,
+    runs: list[dict],
+    tmp_path: Path,
+) -> None:
+    selected = runs[:2]
+    _write_experiment_shell(tmp_path, config, runs, selected)
+    batch = json.loads((tmp_path / "batch_metadata.json").read_text(encoding="utf-8"))
+    batch["freeze_manifest"]["selected_matrix_sha256"] = "wrong"
+    _write_json(tmp_path / "batch_metadata.json", batch)
+
+    payload = validate_stage11(
+        config_path=CONFIG_PATH,
+        repo_root=REPO_ROOT,
+        experiment_dir=tmp_path,
+        selected_runs=selected,
+        require_report_outputs=False,
+        preflight_result=_preflight_payload(),
+    )
+
+    checks = {check["name"]: check for check in payload["checks"]}
+    assert checks["experiment_metadata"]["status"] == "failed"
+    assert "batch_metadata.freeze_manifest.selected_matrix_sha256" in checks["experiment_metadata"]["details"]
+
+
 def _write_experiment_shell(
     experiment_dir: Path,
     config: dict,

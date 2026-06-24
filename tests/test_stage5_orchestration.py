@@ -13,6 +13,8 @@ from harness.orchestrator import (
     capture_diff,
     configure_worktree_git_excludes,
     initialize_git_baseline,
+    judge_phase_failed,
+    load_state,
     prepare_judge_evidence,
     run_hidden_tests,
     resolve_experiment_dir,
@@ -28,6 +30,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 RULELEDGER_V2_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
+RULELEDGER_V3_SANITY_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_sanity.yaml"
+RULELEDGER_V3_PAPER_50_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_paper_50.yaml"
 
 
 @pytest.fixture
@@ -68,6 +72,21 @@ def test_run_id_selection_preserves_matrix_order(runs: list[dict]) -> None:
     selected = select_runs(runs, run_ids=["C2_proposal_r03", "C0_r02"])
 
     assert [run["run_id"] for run in selected] == ["C0_r02", "C2_proposal_r03"]
+
+
+def test_repeat_range_selection_preserves_cell_order_for_batched_studies() -> None:
+    paper_runs = expand_experiment_matrix(load_experiment_config(RULELEDGER_V3_PAPER_50_CONFIG_PATH))
+
+    selected = select_runs(paper_runs, repeat_from=21, repeat_to=50)
+
+    assert len(selected) == 120
+    assert selected[0]["run_id"] == "V3P0_r21"
+    assert selected[-1]["run_id"] == "V3P3_r50"
+    assert {run["repeat_index"] for run in selected} == set(range(21, 51))
+    assert {
+        run["cell_id"]: sum(1 for candidate in selected if candidate["cell_id"] == run["cell_id"])
+        for run in selected
+    } == {"V3P0": 30, "V3P1": 30, "V3P2": 30, "V3P3": 30}
 
 
 def test_run_parallel_prints_incremental_progress(capsys: pytest.CaptureFixture[str]) -> None:
@@ -166,13 +185,55 @@ def test_implementation_command_uses_rendered_agent_config(runs: list[dict], tmp
     assert "agents.spark_direct_implementer.sandbox=\"workspace-write\"" in command
 
 
+def test_implementation_command_uses_rendered_root_sandbox(tmp_path: Path) -> None:
+    run = expand_experiment_matrix(load_experiment_config(RULELEDGER_V3_SANITY_CONFIG_PATH))[0]
+    config_dir = tmp_path / "codex_config"
+    for relative_path, contents in render_codex_config(run, REPO_ROOT).items():
+        path = config_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(contents, encoding="utf-8")
+
+    command = build_implementation_command("codex", run, "prompt text", config_dir=config_dir)
+
+    sandbox_index = command.index("--sandbox")
+    assert command[sandbox_index + 1] == "danger-full-access"
+
+
 def test_judge_command_is_read_only_xhigh(runs: list[dict]) -> None:
     command = build_judge_command("codex", runs[0], "judge prompt")
 
     assert command[:4] == ["codex", "--ask-for-approval", "never", "exec"]
     assert "read-only" in command
+    schema_index = command.index("--output-schema")
+    assert command[schema_index + 1] == "judge_evidence/judge_output.schema.json"
     assert "model_reasoning_effort=xhigh" in command
     assert command[-1] == "judge prompt"
+
+
+def test_judge_phase_failed_when_final_response_is_not_json() -> None:
+    result = ProcessResult(
+        command=["codex"],
+        command_display=["codex"],
+        cwd=".",
+        started_at="2026-01-01T00:00:00+00:00",
+        finished_at="2026-01-01T00:00:01+00:00",
+        elapsed_seconds=1.0,
+        returncode=0,
+        timed_out=False,
+    )
+
+    assert judge_phase_failed(result, {"events_file_exists": True}, {"parsed": False})
+    assert not judge_phase_failed(result, {"events_file_exists": True}, {"parsed": True})
+
+
+def test_load_state_restores_missing_schema_version(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    (run_dir / "state.json").write_text(json.dumps({"phases": {}}), encoding="utf-8")
+
+    state = load_state(run_dir)
+
+    assert state["schema_version"] == 1
 
 
 def test_usage_parser_reads_turn_completed_usage(tmp_path: Path) -> None:
@@ -286,7 +347,10 @@ def test_prepare_judge_evidence_copies_sanitized_artifacts(tmp_path: Path) -> No
     evidence = worktree / "judge_evidence"
     assert (evidence / "hidden-results.json").exists()
     assert (evidence / "public_py.log").read_text(encoding="utf-8") == "public output\n"
+    assert (evidence / "judge_output.schema.json").exists()
     assert (evidence / "evidence-manifest.json").exists()
+    manifest = json.loads((evidence / "evidence-manifest.json").read_text(encoding="utf-8"))
+    assert "judge_output.schema.json" in manifest["files"]
     assert not (evidence / "manifest.json").exists()
     assert not (evidence / "metadata.json").exists()
 

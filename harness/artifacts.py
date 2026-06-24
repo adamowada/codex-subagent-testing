@@ -75,6 +75,7 @@ EXPERIMENT_OUTPUT_ARTIFACTS: tuple[str, ...] = (
 )
 
 EXPERIMENT_METADATA_ARTIFACTS: tuple[str, ...] = (
+    "batch_metadata.json",
     "experiment_metadata.json",
     "experiment-metadata.json",
     "resolved_config.json",
@@ -93,6 +94,7 @@ JSON_WITH_SCHEMA_VERSION = {
     "hidden-results.json",
     "usage.json",
     "score.json",
+    "batch_metadata.json",
     "experiment_metadata.json",
     "experiment-metadata.json",
     "preflight.json",

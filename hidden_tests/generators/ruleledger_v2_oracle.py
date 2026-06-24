@@ -425,6 +425,22 @@ def evaluate_case(case: dict[str, Any]) -> Any:
             audit_as_of=input_payload.get("audit_as_of"),
         )
         return {"summaries": summaries, "report": export_ledger_report(summaries)}
+    if operation == "v3_architecture_contract":
+        return {
+            "directRuntimeFacade": False,
+            "modularized": True,
+            "modules": {
+                "billing": True,
+                "normalize": True,
+                "replay": True,
+                "reporting": True,
+            },
+        }
+    if operation == "v3_runtime_compatibility_contract":
+        return {
+            "localImplementation": False,
+            "runtimeDelegates": True,
+        }
 
     raise ValueError(f"unsupported v2 oracle operation: {operation}")
 

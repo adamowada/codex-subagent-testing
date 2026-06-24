@@ -1,0 +1,23 @@
+[
+  {
+    "accountId": "acct_v2",
+    "status": "active",
+    "plan": "pro",
+    "features": ["dashboard", "exports", "priority_support", "rules"],
+    "usage": 25,
+    "usageLimit": 10000,
+    "overLimit": false,
+    "totalPaidCents": 4900,
+    "currency": "USD",
+    "seats": 4,
+    "couponCode": "SAVE10",
+    "couponActive": true,
+    "invoiceIds": ["inv_100"],
+    "lastInvoiceId": "inv_100",
+    "lastPeriodStart": "2026-01-01T00:00:00.000Z",
+    "lastPeriodEnd": "2026-02-01T00:00:00.000Z",
+    "mergedFromAccountIds": ["acct_legacy"],
+    "closedAt": null,
+    "lastEventAt": "2026-01-06T00:00:00.000Z"
+  }
+]

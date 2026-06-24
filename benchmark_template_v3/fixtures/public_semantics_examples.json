@@ -1,0 +1,194 @@
+{
+  "schema_version": 1,
+  "semantics_document": "docs/ruleledger_v2_semantics.md",
+  "examples": [
+    {
+      "id": "public.bitemporal_late_arrival",
+      "concept": "bitemporal",
+      "rule_ids": ["BT-001", "BT-002", "BT-003", "BT-004", "BT-005", "BT-006", "OR-001", "OR-002", "PY-001"],
+      "as_of": "2026-01-12T00:00:00.000Z",
+      "raw_events": [
+        {
+          "id": "evt_plan_late",
+          "account_id": "acct_semantics",
+          "type": "plan_changed",
+          "timestamp": "2026-01-10T12:00:00Z",
+          "effective_at": "2026-01-03T00:00:00Z",
+          "recorded_at": "2026-01-10T12:00:00Z",
+          "sequence": 2,
+          "plan": "pro"
+        },
+        {
+          "id": "evt_open_semantics",
+          "account_id": "acct_semantics",
+          "type": "account_opened",
+          "timestamp": "2026-01-01T00:00:00Z",
+          "sequence": 1,
+          "plan": "starter"
+        }
+      ],
+      "expected_replay_order": ["evt_open_semantics", "evt_plan_late"],
+      "expected_summary": {
+        "accountId": "acct_semantics",
+        "status": "active",
+        "plan": "pro",
+        "features": ["dashboard", "exports", "priority_support", "rules"],
+        "usage": 0,
+        "usageLimit": 10000,
+        "overLimit": false,
+        "totalPaidCents": 0,
+        "currency": null,
+        "seats": 1,
+        "couponCode": null,
+        "couponActive": false,
+        "invoiceIds": [],
+        "lastInvoiceId": null,
+        "lastPeriodStart": null,
+        "lastPeriodEnd": null,
+        "mergedFromAccountIds": [],
+        "closedAt": null,
+        "lastEventAt": "2026-01-03T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "public.correction_void_lineage",
+      "concept": "correction_void",
+      "rule_ids": ["CV-001", "CV-002", "CV-003", "CV-004", "CV-005", "CV-006", "PY-001"],
+      "raw_events": [
+        {
+          "id": "evt_usage_original",
+          "account_id": "acct_semantics",
+          "type": "usage_recorded",
+          "timestamp": "2026-02-01T00:00:00Z",
+          "usage": 120
+        },
+        {
+          "id": "evt_usage_corrected",
+          "account_id": "acct_semantics",
+          "type": "event_corrected",
+          "timestamp": "2026-02-02T00:00:00Z",
+          "effective_at": "2026-02-01T00:00:00Z",
+          "recorded_at": "2026-02-02T00:00:00Z",
+          "sequence": 1,
+          "correction_of": "evt_usage_original",
+          "quantity": 90
+        },
+        {
+          "id": "evt_usage_void",
+          "account_id": "acct_semantics",
+          "type": "event_voided",
+          "timestamp": "2026-02-03T00:00:00Z",
+          "effective_at": "2026-02-01T00:00:00Z",
+          "recorded_at": "2026-02-03T00:00:00Z",
+          "sequence": 2,
+          "voided_event_id": "evt_usage_corrected"
+        }
+      ],
+      "expected_normalized_fields": {
+        "evt_usage_corrected": {
+          "correctionOf": "evt_usage_original",
+          "quantity": 90,
+          "effectiveAt": "2026-02-01T00:00:00.000Z",
+          "recordedAt": "2026-02-02T00:00:00.000Z"
+        },
+        "evt_usage_void": {
+          "voidedEventId": "evt_usage_corrected",
+          "effectiveAt": "2026-02-01T00:00:00.000Z",
+          "recordedAt": "2026-02-03T00:00:00.000Z"
+        }
+      }
+    },
+    {
+      "id": "public.account_merge_lineage",
+      "concept": "account_merge",
+      "rule_ids": ["MG-001", "MG-002", "MG-003", "MG-004", "MG-005", "RP-005", "PY-001"],
+      "raw_event": {
+        "id": "evt_merge_public",
+        "account_id": "acct_canonical",
+        "type": "account_merged",
+        "timestamp": "2026-03-01T00:00:00Z",
+        "effective_at": "2026-03-01T00:00:00Z",
+        "recorded_at": "2026-03-01T00:00:00Z",
+        "sequence": 1,
+        "merge_from_account_id": "acct_source"
+      },
+      "expected_normalized_fields": {
+        "accountId": "acct_canonical",
+        "mergeFromAccountId": "acct_source",
+        "effectiveAt": "2026-03-01T00:00:00.000Z",
+        "recordedAt": "2026-03-01T00:00:00.000Z"
+      }
+    },
+    {
+      "id": "public.proration_half_away_from_zero",
+      "concept": "proration",
+      "rule_ids": ["BL-001", "BL-002", "BL-003", "BL-004", "BL-005", "BL-006", "BL-007"],
+      "calculation": {
+        "currency": "USD",
+        "period_start": "2026-04-01T00:00:00.000Z",
+        "period_end": "2026-05-01T00:00:00.000Z",
+        "change_effective_at": "2026-04-16T00:00:00.000Z",
+        "full_period_amount_cents": 1000,
+        "active_ms": 1296000000,
+        "period_ms": 2592000000,
+        "expected_prorated_amount_cents": 500
+      },
+      "rounding_examples": [
+        {"value": "1.5", "expected": 2},
+        {"value": "1.4", "expected": 1},
+        {"value": "-1.5", "expected": -2},
+        {"value": "-1.4", "expected": -1}
+      ]
+    },
+    {
+      "id": "public.csv_parity_contract",
+      "concept": "csv_parity",
+      "rule_ids": ["RP-001", "RP-002", "RP-003", "RP-004", "RP-005", "RP-006", "PY-001"],
+      "expected_report_fixture": "public_semantics_expected_report.csv",
+      "summaries": [
+        {
+          "accountId": "acct_z",
+          "status": "closed",
+          "plan": "free",
+          "features": [],
+          "usage": 0,
+          "usageLimit": 0,
+          "overLimit": false,
+          "totalPaidCents": 0,
+          "currency": null,
+          "seats": 0,
+          "couponCode": null,
+          "couponActive": false,
+          "invoiceIds": [],
+          "lastInvoiceId": null,
+          "lastPeriodStart": null,
+          "lastPeriodEnd": null,
+          "mergedFromAccountIds": [],
+          "closedAt": "2026-05-01T00:00:00.000Z",
+          "lastEventAt": "2026-05-01T00:00:00.000Z"
+        },
+        {
+          "accountId": "acct_a",
+          "status": "active",
+          "plan": "pro",
+          "features": ["dashboard", "exports", "priority_support", "rules"],
+          "usage": 42,
+          "usageLimit": 10000,
+          "overLimit": false,
+          "totalPaidCents": 4900,
+          "currency": "USD",
+          "seats": 3,
+          "couponCode": "SAVE10",
+          "couponActive": true,
+          "invoiceIds": ["inv_a", "inv_b"],
+          "lastInvoiceId": "inv_b",
+          "lastPeriodStart": "2026-04-01T00:00:00.000Z",
+          "lastPeriodEnd": "2026-05-01T00:00:00.000Z",
+          "mergedFromAccountIds": ["acct_old"],
+          "closedAt": null,
+          "lastEventAt": "2026-04-20T00:00:00.000Z"
+        }
+      ]
+    }
+  ]
+}

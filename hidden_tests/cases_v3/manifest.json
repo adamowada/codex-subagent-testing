@@ -1,0 +1,52 @@
+{
+  "benchmark": "ruleledger_v3",
+  "category_weights": {
+    "evolution": 0.2,
+    "fail_to_pass": 0.2,
+    "localization": 0.25,
+    "metamorphic": 0.1,
+    "parity": 0.05,
+    "pass_to_pass": 0.1,
+    "performance": 0.1
+  },
+  "files": {
+    "compatibility.json": {
+      "case_count": 7,
+      "points": 10.5,
+      "sha256": "196151d660df824b66027ce5c2133b9e53a82b15eb7a01cd49be21fb5a7a430d"
+    },
+    "evolution.json": {
+      "case_count": 10,
+      "points": 23.0,
+      "sha256": "c8c0c3ce953372c0c9415d7809a6780aca0028ab79d044137c2dad447118bf54"
+    },
+    "localization.json": {
+      "case_count": 2,
+      "points": 12.0,
+      "sha256": "9c67998bbeaabea7ec902a5f78e8b31cee04fd2abf67bb3ca93436e903041e05"
+    },
+    "metamorphic.json": {
+      "case_count": 3,
+      "points": 6.5,
+      "sha256": "08b69cfcbd4f7505fd7fae540466b4f01b872f53c06a97d11077a27cf7c89132"
+    },
+    "parity.json": {
+      "case_count": 3,
+      "points": 4.5,
+      "sha256": "bf217264167a47f8f8190552236361bd63847ba4c44f67140e80cd6505d1244c"
+    },
+    "performance.json": {
+      "case_count": 3,
+      "points": 7.5,
+      "sha256": "4d5d8679fc5b5aa9053190d048843507b94fb1ce1c820dc74e70eccf3b3abec7"
+    },
+    "reasoning_ladder.json": {
+      "case_count": 9,
+      "points": 20.0,
+      "sha256": "aa8d8e7ae7a02e89b47e8f257af893843534954f890ed7b45fa751972e7ac6ce"
+    }
+  },
+  "generated_at": "2026-05-29T00:00:00.000Z",
+  "schema_version": 3,
+  "seed": 20260529
+}

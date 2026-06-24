@@ -1,0 +1,54 @@
+{
+  "benchmark": "ruleledger_v3",
+  "cases": [
+    {
+      "category": "localization",
+      "expected": {
+        "directRuntimeFacade": false,
+        "modularized": true,
+        "modules": {
+          "billing": true,
+          "normalize": true,
+          "replay": true,
+          "reporting": true
+        }
+      },
+      "id": "v3.localization.module_ownership",
+      "input": {},
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v3_architecture_contract",
+      "points": 7.0,
+      "rule_ids": [
+        "LC-010",
+        "PY-001",
+        "TS-001"
+      ]
+    },
+    {
+      "category": "localization",
+      "expected": {
+        "localImplementation": false,
+        "runtimeDelegates": true
+      },
+      "id": "v3.localization.runtime_compatibility_boundary",
+      "input": {},
+      "languages": [
+        "typescript",
+        "python"
+      ],
+      "operation": "v3_runtime_compatibility_contract",
+      "points": 5.0,
+      "rule_ids": [
+        "LC-010",
+        "PY-001",
+        "TS-001"
+      ]
+    }
+  ],
+  "generated_at": "2026-05-29T00:00:00.000Z",
+  "schema_version": 3,
+  "seed": 20260529
+}

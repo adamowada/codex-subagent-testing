@@ -16,6 +16,7 @@ from typing import Any, Mapping
 
 FINAL_JSON_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 KILL_WAIT_SECONDS = 15
+IMPLEMENTATION_FINAL_STATUSES = {"success", "partial", "failed"}
 
 
 @dataclass(frozen=True)
@@ -78,7 +79,7 @@ def build_implementation_command(
     rendered = _rendered_config_values(config_dir)
     model = str(rendered.get("model", root["model"]))
     reasoning = str(rendered.get("model_reasoning_effort", root["reasoning"]))
-    sandbox = str(rendered.get("sandbox", "workspace-write"))
+    sandbox = str(rendered.get("sandbox", root.get("sandbox", "workspace-write")))
     ask_for_approval = str(rendered.get("ask_for_approval", "never"))
 
     return [
@@ -119,6 +120,8 @@ def build_judge_command(codex_bin: str, run: Mapping[str, Any], prompt: str) -> 
         str(judge.get("sandbox", "read-only")),
         "--model",
         str(judge["model"]),
+        "--output-schema",
+        "judge_evidence/judge_output.schema.json",
         "-c",
         f"model_reasoning_effort={judge['reasoning']}",
         prompt,
@@ -274,7 +277,7 @@ def extract_final_response(events_path: Path) -> dict[str, Any]:
     if not events_path.exists():
         return {"parsed": False, "raw": "", "error": "events_file_missing"}
 
-    candidates: list[str] = []
+    message_candidates: list[list[str]] = []
     for line in events_path.read_text(encoding="utf-8", errors="replace").splitlines():
         if not line.strip():
             continue
@@ -282,18 +285,93 @@ def extract_final_response(events_path: Path) -> dict[str, Any]:
             event = json.loads(line)
         except json.JSONDecodeError:
             continue
-        candidates.extend(_collect_text_candidates(event))
+        candidates = _collect_final_response_candidates(event)
+        if candidates:
+            message_candidates.append(candidates)
 
-    for raw in reversed(candidates):
+    if not message_candidates:
+        return {
+            "parsed": False,
+            "raw": "",
+            "error": "no_strict_json_object_found",
+        }
+
+    latest_candidates = message_candidates[-1]
+    for raw in reversed(latest_candidates):
         parsed = _parse_json_object_from_text(raw)
         if parsed["parsed"]:
             return parsed
 
     return {
         "parsed": False,
-        "raw": candidates[-1] if candidates else "",
+        "raw": latest_candidates[-1],
         "error": "no_strict_json_object_found",
     }
+
+
+def summarize_codex_events(events_path: Path) -> dict[str, Any]:
+    """Return a compact health summary for a Codex JSONL event stream."""
+
+    summary: dict[str, Any] = {
+        "events_file_exists": events_path.exists(),
+        "turn_completed": 0,
+        "turn_failed": 0,
+        "error_events": 0,
+        "last_error": "",
+    }
+    if not events_path.exists():
+        summary["last_error"] = "events_file_missing"
+        return summary
+
+    for line in events_path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if not line.strip():
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, Mapping):
+            continue
+        event_type = event.get("type")
+        if event_type == "turn.completed":
+            summary["turn_completed"] += 1
+        elif event_type == "turn.failed":
+            summary["turn_failed"] += 1
+            summary["last_error"] = _event_error_message(event)
+        elif event_type == "error":
+            summary["error_events"] += 1
+            summary["last_error"] = _event_error_message(event)
+    return summary
+
+
+def codex_events_have_failure(summary: Mapping[str, Any]) -> bool:
+    return bool(summary.get("turn_failed") or summary.get("error_events") or not summary.get("events_file_exists"))
+
+
+def implementation_final_response_errors(final_response: Mapping[str, Any]) -> list[str]:
+    """Validate the measured implementation final JSON contract."""
+
+    errors: list[str] = []
+    if final_response.get("parsed") is not True:
+        return [f"final response did not parse as strict JSON: {final_response.get('error', 'unknown_error')}"]
+
+    value = final_response.get("value")
+    if not isinstance(value, Mapping):
+        return ["final response value is not an object"]
+
+    if value.get("status") not in IMPLEMENTATION_FINAL_STATUSES:
+        errors.append("final response status is missing or invalid")
+    if value.get("nested_codex_invoked") is not False:
+        errors.append("final response nested_codex_invoked must be false")
+
+    changed_files = value.get("changed_files")
+    if not isinstance(changed_files, list) or not all(isinstance(item, str) for item in changed_files):
+        errors.append("final response changed_files must be a list of strings")
+
+    tests_run = value.get("tests_run")
+    if not isinstance(tests_run, list):
+        errors.append("final response tests_run must be a list")
+    return errors
 
 
 def iso_now() -> str:
@@ -416,7 +494,7 @@ def _toml_value(value: Any) -> str:
 def _collect_text_candidates(value: Any) -> list[str]:
     candidates: list[str] = []
     if isinstance(value, str):
-        if "{" in value and "}" in value:
+        if value.strip():
             candidates.append(value)
         return candidates
     if isinstance(value, list):
@@ -431,6 +509,18 @@ def _collect_text_candidates(value: Any) -> list[str]:
                 candidates.extend(_collect_text_candidates(item))
         return candidates
     return candidates
+
+
+def _collect_final_response_candidates(event: Mapping[str, Any]) -> list[str]:
+    event_type = event.get("type")
+    if event_type in {"message", "agent_message"}:
+        return _collect_text_candidates(event)
+
+    item = event.get("item")
+    if event_type == "item.completed" and isinstance(item, Mapping) and item.get("type") == "agent_message":
+        return _collect_text_candidates(item)
+
+    return []
 
 
 def _parse_json_object_from_text(text: str) -> dict[str, Any]:
@@ -489,3 +579,11 @@ def _json_object_candidates(text: str) -> list[str]:
         if match:
             candidates.append(match.group(0))
     return candidates
+
+
+def _event_error_message(event: Mapping[str, Any]) -> str:
+    value = event.get("error", event.get("message", ""))
+    if isinstance(value, Mapping):
+        message = value.get("message")
+        return str(message) if message else json.dumps(value, sort_keys=True)
+    return str(value)

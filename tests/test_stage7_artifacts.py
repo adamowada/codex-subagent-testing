@@ -174,7 +174,19 @@ def test_experiment_metadata_writes_stable_aliases_and_resume_reads_them(
     tmp_path: Path,
 ) -> None:
     selected = runs[:2]
-    args = SimpleNamespace(pilot=True, dry_run=True, jobs=1, judge_jobs=1)
+    args = SimpleNamespace(
+        repo_root=str(REPO_ROOT),
+        pilot=True,
+        dry_run=True,
+        jobs=1,
+        judge_jobs=1,
+        study_id="ruleledger-v3-paper",
+        batch_id="batch-001",
+        batch_sequence=1,
+        batch_started_at="2026-06-05T12:00:00Z",
+        batch_notes="first frozen batch",
+        rerun_failed=False,
+    )
     write_experiment_metadata(
         experiment_dir=tmp_path,
         config_path=CONFIG_PATH,
@@ -189,9 +201,21 @@ def test_experiment_metadata_writes_stable_aliases_and_resume_reads_them(
 
     assert (tmp_path / "experiment_metadata.json").exists()
     assert (tmp_path / "experiment-metadata.json").exists()
+    assert (tmp_path / "batch_metadata.json").exists()
     assert (tmp_path / "resolved_config.json").exists()
     metadata = json.loads((tmp_path / "experiment_metadata.json").read_text(encoding="utf-8"))
+    batch = json.loads((tmp_path / "batch_metadata.json").read_text(encoding="utf-8"))
     assert metadata["benchmark"]["version"] == "ruleledger_v1"
+    assert metadata["batch"]["study_id"] == "ruleledger-v3-paper"
+    assert metadata["batch"]["batch_id"] == "batch-001"
+    assert batch["study"]["id"] == "ruleledger-v3-paper"
+    assert batch["batch"]["id"] == "batch-001"
+    assert batch["batch"]["sequence"] == 1
+    assert batch["batch"]["notes"] == "first frozen batch"
+    assert batch["freeze_manifest"]["config_sha256"] == metadata["config_sha256"]
+    assert batch["freeze_manifest"]["full_matrix_sha256"]
+    assert batch["freeze_manifest"]["selected_matrix_sha256"]
+    assert "same hidden cases tree hash and hidden manifest hash" in batch["pooling_requirements"]
 
 
 def test_run_metadata_validation_accepts_defaulted_benchmark_for_legacy_run(tmp_path: Path) -> None:

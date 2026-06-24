@@ -8,11 +8,14 @@ import stat
 import sys
 
 from harness.codex_runner import (
+    codex_events_have_failure,
     command_for_display,
     extract_final_response,
+    implementation_final_response_errors,
     resolve_codex_bin,
     resolve_npm_bin,
     run_process_to_files,
+    summarize_codex_events,
 )
 from harness.hidden_runner import (
     JS_CASE_RUNNER,
@@ -106,6 +109,54 @@ def test_run_process_to_files_captures_success_stdout_stderr_and_final_json(tmp_
     assert "warning from fake codex" in stderr
     assert final["parsed"]
     assert final["value"]["status"] == "success"
+
+
+def test_codex_event_summary_detects_turn_failures(tmp_path: Path) -> None:
+    events = tmp_path / "events.jsonl"
+    events.write_text(
+        "\n".join(
+            [
+                json.dumps({"type": "thread.started"}),
+                json.dumps({"type": "error", "message": "usage limit"}),
+                json.dumps({"type": "turn.failed", "error": {"message": "usage limit"}}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    summary = summarize_codex_events(events)
+
+    assert summary["error_events"] == 1
+    assert summary["turn_failed"] == 1
+    assert summary["last_error"] == "usage limit"
+    assert codex_events_have_failure(summary)
+
+
+def test_implementation_final_response_contract_requires_nested_codex_false() -> None:
+    valid = {
+        "parsed": True,
+        "value": {
+            "status": "partial",
+            "changed_files": ["src/index.ts"],
+            "tests_run": [],
+            "nested_codex_invoked": False,
+        },
+    }
+    invalid = {
+        "parsed": True,
+        "value": {
+            "status": "success",
+            "changed_files": [],
+            "tests_run": [],
+            "nested_codex_invoked": True,
+        },
+    }
+
+    assert implementation_final_response_errors(valid) == []
+    assert implementation_final_response_errors(invalid) == [
+        "final response nested_codex_invoked must be false"
+    ]
 
 
 def test_hidden_runner_command_decodes_utf8_output_on_windows(tmp_path: Path) -> None:
@@ -425,6 +476,68 @@ def test_extract_final_response_uses_last_parseable_json_object(tmp_path: Path) 
 
     assert final["parsed"]
     assert final["value"] == {"status": "success"}
+
+
+def test_extract_final_response_ignores_tool_json_candidates(tmp_path: Path) -> None:
+    events_path = tmp_path / "events.jsonl"
+    events_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {
+                            "type": "mcp_tool_call",
+                            "result": {"content": [{"type": "text", "text": '{"tool": "not_final"}'}]},
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "agent_message", "text": "finished without strict json"},
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    final = extract_final_response(events_path)
+
+    assert not final["parsed"]
+    assert final["raw"] == "finished without strict json"
+    assert final["error"] == "no_strict_json_object_found"
+
+
+def test_extract_final_response_does_not_fall_back_past_latest_agent_message(tmp_path: Path) -> None:
+    events_path = tmp_path / "events.jsonl"
+    events_path.write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "agent_message", "text": '{"status": "old"}'},
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "item.completed",
+                        "item": {"type": "agent_message", "text": "final prose only"},
+                    }
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    final = extract_final_response(events_path)
+
+    assert not final["parsed"]
+    assert final["raw"] == "final prose only"
 
 
 def test_check_codex_version_records_stdout_stderr_and_returncode() -> None:

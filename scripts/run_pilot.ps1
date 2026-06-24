@@ -4,7 +4,14 @@ param(
     [int]$JudgeJobs = 1,
     [string]$RunsRoot = "runs",
     [string]$ExperimentName = "",
+    [string]$StudyId = "",
+    [string]$BatchId = "",
+    [int]$BatchSequence = 0,
+    [string]$BatchStartedAt = "",
+    [string]$BatchNotes = "",
     [string]$Resume = "",
+    [int]$RepeatFrom = 0,
+    [int]$RepeatTo = 0,
     [switch]$RerunFailed,
     [switch]$NoReport,
     [switch]$DryRun
@@ -28,8 +35,29 @@ $ArgsList = @(
 if ($ExperimentName) {
     $ArgsList += @("--experiment-name", $ExperimentName)
 }
+if ($StudyId) {
+    $ArgsList += @("--study-id", $StudyId)
+}
+if ($BatchId) {
+    $ArgsList += @("--batch-id", $BatchId)
+}
+if ($BatchSequence -gt 0) {
+    $ArgsList += @("--batch-sequence", "$BatchSequence")
+}
+if ($BatchStartedAt) {
+    $ArgsList += @("--batch-started-at", $BatchStartedAt)
+}
+if ($BatchNotes) {
+    $ArgsList += @("--batch-notes", $BatchNotes)
+}
 if ($Resume) {
     $ArgsList += @("--resume", $Resume)
+}
+if ($RepeatFrom -gt 0) {
+    $ArgsList += @("--repeat-from", "$RepeatFrom")
+}
+if ($RepeatTo -gt 0) {
+    $ArgsList += @("--repeat-to", "$RepeatTo")
 }
 if ($RerunFailed) {
     $ArgsList += "--rerun-failed"

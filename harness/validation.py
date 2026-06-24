@@ -122,6 +122,7 @@ def validate_stage11(
             _experiment_checks(
                 experiment_dir=experiment_path,
                 config=config,
+                all_runs=all_runs,
                 selected_runs=selected,
                 require_report_outputs=require_report_outputs,
                 repo_root=root,
@@ -164,12 +165,13 @@ def _experiment_checks(
     *,
     experiment_dir: Path,
     config: Mapping[str, Any],
+    all_runs: Sequence[Mapping[str, Any]],
     selected_runs: Sequence[Mapping[str, Any]],
     require_report_outputs: bool,
     repo_root: Path,
 ) -> list[Stage11Check]:
     checks = [
-        _experiment_metadata_check(experiment_dir, config, selected_runs),
+        _experiment_metadata_check(experiment_dir, config, all_runs, selected_runs),
         _run_artifacts_check(experiment_dir, selected_runs),
         _hidden_isolation_check(experiment_dir, selected_runs, repo_root),
         _judge_json_check(experiment_dir, selected_runs),
@@ -261,11 +263,13 @@ def _preflight_check(
 def _experiment_metadata_check(
     experiment_dir: Path,
     config: Mapping[str, Any],
+    all_runs: Sequence[Mapping[str, Any]],
     selected_runs: Sequence[Mapping[str, Any]],
 ) -> Stage11Check:
     errors: list[str] = []
     for name in (
         "experiment_metadata.json",
+        "batch_metadata.json",
         "resolved_config.json",
         "matrix.json",
         "matrix-summary.json",
@@ -296,6 +300,25 @@ def _experiment_metadata_check(
         expected_benchmark = benchmark_metadata(config)
         if metadata.get("benchmark") != expected_benchmark:
             errors.append("experiment_metadata.benchmark does not match selected config")
+
+    batch_metadata = _read_json(experiment_dir / "batch_metadata.json")
+    if batch_metadata:
+        freeze = batch_metadata.get("freeze_manifest")
+        if not isinstance(freeze, Mapping):
+            errors.append("batch_metadata.freeze_manifest is missing")
+        else:
+            if freeze.get("config_sha256") != _json_sha256(config):
+                errors.append("batch_metadata.freeze_manifest.config_sha256 does not match selected config")
+            if freeze.get("full_matrix_sha256") != _json_sha256(list(all_runs)):
+                errors.append("batch_metadata.freeze_manifest.full_matrix_sha256 does not match selected config matrix")
+            if freeze.get("selected_matrix_sha256") != _json_sha256(list(selected_runs)):
+                errors.append("batch_metadata.freeze_manifest.selected_matrix_sha256 does not match selected runs")
+            expected_benchmark = benchmark_metadata(config)
+            if freeze.get("benchmark") != expected_benchmark:
+                errors.append("batch_metadata.freeze_manifest.benchmark does not match selected config")
+        requirements = batch_metadata.get("pooling_requirements")
+        if not isinstance(requirements, list) or not requirements:
+            errors.append("batch_metadata.pooling_requirements is missing")
 
     if errors:
         return _failed("experiment_metadata", _join_errors(errors), {"error_count": len(errors)})
@@ -684,8 +707,9 @@ def _check_names(preflight: Mapping[str, Any], status: str) -> list[str]:
 
 
 def _judge_has_numeric_score(value: Mapping[str, Any]) -> bool:
-    if isinstance(value.get("overall_score"), (int, float)) and not isinstance(value.get("overall_score"), bool):
-        return True
+    for key in ("overall_score", "score"):
+        if isinstance(value.get(key), (int, float)) and not isinstance(value.get(key), bool):
+            return True
     for key in ("correctness_score", "parity_score", "maintainability_score", "test_evidence_score"):
         if isinstance(value.get(key), (int, float)) and not isinstance(value.get(key), bool):
             return True
