@@ -1,47 +1,125 @@
-# Codex Subagent Topology Benchmark
+# RuleLedger v3 Benchmark Harness
 
-## Introduction
+This repository contains a reproducible benchmark harness for Codex coding experiments. The current focus is RuleLedger v3: a TypeScript and Python subscription-ledger task designed to measure whether larger reasoning budgets and Spark-assisted topologies produce better code.
 
-## Methods
+The repo preserves measured evidence for each run: rendered configs, prompts, Codex JSONL events, stderr logs, diffs, public test logs, hidden-test summaries, judge output, usage metrics, scores, and generated reports.
 
-This project is designed to compare different ways of using Codex subagents for coding work. The goal is not just to see which setup writes the most code, but which setup produces the most correct, useful code for the amount of scarce GPT-5.5 usage it consumes.
+## RuleLedger v3
 
-The experiment uses a contrived benchmark project called RuleLedger. RuleLedger is intentionally mixed-language: agents must implement matching TypeScript and Python modules that parse subscription event logs, normalize messy records, apply pricing and account-state rules, and export deterministic summaries. The task is complex enough to require real coordination, but structured enough that subagents can be assigned clear pieces of work.
+RuleLedger v3 is a controlled software-engineering benchmark. A measured agent starts from a frozen mixed-language starter project and must implement one coherent ledger engine across:
 
-Each experiment run starts from the same clean starter project. Codex is launched through `codex exec --json`, and the run output is saved as machine-readable JSONL along with logs, diffs, timing data, test results, and judge results. Runs are isolated from each other so that one topology cannot accidentally benefit from another topology's work.
+- TypeScript and Python implementation surfaces.
+- Bitemporal replay using business-effective and audit-visible cutoffs.
+- Account lineage, merges, corrections, voids, billing, reports, and replay digests.
+- Cross-language parity, deterministic CSV output, compatibility behavior, and performance constraints.
 
-The first experiment compares five v1 cells. One is a solo GPT-5.5 xhigh baseline. Three use a GPT-5.5 lead at medium, high, or xhigh reasoning with six Spark xhigh leaf subagents. The final cell is a stress test: a GPT-5.5 xhigh root lead coordinates three GPT-5.5 medium subleads, and each sublead coordinates six Spark xhigh leaves. Spark leaves are tested in two modes: direct edit mode and proposal-only mode.
+The benchmark is intentionally issue-like rather than a complete truth table. Public tests are visible and incomplete. Hidden tests remain outside implementation workspaces and score correctness, parity, performance, behavior-family coverage, and regression behavior. A fixed GPT-5.5 xhigh judge contributes an additional review signal.
 
-The repository also contains a harder RuleLedger v2 path. V2 has a separate starter template, hidden case directory, scoring profile, pilot config, and full readiness matrix. It adds bitemporal business/audit views, lifecycle precedence, account merges, proration, performance cases, category-level reporting, and v2-specific public hooks while keeping the v1 experiment intact.
+The RuleLedger v3 paper reports a 200-run GPT-5.5 reasoning study: 50 runs each at `low`, `medium`, `high`, and `xhigh` reasoning. The main result is the quality jump from medium to high reasoning; xhigh produced the best observed mean quality and tail behavior.
 
-Quality is measured with visible public tests, hidden tests, typechecking, code-diff metrics, and a separate blind GPT-5.5 xhigh judge. The hidden tests are created once and kept outside the implementation workspaces so implementation agents cannot read them. Partial runs still receive whatever score they earn.
+Primary paper:
 
-The primary comparison metric is quality per implementation-only GPT-5.5 token. The harness also tracks judge-inclusive GPT-5.5 cost, total token usage, best-effort Spark usage, wall-clock time, code quantity, failure rate, and direct-edit versus proposal-only differences. Reports label benchmark version and avoid silently ranking v1 and v2 scores together.
+- [RuleLedger v3 white paper](papers/ruleledger-v3-white-paper.md)
 
-## Commands
+Key assets:
 
-Run the initial v1 experiment:
+- Starter project: `benchmark_template_v3/`
+- Public prompt: `prompts/task_common_v3.md`
+- Hidden cases: `hidden_tests/cases_v3/`
+- Scoring profile: `configs/scoring_v3.yaml`
+- Paper experiment config: `configs/ruleledger_v3_paper_50.yaml`
+- Sanity config: `configs/ruleledger_v3_sanity.yaml`
+
+## Spark Mode Efficiency
+
+The Spark mode efficiency experiment uses RuleLedger v3 to compare two ways of using six `gpt-5.3-codex-spark` xhigh leaf workers under a GPT-5.5 coordinator:
+
+- Direct edit mode: Spark leaves work in separate writable git worktrees and return diffs.
+- Proposal mode: Spark leaves run read-only and return findings, proposed patches, tests, and integration notes.
+
+The official comparison set contains 360 scored implementation runs:
+
+| Group | Cells | Runs per cell | Rows |
+| --- | ---: | ---: | ---: |
+| GPT-5.5 solo comparison | 4 reasoning levels | 50 | 200 |
+| Spark direct | 4 reasoning levels | 20 | 80 |
+| Spark proposal | 4 reasoning levels | 20 | 80 |
+
+The analysis reports GPT-5.5 coordinator tokens, Spark leaf tokens, total implementation tokens, quality, and efficiency. Official Spark-assisted rows use per-event model attribution from Codex JSONL usage events.
+
+Primary paper:
+
+- [Spark mode efficiency white paper](papers/spark-mode-efficiency-white-paper.md)
+
+Key assets:
+
+- Experiment plan: `plans/experiments/spark-mode-efficiency-direct-vs-proposal.md`
+- Run log: `plans/experiments/spark-mode-efficiency-run-log.md`
+- Main config: `configs/spark_mode_efficiency_main.yaml`
+- Extension configs: `configs/spark_mode_efficiency_low_medium_extension.yaml`, `configs/spark_mode_efficiency_high_extension.yaml`, `configs/spark_mode_efficiency_xhigh_extension.yaml`
+- Analysis script: `scripts/analyze_spark_mode_efficiency.py`
+
+## Harness Architecture
+
+The harness is config-driven. Experiment configs select the benchmark template, hidden cases, prompt templates, scoring profile, model names, reasoning levels, topology, repeat counts, and parallelism. The orchestrator expands those configs into measured run records and executes each run in an isolated workspace.
+
+Core modules:
+
+| Module | Responsibility |
+| --- | --- |
+| `harness.matrix` | Load, validate, summarize, and expand experiment configs into deterministic run records |
+| `harness.preflight` | Check environment readiness, config paths, prompt rendering, and hidden-case isolation before spending model quota |
+| `harness.prompt_rendering` | Render implementation prompts, judge prompts, and Codex config files from run records |
+| `harness.orchestrator` | Create run directories/workspaces, schedule implementation and judge phases, resume runs, rerun failed phases, and write aggregate outputs |
+| `harness.codex_runner` | Build and run `codex exec --json` commands, capture JSONL/stderr, handle timeouts, and extract final responses |
+| `harness.hidden_runner` | Run hidden RuleLedger checks from outside measured implementation workspaces |
+| `harness.jsonl_usage` | Parse Codex JSONL usage events and attribute implementation tokens by model when available |
+| `harness.scoring` | Compute quality scores from public checks, hidden results, performance, judge output, and minimality |
+| `harness.report_data` | Collect result rows and write aggregate report data, CSV, and SQLite artifacts |
+| `harness.validation` | Validate completed runs, reports, hidden-test privacy, judge JSON, and artifact completeness |
+
+Important conventions:
+
+- Every measured run starts from a frozen benchmark template.
+- Hidden cases are never copied into implementation workspaces or prompts.
+- Measured agents must not invoke nested Codex runs or other AI services.
+- Raw evidence is preserved under `runs/`.
+- Generated run outputs should normally stay out of commits unless a specific experiment artifact is being intentionally published.
+
+## Install and Use
+
+Prerequisites:
+
+- Python 3.12+
+- Node.js/npm
+- Codex CLI available as `codex`, or set `CODEX_BIN` to the executable path
+
+Install local test and report dependencies:
 
 ```powershell
-.\scripts\run_experiment.ps1 -Jobs 3
+python -m pip install -r requirements-dev.txt
+npm install
+npm run install:report-browser
 ```
 
-Run the default pilot smoke test:
+Run the repository tests:
 
 ```powershell
-.\scripts\run_pilot.ps1
+python -m pytest -q
 ```
 
-Run the v2 pilot:
+Dry-run the RuleLedger v3 sanity matrix without spending model quota:
 
 ```powershell
-.\scripts\run_pilot.ps1 -Config configs\ruleledger_v2_pilot.yaml -Jobs 1 -JudgeJobs 1
+.\scripts\run_experiment.ps1 -Config configs\ruleledger_v3_sanity.yaml -DryRun -NoReport
 ```
 
-Dry-run the full v2 readiness matrix:
+Run a measured RuleLedger v3 sanity sweep:
 
 ```powershell
-.\scripts\run_experiment.ps1 -Config configs\ruleledger_v2_experiment.yaml -Jobs 3 -JudgeJobs 1 -DryRun
+.\scripts\run_experiment.ps1 -Config configs\ruleledger_v3_sanity.yaml -Jobs 1 -JudgeJobs 1
 ```
 
-Remove `-DryRun` only after the v2 pilot has produced real calibration evidence and the local Codex executable is available.
+Use the explicit config for any larger run, for example `configs/ruleledger_v3_paper_50.yaml` or `configs/spark_mode_efficiency_main.yaml`. Full measured experiment configs can consume substantial model quota, so start with `-DryRun`, small sanity configs, and explicit `-Jobs` / `-JudgeJobs` settings.
+
+The Spark analysis command used for the published paper is recorded in [the Spark white paper](papers/spark-mode-efficiency-white-paper.md).
