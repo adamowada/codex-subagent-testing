@@ -8,13 +8,15 @@ Configs:
 
 - Pilot: `configs/spark_mode_efficiency_pilot.yaml`
 - Main: `configs/spark_mode_efficiency_main.yaml`
+- Low/medium extension:
+  `configs/spark_mode_efficiency_low_medium_extension.yaml`
 - Xhigh extension: `configs/spark_mode_efficiency_xhigh_extension.yaml`
 - High extension: `configs/spark_mode_efficiency_high_extension.yaml`
 
 Concurrency targets:
 
 - Pilot, main, and xhigh extension: implementation jobs 5, judge jobs 4
-- High extension: implementation jobs 7, judge jobs 6
+- Low/medium and high extensions: implementation jobs 7, judge jobs 6
 
 ## Implementation Checkpoints
 
@@ -56,6 +58,15 @@ The high extension added:
 - A focused high direct/proposal section in the white paper that compares the
   combined high Spark-assisted cells against the historical 50-run high
   GPT-only baseline.
+
+The low/medium extension added:
+
+- `configs/spark_mode_efficiency_low_medium_extension.yaml`.
+- Analysis support for combining low and medium main rows with the shared
+  low/medium extension source while keeping focused low and medium comparisons
+  separate.
+- A full expanded 20-run results section in the white paper covering all four
+  root reasoning levels.
 
 ## Pilot Runs
 
@@ -211,12 +222,37 @@ High extension repair:
 - Extension PDF:
   `runs/20260624T220413-spark_mode_efficiency_high_extension-high_extension_j7_j6/report/report.pdf`
 
+## Low/Medium Extension
+
+Dry run:
+
+- Directory:
+  `runs/20260625T054122-spark_mode_efficiency_low_medium_extension-low_medium_extension_j7_j6_dry_run`
+- Result: preflight passed and selected 60 runs: 15 low direct, 15 low
+  proposal, 15 medium direct, and 15 medium proposal.
+
+Measured low/medium extension:
+
+- Directory:
+  `runs/20260625T054133-spark_mode_efficiency_low_medium_extension-low_medium_extension_j7_j6`
+- Command:
+  `.\scripts\run_experiment.ps1 -Config configs/spark_mode_efficiency_low_medium_extension.yaml -Jobs 7 -JudgeJobs 6 -WorkspaceRoot C:\cstws -ExperimentName low_medium_extension_j7_j6 -StudyId spark-mode-efficiency -BatchId low-medium-extension-j7-j6 -BatchSequence 5 -BatchNotes "Spark mode efficiency low/medium extension: 15 additional low direct, low proposal, medium direct, and medium proposal runs with implementation jobs 7 and judge jobs 6."`
+- Result: completed without quota repair.
+- Implementation phase: 60/60 ok, 0 failed.
+- Judge phase: 60/60 ok, 0 failed.
+- Final validation status: `passed`.
+- Extension rows: 60.
+- Extension report:
+  `runs/20260625T054133-spark_mode_efficiency_low_medium_extension-low_medium_extension_j7_j6/report/report.html`
+- Extension PDF:
+  `runs/20260625T054133-spark_mode_efficiency_low_medium_extension-low_medium_extension_j7_j6/report/report.pdf`
+
 ## Analysis and Reporting
 
 Final analysis command:
 
 ```powershell
-python scripts\analyze_spark_mode_efficiency.py --experiment-dir runs\20260624T023048-spark_mode_efficiency_pilot-pilot --experiment-dir runs\20260624T053702-spark_mode_efficiency_main-main --experiment-dir runs\20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension --experiment-dir runs\20260624T220413-spark_mode_efficiency_high_extension-high_extension_j7_j6 --output-dir runs\analysis\spark_mode_efficiency_final
+python scripts\analyze_spark_mode_efficiency.py --experiment-dir runs\20260624T023048-spark_mode_efficiency_pilot-pilot --experiment-dir runs\20260624T053702-spark_mode_efficiency_main-main --experiment-dir runs\20260625T054133-spark_mode_efficiency_low_medium_extension-low_medium_extension_j7_j6 --experiment-dir runs\20260624T220413-spark_mode_efficiency_high_extension-high_extension_j7_j6 --experiment-dir runs\20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension --output-dir runs\analysis\spark_mode_efficiency_final
 ```
 
 Final analysis artifacts:
@@ -226,7 +262,7 @@ Final analysis artifacts:
 - `runs/analysis/spark_mode_efficiency_final/phase_summary.csv`
 - `runs/analysis/spark_mode_efficiency_final/summary.md`
 
-Rows analyzed: 324.
+Rows analyzed: 384.
 
 White paper:
 
@@ -235,8 +271,12 @@ White paper:
 Headline result:
 
 - Direct edit is the better default for Spark leaves.
-- Direct edit wins quality and implementation-token efficiency at low, medium,
-  and high root reasoning.
+- The final analysis has 20 direct and 20 proposal runs for each root reasoning
+  level.
+- Low direct is slightly higher quality than low proposal: `0.482419` versus
+  `0.472281`, and uses fewer GPT/Spark/total implementation tokens.
+- Medium direct is the strongest Spark-assisted quality lift over solo:
+  `0.621764` versus `0.461959` historical medium solo.
 - In the 20-run-per-mode high comparison, direct is higher quality:
   `0.711964` versus `0.652004`, and uses about `1.06M` fewer total
   implementation tokens per run.

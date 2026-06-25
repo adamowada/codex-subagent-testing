@@ -241,3 +241,110 @@ def test_summary_combines_main_and_extension_for_high_comparison() -> None:
     assert proposal["runs"] == 1
     assert summary["high_combined_direct_vs_proposal"][0]["quality_mean_delta_proposal_minus_direct"] == -0.2
     assert len(summary["high_combined_spark_vs_historical"]) == 2
+
+
+def test_summary_combines_low_medium_extension_by_reasoning() -> None:
+    summary = build_summary(
+        [
+            _row(
+                cell_id="V3P0_r01",
+                source="historical",
+                cohort="historical_solo",
+                reasoning="low",
+                mode="solo",
+                quality=0.4,
+                gpt_tokens=100.0,
+                spark_tokens=None,
+            ),
+            _row(
+                cell_id="SME0_direct_r01",
+                source="main",
+                cohort="spark_assisted",
+                reasoning="low",
+                mode="direct",
+                quality=0.5,
+                gpt_tokens=80.0,
+                spark_tokens=20.0,
+            ),
+            _row(
+                cell_id="SMELM0_direct_r01",
+                source="low_medium_extension",
+                cohort="spark_assisted",
+                reasoning="low",
+                mode="direct",
+                quality=0.7,
+                gpt_tokens=120.0,
+                spark_tokens=20.0,
+            ),
+            _row(
+                cell_id="SMELM1_proposal_r01",
+                source="low_medium_extension",
+                cohort="spark_assisted",
+                reasoning="low",
+                mode="proposal",
+                quality=0.6,
+                gpt_tokens=90.0,
+                spark_tokens=40.0,
+            ),
+            _row(
+                cell_id="V3P1_r01",
+                source="historical",
+                cohort="historical_solo",
+                reasoning="medium",
+                mode="solo",
+                quality=0.45,
+                gpt_tokens=100.0,
+                spark_tokens=None,
+            ),
+            _row(
+                cell_id="SME2_direct_r01",
+                source="main",
+                cohort="spark_assisted",
+                reasoning="medium",
+                mode="direct",
+                quality=0.55,
+                gpt_tokens=100.0,
+                spark_tokens=20.0,
+            ),
+            _row(
+                cell_id="SMELM2_direct_r01",
+                source="low_medium_extension",
+                cohort="spark_assisted",
+                reasoning="medium",
+                mode="direct",
+                quality=0.65,
+                gpt_tokens=110.0,
+                spark_tokens=20.0,
+            ),
+            _row(
+                cell_id="SMELM3_proposal_r01",
+                source="low_medium_extension",
+                cohort="spark_assisted",
+                reasoning="medium",
+                mode="proposal",
+                quality=0.5,
+                gpt_tokens=130.0,
+                spark_tokens=40.0,
+            ),
+        ]
+    )
+
+    low_direct = next(
+        group
+        for group in summary["low_combined_groups"]
+        if group["cohort"] == "low_combined_spark_assisted" and group["mode"] == "direct"
+    )
+    medium_direct = next(
+        group
+        for group in summary["medium_combined_groups"]
+        if group["cohort"] == "medium_combined_spark_assisted" and group["mode"] == "direct"
+    )
+
+    assert low_direct["runs"] == 2
+    assert low_direct["quality"]["mean"] == 0.6
+    assert medium_direct["runs"] == 2
+    assert medium_direct["quality"]["mean"] == 0.6
+    assert summary["low_combined_direct_vs_proposal"][0]["quality_mean_delta_proposal_minus_direct"] == 0.0
+    assert summary["medium_combined_direct_vs_proposal"][0]["quality_mean_delta_proposal_minus_direct"] == -0.1
+    assert len(summary["low_combined_spark_vs_historical"]) == 2
+    assert len(summary["medium_combined_spark_vs_historical"]) == 2

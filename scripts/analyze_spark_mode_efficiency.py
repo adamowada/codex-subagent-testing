@@ -11,6 +11,13 @@ from typing import Any, Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HISTORICAL_GLOB = "runs/*ruleledger_v3_paper_50*measured"
+FOCUSED_REASONING_LEVELS = ("low", "medium", "high", "xhigh")
+FOCUSED_EXTENSION_SOURCES = {
+    "low": "low_medium_extension",
+    "medium": "low_medium_extension",
+    "high": "high_extension",
+    "xhigh": "xhigh_extension",
+}
 NUMERIC_FIELDS = (
     "quality_score",
     "hidden_correctness",
@@ -101,34 +108,55 @@ def read_results(experiment_dir: Path, *, source: str) -> list[dict[str, Any]]:
 def build_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     group_summaries = summarize_groups(rows, cohort_key=lambda row: str(row.get("cohort") or "unknown"))
     phase_group_summaries = summarize_groups(rows, cohort_key=_phase_cohort)
-    high_combined_groups = _focused_combined_groups(rows, reasoning="high")
-    xhigh_combined_groups = _focused_combined_groups(rows, reasoning="xhigh")
+    focused_groups = {
+        reasoning: _focused_combined_groups(rows, reasoning=reasoning)
+        for reasoning in FOCUSED_REASONING_LEVELS
+    }
     return {
         "schema_version": 1,
         "row_count": len(rows),
         "groups": group_summaries,
         "phase_groups": phase_group_summaries,
-        "high_combined_groups": high_combined_groups,
-        "xhigh_combined_groups": xhigh_combined_groups,
+        "focused_combined_groups": focused_groups,
+        "low_combined_groups": focused_groups["low"],
+        "medium_combined_groups": focused_groups["medium"],
+        "high_combined_groups": focused_groups["high"],
+        "xhigh_combined_groups": focused_groups["xhigh"],
         "direct_vs_proposal": direct_proposal_deltas(group_summaries, cohort="spark_assisted"),
         "main_direct_vs_proposal": direct_proposal_deltas(phase_group_summaries, cohort="main_spark_assisted"),
         "pilot_direct_vs_proposal": direct_proposal_deltas(phase_group_summaries, cohort="pilot_spark_assisted"),
+        "low_combined_direct_vs_proposal": direct_proposal_deltas(
+            focused_groups["low"],
+            cohort="low_combined_spark_assisted",
+        ),
+        "medium_combined_direct_vs_proposal": direct_proposal_deltas(
+            focused_groups["medium"],
+            cohort="medium_combined_spark_assisted",
+        ),
         "high_combined_direct_vs_proposal": direct_proposal_deltas(
-            high_combined_groups,
+            focused_groups["high"],
             cohort="high_combined_spark_assisted",
         ),
         "xhigh_combined_direct_vs_proposal": direct_proposal_deltas(
-            xhigh_combined_groups,
+            focused_groups["xhigh"],
             cohort="xhigh_combined_spark_assisted",
         ),
         "bridge_vs_historical": bridge_deltas(group_summaries),
         "main_spark_vs_historical": spark_historical_deltas(phase_group_summaries),
+        "low_combined_spark_vs_historical": spark_historical_deltas(
+            focused_groups["low"],
+            spark_cohort="low_combined_spark_assisted",
+        ),
+        "medium_combined_spark_vs_historical": spark_historical_deltas(
+            focused_groups["medium"],
+            spark_cohort="medium_combined_spark_assisted",
+        ),
         "high_combined_spark_vs_historical": spark_historical_deltas(
-            high_combined_groups,
+            focused_groups["high"],
             spark_cohort="high_combined_spark_assisted",
         ),
         "xhigh_combined_spark_vs_historical": spark_historical_deltas(
-            xhigh_combined_groups,
+            focused_groups["xhigh"],
             spark_cohort="xhigh_combined_spark_assisted",
         ),
         "sources": sorted({str(row.get("source")) for row in rows}),
@@ -330,18 +358,13 @@ def render_markdown(summary: dict[str, Any]) -> str:
     main_groups = [group for group in summary["phase_groups"] if group["cohort"] == "main_spark_assisted"]
     lines.extend(["", "## Official Main Spark-Assisted Summary", ""])
     _append_group_table(lines, main_groups)
-    high_groups = [
-        group for group in summary["high_combined_groups"] if group["cohort"] == "high_combined_spark_assisted"
-    ]
-    if high_groups:
-        lines.extend(["", "## Combined High Main Plus Extension Summary", ""])
-        _append_group_table(lines, high_groups)
-    xhigh_groups = [
-        group for group in summary["xhigh_combined_groups"] if group["cohort"] == "xhigh_combined_spark_assisted"
-    ]
-    if xhigh_groups:
-        lines.extend(["", "## Combined Xhigh Main Plus Extension Summary", ""])
-        _append_group_table(lines, xhigh_groups)
+    for reasoning in FOCUSED_REASONING_LEVELS:
+        key = f"{reasoning}_combined_groups"
+        cohort = f"{reasoning}_combined_spark_assisted"
+        groups = [group for group in summary[key] if group["cohort"] == cohort]
+        if groups:
+            lines.extend(["", f"## Combined {reasoning.title()} Main Plus Extension Summary", ""])
+            _append_group_table(lines, groups)
     lines.extend(["", "## Pooled Proposal Minus Direct", ""])
     if summary["direct_vs_proposal"]:
         _append_direct_delta_table(lines, summary["direct_vs_proposal"])
@@ -352,12 +375,11 @@ def render_markdown(summary: dict[str, Any]) -> str:
         _append_direct_delta_table(lines, summary["main_direct_vs_proposal"])
     else:
         lines.append("No complete direct/proposal pairs available.")
-    if summary["high_combined_direct_vs_proposal"]:
-        lines.extend(["", "## Combined High Proposal Minus Direct", ""])
-        _append_direct_delta_table(lines, summary["high_combined_direct_vs_proposal"])
-    if summary["xhigh_combined_direct_vs_proposal"]:
-        lines.extend(["", "## Combined Xhigh Proposal Minus Direct", ""])
-        _append_direct_delta_table(lines, summary["xhigh_combined_direct_vs_proposal"])
+    for reasoning in FOCUSED_REASONING_LEVELS:
+        key = f"{reasoning}_combined_direct_vs_proposal"
+        if summary[key]:
+            lines.extend(["", f"## Combined {reasoning.title()} Proposal Minus Direct", ""])
+            _append_direct_delta_table(lines, summary[key])
     lines.extend(["", "## Bridge Minus Historical", ""])
     if summary["bridge_vs_historical"]:
         lines.append("| Reasoning | Bridge quality | Historical quality | Delta |")
@@ -393,12 +415,11 @@ def render_markdown(summary: dict[str, Any]) -> str:
             )
     else:
         lines.append("No main Spark/historical pairs available.")
-    if summary["high_combined_spark_vs_historical"]:
-        lines.extend(["", "## Combined High Spark Minus Historical", ""])
-        _append_spark_historical_delta_table(lines, summary["high_combined_spark_vs_historical"])
-    if summary["xhigh_combined_spark_vs_historical"]:
-        lines.extend(["", "## Combined Xhigh Spark Minus Historical", ""])
-        _append_spark_historical_delta_table(lines, summary["xhigh_combined_spark_vs_historical"])
+    for reasoning in FOCUSED_REASONING_LEVELS:
+        key = f"{reasoning}_combined_spark_vs_historical"
+        if summary[key]:
+            lines.extend(["", f"## Combined {reasoning.title()} Spark Minus Historical", ""])
+            _append_spark_historical_delta_table(lines, summary[key])
     return "\n".join(lines) + "\n"
 
 
@@ -471,13 +492,13 @@ def _cohort(row: dict[str, Any]) -> str:
 def _phase_cohort(row: dict[str, Any]) -> str:
     cohort = str(row.get("cohort") or _cohort(row))
     source = str(row.get("source") or "")
-    if cohort == "spark_assisted" and source in {"main", "pilot", "high_extension", "xhigh_extension"}:
+    if cohort == "spark_assisted" and source in {"main", "pilot", *FOCUSED_EXTENSION_SOURCES.values()}:
         return f"{source}_spark_assisted"
     return cohort
 
 
 def _focused_combined_groups(rows: list[dict[str, Any]], *, reasoning: str) -> list[dict[str, Any]]:
-    source = f"{reasoning}_extension"
+    source = FOCUSED_EXTENSION_SOURCES[reasoning]
     combined_rows = [
         row
         for row in rows
@@ -489,7 +510,7 @@ def _focused_combined_groups(rows: list[dict[str, Any]], *, reasoning: str) -> l
 def _focused_combined_cohort(row: dict[str, Any], *, reasoning: str) -> str:
     cohort = str(row.get("cohort") or _cohort(row))
     source = str(row.get("source"))
-    if cohort == "spark_assisted" and source in {"main", f"{reasoning}_extension"}:
+    if cohort == "spark_assisted" and source in {"main", FOCUSED_EXTENSION_SOURCES[reasoning]}:
         return f"{reasoning}_combined_spark_assisted"
     return cohort
 
@@ -503,6 +524,8 @@ def _analysis_mode(row: dict[str, Any]) -> str:
 
 def _experiment_source(path: Path) -> str:
     name = path.name.lower()
+    if "low_medium_extension" in name:
+        return "low_medium_extension"
     if "xhigh_extension" in name:
         return "xhigh_extension"
     if "high_extension" in name:
