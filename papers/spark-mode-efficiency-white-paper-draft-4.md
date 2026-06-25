@@ -15,27 +15,17 @@ Within Spark-assisted runs, direct edit was the better write mode. Direct edit h
 
 The practical recommendation is: use solo GPT-5.5 xhigh when the goal is maximum code quality; use solo GPT-5.5 high when the goal is strong quality with better aggregate GPT-token efficiency; use Spark direct only when the operational value of parallel Spark work justifies the coordination cost. If Spark is used, prefer direct edit over proposal unless read-only constraints are the reason for using proposal mode.
 
-## Executive Summary
-
-- For RuleLedger v3, the results recommend against treating the tested six-leaf Spark topology as the first-choice configuration. Solo GPT-5.5 high and xhigh are stronger practical configurations.
-- Solo GPT-5.5 xhigh had the highest observed mean composite quality: `0.755`.
-- Solo GPT-5.5 high was the strongest high-quality efficiency point: `0.696` mean quality and `2.66466e-7` aggregate quality per GPT token.
-- Medium direct Spark was the best Spark-assisted lift over the same coordinator reasoning level: `0.622` mean quality versus `0.462` for medium solo.
-- That medium direct lift was expensive: GPT tokens increased from `1.390M` to `2.436M`, and total implementation tokens increased from `1.390M` to `3.843M`.
-- Direct edit is the preferred Spark write mode when using this Spark topology. It had higher observed mean quality than proposal at every coordinator reasoning level.
-- Proposal mode should be treated as a review and governance mode. It is appropriate when leaves must remain read-only or patch proposals need a separate approval step.
-
-## Decision Guidance
+## Decision Summary
 
 | Developer goal | Recommended configuration | Why |
 | --- | --- | --- |
 | Maximize code quality | Solo GPT-5.5 xhigh | Highest observed mean quality: `0.755` |
 | Balance strong quality with aggregate GPT-token efficiency | Solo GPT-5.5 high | Higher quality and better aggregate GPT-token efficiency than medium direct Spark |
 | Improve a medium-only coordinator while using separate Spark capacity | Medium root + direct Spark leaves | Best same-level Spark lift: `+0.160` quality over medium solo |
-| Use Spark subagents because parallel exploration or separate work review is operationally valuable | Direct-edit Spark leaves | Better quality and token profile than proposal in most Spark cells |
-| Keep workers read-only for policy, governance, or review reasons | Proposal-only Spark leaves | Preserves read-only worker behavior, but did not reduce measured token cost |
+| Use Spark leaves for implementation | Direct-edit Spark leaves | Better observed quality than proposal at every coordinator reasoning level |
+| Keep Spark leaves read-only | Proposal-only Spark leaves | Fits review, governance, or separate-approval workflows |
 
-The medium direct result is the easiest place to overread the data. It is a real quality lift over medium solo, but high solo remains the better choice when high reasoning is available. The clean practical ranking for RuleLedger v3 is solo xhigh for maximum quality, solo high for quality-per-GPT-token planning, and Spark direct for cases where parallel Spark work is valuable enough to justify extra coordination.
+Medium direct Spark is the narrow exception worth studying: it is a real lift over medium solo, but high solo remains the better choice when high reasoning is available. Treat Spark direct as a specialized tool for parallel implementation work, not as the default path to higher quality.
 
 ## Terminology
 
