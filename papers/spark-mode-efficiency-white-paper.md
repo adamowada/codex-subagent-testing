@@ -32,29 +32,29 @@ Quality is a 0 to 1 composite score:
 
 The headline results are:
 
-- Best quality overall: solo GPT-5.5 xhigh at `0.755057`.
-- Xhigh with Spark direct leaves: `0.733897`.
-- Xhigh with Spark proposal leaves: `0.714206`.
-- Medium with Spark direct leaves: `0.621764`, compared with `0.461959`
-  for medium solo and `0.696050` for high solo.
+- Best quality overall: solo GPT-5.5 xhigh at `0.755`.
+- Xhigh with Spark direct leaves: `0.734`.
+- Xhigh with Spark proposal leaves: `0.714`.
+- Medium with Spark direct leaves: `0.622`, compared with `0.462`
+  for medium solo and `0.696` for high solo.
 
 Direct edit mode beat proposal mode on observed quality at all four root
-reasoning levels: `+0.010139` at low, `+0.092812` at medium, `+0.059960` at
-high, and `+0.019691` at xhigh. At low, medium, and high, direct edit also
+reasoning levels: `+0.010` at low, `+0.093` at medium, `+0.060` at
+high, and `+0.020` at xhigh. At low, medium, and high, direct edit also
 used fewer GPT, Spark, and total implementation tokens than proposal mode.
 The total-token savings for direct edit were about `183k` tokens per low run,
 `477k` per medium run, and `1.064M` per high run. Xhigh was the exception in
 budget shape: proposal mode saved about `242k` GPT tokens and `59k` total
-tokens per run relative to xhigh direct, but it scored `0.019691` lower on
+tokens per run relative to xhigh direct, but it scored `0.020` lower on
 quality.
 
 Medium direct is the clearest Spark-assisted quality lift over the same root
-reasoning level: it raised mean quality from `0.461959` for medium solo GPT-5.5
-to `0.621764`, a `+0.159805` absolute gain and about a 35% relative lift over
+reasoning level: it raised mean quality from `0.462` for medium solo GPT-5.5
+to `0.622`, a `+0.160` absolute gain and about a 35% relative lift over
 the solo medium score. That result should be compared against simply raising
-the root reasoning level. High solo scored `0.696050`, used about `176k` more
+the root reasoning level. High solo scored `0.696`, used about `176k` more
 GPT tokens than medium direct, and was more efficient by quality per GPT token
-using ratio-of-means math (`2.66466e-7` versus `2.55230e-7`). The practical
+using ratio-of-means math (`2.66e-7` versus `2.55e-7`). The practical
 conclusion is: prefer solo xhigh for maximum quality, prefer high solo over
 medium direct when GPT-token efficiency matters, and use direct-edit Spark
 leaves when Spark budget is strategically cheaper or when parallel implementation
@@ -196,6 +196,8 @@ group and is not used as the official baseline in the tables below.
 
 ## Measurement
 
+Reported precision is standardized across the RuleLedger and Spark papers: quality-like scores, deltas, intervals, and component means are rounded to three decimals; token counts are shown as whole-token means or `M` shorthand in prose; efficiency ratios use three significant figures in scientific notation.
+
 The primary outcome is quality, a 0 to 1 composite from
 `configs/scoring_v3.yaml`:
 
@@ -232,35 +234,35 @@ token efficiency figures in the main result tables.
 
 | Root | Mode | Runs | Quality mean | Quality median | Quality sd | Hidden correctness | Hidden parity | Performance | Judge |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| low | solo | 50 | 0.433800 | 0.447182 | 0.181064 | 0.363958 | 0.531111 | 0.556000 | 0.393869 |
-| low | direct | 20 | 0.482419 | 0.455320 | 0.137152 | 0.400174 | 0.602778 | 0.611667 | 0.457950 |
-| low | proposal | 20 | 0.472281 | 0.479403 | 0.152909 | 0.424305 | 0.527778 | 0.543334 | 0.439217 |
-| medium | solo | 50 | 0.461959 | 0.480347 | 0.175457 | 0.409375 | 0.505556 | 0.515334 | 0.459012 |
-| medium | direct | 20 | 0.621764 | 0.575937 | 0.160138 | 0.571007 | 0.727778 | 0.710000 | 0.575134 |
-| medium | proposal | 20 | 0.528952 | 0.488858 | 0.114302 | 0.438889 | 0.661111 | 0.663334 | 0.522185 |
-| high | solo | 50 | 0.696050 | 0.684818 | 0.194662 | 0.674375 | 0.734445 | 0.738000 | 0.683359 |
-| high | direct | 20 | 0.711964 | 0.691288 | 0.157685 | 0.679687 | 0.775000 | 0.775000 | 0.698229 |
-| high | proposal | 20 | 0.652004 | 0.592725 | 0.161956 | 0.635243 | 0.736111 | 0.718333 | 0.574779 |
-| xhigh | solo | 50 | 0.755057 | 0.709206 | 0.171127 | 0.739375 | 0.791111 | 0.800000 | 0.752072 |
-| xhigh | direct | 20 | 0.733897 | 0.693232 | 0.151871 | 0.720313 | 0.750000 | 0.750000 | 0.750591 |
-| xhigh | proposal | 20 | 0.714206 | 0.611878 | 0.162431 | 0.685069 | 0.750000 | 0.750000 | 0.739951 |
+| low | solo | 50 | 0.434 | 0.447 | 0.181 | 0.364 | 0.531 | 0.556 | 0.394 |
+| low | direct | 20 | 0.482 | 0.455 | 0.137 | 0.400 | 0.603 | 0.612 | 0.458 |
+| low | proposal | 20 | 0.472 | 0.479 | 0.153 | 0.424 | 0.528 | 0.543 | 0.439 |
+| medium | solo | 50 | 0.462 | 0.480 | 0.175 | 0.409 | 0.506 | 0.515 | 0.459 |
+| medium | direct | 20 | 0.622 | 0.576 | 0.160 | 0.571 | 0.728 | 0.710 | 0.575 |
+| medium | proposal | 20 | 0.529 | 0.489 | 0.114 | 0.439 | 0.661 | 0.663 | 0.522 |
+| high | solo | 50 | 0.696 | 0.685 | 0.195 | 0.674 | 0.734 | 0.738 | 0.683 |
+| high | direct | 20 | 0.712 | 0.691 | 0.158 | 0.680 | 0.775 | 0.775 | 0.698 |
+| high | proposal | 20 | 0.652 | 0.593 | 0.162 | 0.635 | 0.736 | 0.718 | 0.575 |
+| xhigh | solo | 50 | 0.755 | 0.709 | 0.171 | 0.739 | 0.791 | 0.800 | 0.752 |
+| xhigh | direct | 20 | 0.734 | 0.693 | 0.152 | 0.720 | 0.750 | 0.750 | 0.751 |
+| xhigh | proposal | 20 | 0.714 | 0.612 | 0.162 | 0.685 | 0.750 | 0.750 | 0.740 |
 
 ### Resource and Size Metrics
 
 | Root | Mode | Runs | GPT tokens | Spark tokens | Total tokens | Quality/GPT token | Quality/total token | Elapsed seconds | Changed files | Prod LOC | Test LOC |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| low | solo | 50 | 815,190 | n/a | 815,190 | 5.32146e-07 | 5.32146e-07 | 199 | 2.68 | 286 | 6 |
-| low | direct | 20 | 1,444,628 | 1,472,207 | 2,916,835 | 3.33940e-07 | 1.65391e-07 | 494 | 3.00 | 287 | 7 |
-| low | proposal | 20 | 1,486,511 | 1,613,103 | 3,099,614 | 3.17711e-07 | 1.52368e-07 | 541 | 4.00 | 302 | 0 |
-| medium | solo | 50 | 1,389,968 | n/a | 1,389,968 | 3.32352e-07 | 3.32352e-07 | 318 | 5.14 | 735 | 0 |
-| medium | direct | 20 | 2,436,094 | 1,406,665 | 3,842,759 | 2.55230e-07 | 1.61801e-07 | 589 | 5.50 | 609 | 17 |
-| medium | proposal | 20 | 2,508,418 | 1,811,092 | 4,319,510 | 2.10871e-07 | 1.22456e-07 | 628 | 6.00 | 774 | 10 |
-| high | solo | 50 | 2,612,154 | n/a | 2,612,154 | 2.66466e-07 | 2.66466e-07 | 686 | 10.92 | 1,858 | 4 |
-| high | direct | 20 | 2,801,135 | 632,108 | 3,433,243 | 2.54170e-07 | 2.07374e-07 | 650 | 10.45 | 1,856 | 0 |
-| high | proposal | 20 | 2,933,084 | 1,563,753 | 4,496,837 | 2.22293e-07 | 1.44992e-07 | 751 | 10.20 | 1,602 | 12 |
-| xhigh | solo | 50 | 3,333,886 | n/a | 3,333,886 | 2.26480e-07 | 2.26480e-07 | 1,019 | 12.08 | 2,359 | 6 |
-| xhigh | direct | 20 | 3,877,968 | 610,527 | 4,488,495 | 1.89248e-07 | 1.63506e-07 | 951 | 12.85 | 2,385 | 34 |
-| xhigh | proposal | 20 | 3,636,127 | 793,673 | 4,429,799 | 1.96419e-07 | 1.61228e-07 | 968 | 12.85 | 2,349 | 57 |
+| low | solo | 50 | 815,190 | n/a | 815,190 | 5.32e-7 | 5.32e-7 | 199 | 2.68 | 286 | 6 |
+| low | direct | 20 | 1,444,628 | 1,472,207 | 2,916,835 | 3.34e-7 | 1.65e-7 | 494 | 3.00 | 287 | 7 |
+| low | proposal | 20 | 1,486,511 | 1,613,103 | 3,099,614 | 3.18e-7 | 1.52e-7 | 541 | 4.00 | 302 | 0 |
+| medium | solo | 50 | 1,389,968 | n/a | 1,389,968 | 3.32e-7 | 3.32e-7 | 318 | 5.14 | 735 | 0 |
+| medium | direct | 20 | 2,436,094 | 1,406,665 | 3,842,759 | 2.55e-7 | 1.62e-7 | 589 | 5.50 | 609 | 17 |
+| medium | proposal | 20 | 2,508,418 | 1,811,092 | 4,319,510 | 2.11e-7 | 1.22e-7 | 628 | 6.00 | 774 | 10 |
+| high | solo | 50 | 2,612,154 | n/a | 2,612,154 | 2.66e-7 | 2.66e-7 | 686 | 10.92 | 1,858 | 4 |
+| high | direct | 20 | 2,801,135 | 632,108 | 3,433,243 | 2.54e-7 | 2.07e-7 | 650 | 10.45 | 1,856 | 0 |
+| high | proposal | 20 | 2,933,084 | 1,563,753 | 4,496,837 | 2.22e-7 | 1.45e-7 | 751 | 10.20 | 1,602 | 12 |
+| xhigh | solo | 50 | 3,333,886 | n/a | 3,333,886 | 2.26e-7 | 2.26e-7 | 1,019 | 12.08 | 2,359 | 6 |
+| xhigh | direct | 20 | 3,877,968 | 610,527 | 4,488,495 | 1.89e-7 | 1.64e-7 | 951 | 12.85 | 2,385 | 34 |
+| xhigh | proposal | 20 | 3,636,127 | 793,673 | 4,429,799 | 1.96e-7 | 1.61e-7 | 968 | 12.85 | 2,349 | 57 |
 
 ### Direct Edit Minus Proposal
 
@@ -269,10 +271,10 @@ direct edit used fewer tokens than proposal mode.
 
 | Root | Quality | GPT tokens | Spark tokens | Total tokens | Quality/GPT token | Quality/total token |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| low | +0.010139 | -41,883 | -140,896 | -182,779 | +1.62293e-08 | +1.30238e-08 |
-| medium | +0.092812 | -72,324 | -404,427 | -476,751 | +4.43591e-08 | +3.93450e-08 |
-| high | +0.059960 | -131,950 | -931,645 | -1,063,595 | +3.18770e-08 | +6.23820e-08 |
-| xhigh | +0.019691 | +241,841 | -183,146 | +58,696 | -7.17157e-09 | +2.27868e-09 |
+| low | +0.010 | -41,883 | -140,896 | -182,779 | 1.62e-8 | 1.30e-8 |
+| medium | +0.093 | -72,324 | -404,427 | -476,751 | 4.44e-8 | 3.93e-8 |
+| high | +0.060 | -131,950 | -931,645 | -1,063,595 | 3.19e-8 | 6.24e-8 |
+| xhigh | +0.020 | +241,841 | -183,146 | +58,696 | -7.17e-9 | 2.28e-9 |
 
 ### Spark-Assisted Minus Solo
 
@@ -282,14 +284,14 @@ tokens than solo.
 
 | Root | Mode | Quality | GPT tokens | Total tokens | Quality/total token | Quality/GPT token |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| low | direct | +0.048619 | +629,438 | +2,101,645 | -3.66755e-07 | -1.98206e-07 |
-| low | proposal | +0.038480 | +671,321 | +2,284,424 | -3.79778e-07 | -2.14435e-07 |
-| medium | direct | +0.159805 | +1,046,126 | +2,452,791 | -1.70551e-07 | -7.71223e-08 |
-| medium | proposal | +0.066993 | +1,118,450 | +2,929,542 | -2.09896e-07 | -1.21481e-07 |
-| high | direct | +0.015914 | +188,981 | +821,089 | -5.90923e-08 | -1.22961e-08 |
-| high | proposal | -0.044046 | +320,931 | +1,884,684 | -1.21474e-07 | -4.41731e-08 |
-| xhigh | direct | -0.021161 | +544,083 | +1,154,609 | -6.29735e-08 | -3.72319e-08 |
-| xhigh | proposal | -0.040852 | +302,241 | +1,095,914 | -6.52522e-08 | -3.00604e-08 |
+| low | direct | +0.049 | +629,438 | +2,101,645 | -3.67e-7 | -1.98e-7 |
+| low | proposal | +0.038 | +671,321 | +2,284,424 | -3.80e-7 | -2.14e-7 |
+| medium | direct | +0.160 | +1,046,126 | +2,452,791 | -1.71e-7 | -7.71e-8 |
+| medium | proposal | +0.067 | +1,118,450 | +2,929,542 | -2.10e-7 | -1.21e-7 |
+| high | direct | +0.016 | +188,981 | +821,089 | -5.91e-8 | -1.23e-8 |
+| high | proposal | -0.044 | +320,931 | +1,884,684 | -1.21e-7 | -4.42e-8 |
+| xhigh | direct | -0.021 | +544,083 | +1,154,609 | -6.30e-8 | -3.72e-8 |
+| xhigh | proposal | -0.041 | +302,241 | +1,095,914 | -6.53e-8 | -3.01e-8 |
 
 ## Results by Reasoning Level
 
@@ -297,11 +299,11 @@ tokens than solo.
 
 Low root reasoning is the cheapest GPT-5.5 root setting in the experiment, and
 Spark assistance produced only a modest quality lift. Solo low scored
-`0.433800`. Low direct scored `0.482419`, a `+0.048619` improvement. Low
-proposal scored `0.472281`, a `+0.038480` improvement.
+`0.434`. Low direct scored `0.482`, a `+0.049` improvement. Low
+proposal scored `0.472`, a `+0.038` improvement.
 
 The direct/proposal comparison at low is close on quality: direct beat proposal
-by only `0.010139`. The cost comparison is clearer. Low direct used about
+by only `0.010`. The cost comparison is clearer. Low direct used about
 `42k` fewer GPT tokens, `141k` fewer Spark tokens, and `183k` fewer total
 implementation tokens than low proposal.
 
@@ -313,17 +315,17 @@ where the extra Spark spend is acceptable for a modest improvement.
 ### Medium
 
 Medium is the strongest same-reasoning case for Spark subagents. Solo medium
-scored `0.461959`. Medium direct scored `0.621764`, a `+0.159805` absolute
-gain. Medium proposal scored `0.528952`, a `+0.066993` gain.
+scored `0.462`. Medium direct scored `0.622`, a `+0.160` absolute
+gain. Medium proposal scored `0.529`, a `+0.067` gain.
 
-Direct edit also clearly beat proposal at medium. It scored `0.092812` higher
+Direct edit also clearly beat proposal at medium. It scored `0.093` higher
 while using about `72k` fewer GPT tokens, `404k` fewer Spark tokens, and `477k`
 fewer total tokens per run.
 
 The important comparison is medium direct versus simply raising the root to
-high. High solo scored `0.696050`, which is `0.074286` higher than medium
+high. High solo scored `0.696`, which is `0.074` higher than medium
 direct. High solo also had better GPT-token efficiency by ratio of means:
-`2.66466e-7` quality per GPT token versus `2.55230e-7` for medium direct.
+`2.66e-7` quality per GPT token versus `2.55e-7` for medium direct.
 Medium direct is therefore not a replacement for high solo. Its best case is a
 workflow where medium root behavior is desirable, Spark tokens are meaningfully
 cheaper or separately budgeted, and parallel implementation search is worth
@@ -331,12 +333,12 @@ the coordination cost.
 
 ### High
 
-High solo was already strong at `0.696050`. High direct scored `0.711964`, only
-`+0.015914` above high solo. High proposal scored `0.652004`, which was
-`-0.044046` below high solo.
+High solo was already strong at `0.696`. High direct scored `0.712`, only
+`+0.016` above high solo. High proposal scored `0.652`, which was
+`-0.044` below high solo.
 
 Within Spark-assisted high, direct edit is the better mode. It scored
-`0.059960` higher than proposal and used about `132k` fewer GPT tokens,
+`0.060` higher than proposal and used about `132k` fewer GPT tokens,
 `932k` fewer Spark tokens, and `1.064M` fewer total tokens per run.
 
 The solo comparison changes the recommendation. High direct is better than
@@ -346,11 +348,11 @@ and it costs about `821k` more total implementation tokens per run.
 
 ### Xhigh
 
-Xhigh solo is the best quality result in the study: `0.755057`. Both
-Spark-assisted xhigh modes underperformed it. Xhigh direct scored `0.733897`,
-and xhigh proposal scored `0.714206`.
+Xhigh solo is the best quality result in the study: `0.755`. Both
+Spark-assisted xhigh modes underperformed it. Xhigh direct scored `0.734`,
+and xhigh proposal scored `0.714`.
 
-Direct edit still beat proposal on quality by `0.019691`, but xhigh proposal
+Direct edit still beat proposal on quality by `0.020`, but xhigh proposal
 has a different budget profile. Proposal used about `242k` fewer GPT tokens
 and `59k` fewer total tokens than direct, while using about `183k` more Spark
 tokens. If GPT tokens are the only scarce resource, xhigh proposal has a
@@ -416,14 +418,14 @@ appear to outweigh the benefit of six additional workers.
 ## Recommendations
 
 Use solo xhigh when maximum code quality matters most. It produced the highest
-mean quality in the experiment (`0.755057`) and beat both xhigh Spark-assisted
+mean quality in the experiment (`0.755`) and beat both xhigh Spark-assisted
 modes. This is the cleanest conclusion for developers working on high-stakes,
 cross-language tasks where cost is secondary to correctness.
 
 Use medium direct when medium reasoning is the practical root setting and
 Spark budget is cheaper, separately constrained, or useful for parallel search.
 It delivered the clearest Spark-assisted lift over the same reasoning level:
-`0.621764` versus `0.461959` for medium solo. It did not beat high solo on
+`0.622` versus `0.462` for medium solo. It did not beat high solo on
 quality or GPT-token efficiency.
 
 Use high solo as the default high-reasoning configuration when total token

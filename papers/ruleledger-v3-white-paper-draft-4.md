@@ -1,42 +1,27 @@
 # RuleLedger v3: Measuring Reasoning Effort in LLM Software Engineering
 
-A controlled benchmark for solo GPT-5.5 coding runs
+A controlled benchmark for GPT-5.5 reasoning-effort studies
 
 By Adam Owada, with Codex<br>
-Benchmark completed June 17, 2026<br>
-Paper revised June 25, 2026
+June 17, 2026
 
 ## Abstract
 
 RuleLedger v3 is a controlled software-engineering benchmark for measuring whether larger reasoning budgets produce better code on a realistic repair-and-extension task. The benchmark asks a model to implement one coherent subscription-ledger engine across TypeScript and Python, bitemporal replay, account lineage, corrections and voids, exact billing, deterministic reports, performance constraints, and maintainable architecture.
 
-This paper reports a completed 200-run GPT-5.5 study: 50 solo implementation runs each at `low`, `medium`, `high`, and `xhigh` reasoning. The primary endpoint is aggregate quality under the `reasoning_ladder_v3` scoring profile, a 0 to 1 composite weighted toward hidden correctness and cross-language parity. Mean quality was `0.434` for low, `0.462` for medium, `0.696` for high, and `0.755` for xhigh.
+This paper reports a completed 200-run GPT-5.5 study: 50 implementation runs each at `low`, `medium`, `high`, and `xhigh` reasoning. The primary endpoint is aggregate quality under the `reasoning_ladder_v3` scoring profile, a 0 to 1 composite weighted toward hidden correctness and cross-language parity. Mean quality was `0.434` for low, `0.462` for medium, `0.696` for high, and `0.755` for xhigh.
 
 The central result is the jump from medium to high reasoning. High exceeded medium by `+0.234` quality points with an approximate 95% interval of `[+0.161, +0.308]`. High and xhigh also strongly outperformed low and medium as groups. Xhigh had the best observed mean quality, hidden correctness, judge score, parity, performance, and tail behavior; no xhigh run fell below `0.4` quality. The adjacent xhigh-over-high mean gap was smaller: `+0.059` with an approximate 95% interval of `[-0.014, +0.132]`.
 
-For RuleLedger v3-like solo coding tasks, high reasoning is the practical quality/cost knee: it captures the main quality transition at materially lower token and wall-clock cost than xhigh. Xhigh is the maximum-quality setting when the user values best observed mean quality and weak-run reduction over cost. The strongest supported benchmark claim is precise: RuleLedger v3 strongly differentiates high/xhigh reasoning from low/medium reasoning, and it strongly differentiates high from medium. Medium-over-low and xhigh-over-high should be treated as directional adjacent results rather than settled separations.
-
-## Decision Summary
-
-| Developer or evaluator goal | Recommended setting | Why |
-| --- | --- | --- |
-| Measure whether reasoning effort matters | RuleLedger v3 across low, medium, high, xhigh | The benchmark produced a clear high/xhigh versus low/medium split |
-| Test the main adjacent reasoning jump | Medium vs high | Largest adjacent gap: `+0.234` quality |
-| Choose a practical solo coding setting | GPT-5.5 high | Main quality jump with lower cost than xhigh |
-| Maximize expected quality | GPT-5.5 xhigh | Highest observed mean quality: `0.755` |
-| Reduce weak-run risk | GPT-5.5 xhigh | `0/50` xhigh runs fell below `0.4` quality |
-| Frame adjacent claims | High > medium is strong; medium > low and xhigh > high are directional | Medium-low and xhigh-high intervals cross zero |
-
-The benchmark's diagnostic force comes from global consistency. Low and medium runs often make useful local progress, but high and xhigh more reliably infer that the task needs one replay model shared across both language implementations and all report surfaces.
+For RuleLedger v3-like coding tasks, high reasoning is the practical quality/cost knee: it captures the main quality transition at materially lower token and wall-clock cost than xhigh. Xhigh is the maximum-quality setting when the user values best observed mean quality and weak-run reduction over cost. The strongest supported benchmark claim is precise: RuleLedger v3 strongly differentiates high/xhigh reasoning from low/medium reasoning, and it strongly differentiates high from medium. Medium-over-low and xhigh-over-high should be treated as directional adjacent results rather than settled separations.
 
 ## Terminology
 
 | Term | Meaning |
 | --- | --- |
 | RuleLedger v3 | A synthetic but realistic subscription-ledger repair benchmark with TypeScript and Python implementation surfaces. |
-| GPT-5.5 | The implementation model used for all measured solo runs and the judge model used for scoring. |
-| Reasoning level | A runtime reasoning-effort setting in the benchmark harness: `low`, `medium`, `high`, or `xhigh`. It is not a model-size or temperature label. |
-| Solo run | One GPT-5.5 implementation process works directly on the frozen starter project. No subagents are used. |
+| GPT-5.5 | The implementation model used for all measured runs and the judge model used for scoring. |
+| Reasoning level | A runtime reasoning-effort setting in the benchmark harness: `low`, `medium`, `high`, or `xhigh`. |
 | Hidden correctness | Private RuleLedger v3 behavior checks excluding parity and performance categories. |
 | Hidden parity | Private checks that TypeScript and Python outputs agree on equivalent cases. |
 | Judge score | A GPT-5.5 xhigh review signal over source, diffs, logs, public checks, and hidden-result summaries. |
@@ -66,37 +51,24 @@ The hard part is coherence. A run can make a summary pass while CSV output remai
 
 RuleLedger v3 was developed after earlier RuleLedger variants proved too easy to separate reasoning levels reliably. Those earlier tasks were meaningful, but models could often localize the visible issue and patch narrowly. Version 3 changed the unit of evaluation from "can the model patch this ledger bug?" to "can the model infer and implement one coherent ledger engine across interacting constraints?"
 
-## Tested Topology
-
-The RuleLedger v3 reasoning study used solo GPT-5.5 implementation runs:
-
-```text
-Frozen starter project
-  -> one GPT-5.5 implementation run
-       - reasoning: low, medium, high, or xhigh
-       - topology: solo
-       - no subagents
-  -> public tests, hidden tests, scoring, and judge assessment
-```
-
-The implementation submitted for scoring was the final workspace produced by the solo GPT-5.5 implementation run. The model could edit the starter project, run visible checks, and submit its final code. Hidden tests and hidden case payloads remained outside the implementation workspace.
-
 ## Experiment Design
 
 The official study contains `200` scored implementation runs:
 
-| Cell | Reasoning | Model | Topology | Runs |
-| --- | --- | --- | --- | ---: |
-| V3P0 | low | GPT-5.5 | solo | 50 |
-| V3P1 | medium | GPT-5.5 | solo | 50 |
-| V3P2 | high | GPT-5.5 | solo | 50 |
-| V3P3 | xhigh | GPT-5.5 | solo | 50 |
+| Cell | Reasoning | Model | Runs |
+| --- | --- | --- | ---: |
+| V3P0 | low | GPT-5.5 | 50 |
+| V3P1 | medium | GPT-5.5 | 50 |
+| V3P2 | high | GPT-5.5 | 50 |
+| V3P3 | xhigh | GPT-5.5 | 50 |
 
 Measured implementation runs used `codex exec --json`. Raw JSONL events, prompts, rendered configs, stderr logs, diffs, test logs, judge output, metadata, scores, HTML reports, and PDF reports were preserved under run-specific directories. The implementation model was GPT-5.5 in all cells. The judge was GPT-5.5 xhigh in all cells.
 
 The study accumulated repeats in six measured batches. Pooling required the full expanded matrix hash, selected repeat ranges, benchmark template, hidden cases, prompts, scoring config, judge schema, model identifiers, timeout policy, and failure policy to remain fixed. All six measured batches passed final validation. There were zero implementation failures and zero judge failures.
 
 ## Measurement
+
+Reported precision is standardized across the RuleLedger and Spark papers: quality-like scores, deltas, intervals, and component means are rounded to three decimals; token counts are shown as whole-token means or `M` shorthand in prose; efficiency ratios use three significant figures in scientific notation.
 
 ### Quality
 
@@ -116,7 +88,7 @@ The judge was fixed across conditions and contributes to a broader scoring profi
 
 ### Tokens and Time
 
-The harness parsed implementation usage from `codex exec --json` event streams. Because every measured implementation run was solo GPT-5.5, implementation tokens are GPT-5.5 implementation tokens. Judge tokens are excluded from the cost table because the measured developer decision is which implementation reasoning level to run.
+The harness parsed implementation usage from `codex exec --json` event streams. Because every measured implementation run used GPT-5.5, implementation tokens are GPT-5.5 implementation tokens. Judge tokens are excluded from the cost table because the measured developer decision is which implementation reasoning level to run.
 
 Elapsed seconds are per-run harness measurements. They are useful for comparing this study's conditions, but they are affected by local scheduling, batch parallelism, and the execution environment.
 
@@ -128,10 +100,10 @@ The paper reports observed sample means, standard deviations, approximate confid
 
 | Reasoning | Runs | Quality mean | Quality sd | Hidden correctness | Judge | Impl tokens | Impl seconds | Primary read |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| low | 50 | 0.433800 | 0.181064 | 0.363958 | 0.393869 | 815,190 | 199 | Useful local progress, weak global consistency |
-| medium | 50 | 0.461959 | 0.175457 | 0.409375 | 0.459012 | 1,389,968 | 318 | Modest gain over low |
-| high | 50 | 0.696050 | 0.194662 | 0.674375 | 0.683359 | 2,612,154 | 686 | Main quality jump |
-| xhigh | 50 | 0.755057 | 0.171127 | 0.739375 | 0.752072 | 3,333,886 | 1,019 | Best mean and tail behavior |
+| low | 50 | 0.434 | 0.181 | 0.364 | 0.394 | 815,190 | 199 | Useful local progress, weak global consistency |
+| medium | 50 | 0.462 | 0.175 | 0.409 | 0.459 | 1,389,968 | 318 | Modest gain over low |
+| high | 50 | 0.696 | 0.195 | 0.674 | 0.683 | 2,612,154 | 686 | Main quality jump |
+| xhigh | 50 | 0.755 | 0.171 | 0.739 | 0.752 | 3,333,886 | 1,019 | Best mean and tail behavior |
 
 ## Detailed Findings
 
@@ -163,12 +135,12 @@ The adjacent xhigh-over-high gap was `+0.059`, with an approximate 95% interval 
 
 | Comparison | Mean difference | Approx. 95% interval | Cohen's d | Interpretation |
 | --- | ---: | ---: | ---: | --- |
-| medium - low | +0.028159 | [-0.042583, +0.098901] | 0.158 | Small, not robustly separated |
-| high - medium | +0.234091 | [+0.160561, +0.307621] | 1.263 | Large, robust adjacent separation |
-| xhigh - high | +0.059007 | [-0.013715, +0.131729] | 0.322 | Positive mean, interval crosses zero |
-| high - low | +0.262250 | [+0.187657, +0.336843] | 1.395 | Large separation |
-| xhigh - low | +0.321257 | [+0.251355, +0.391159] | 1.824 | Very large separation |
-| xhigh - medium | +0.293099 | [+0.224331, +0.361867] | 1.691 | Very large separation |
+| medium - low | +0.028 | [-0.043, +0.099] | 0.158 | Small, not robustly separated |
+| high - medium | +0.234 | [+0.161, +0.308] | 1.263 | Large, robust adjacent separation |
+| xhigh - high | +0.059 | [-0.014, +0.132] | 0.322 | Positive mean, interval crosses zero |
+| high - low | +0.262 | [+0.188, +0.337] | 1.395 | Large separation |
+| xhigh - low | +0.321 | [+0.251, +0.391] | 1.824 | Very large separation |
+| xhigh - medium | +0.293 | [+0.224, +0.362] | 1.691 | Very large separation |
 
 This is the paper's main claim boundary. RuleLedger v3 strongly separates high/xhigh from low/medium. It strongly separates high from medium. The medium-over-low and xhigh-over-high observed means point in the expected direction, but they do not carry the same evidentiary weight.
 
@@ -176,10 +148,10 @@ This is the paper's main claim boundary. RuleLedger v3 strongly separates high/x
 
 | Reasoning | Hidden tests | Hidden correctness | Hidden parity | Performance | Judge |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| low | 0.378911 | 0.363958 | 0.531111 | 0.556000 | 0.393869 |
-| medium | 0.420218 | 0.409375 | 0.505556 | 0.515334 | 0.459012 |
-| high | 0.687041 | 0.674375 | 0.734445 | 0.738000 | 0.683359 |
-| xhigh | 0.753693 | 0.739375 | 0.791111 | 0.800000 | 0.752072 |
+| low | 0.379 | 0.364 | 0.531 | 0.556 | 0.394 |
+| medium | 0.420 | 0.409 | 0.506 | 0.515 | 0.459 |
+| high | 0.687 | 0.674 | 0.734 | 0.738 | 0.683 |
+| xhigh | 0.754 | 0.739 | 0.791 | 0.800 | 0.752 |
 
 Hidden-test and judge signals show the same broad ladder: low and medium are clustered together, high improves sharply, and xhigh leads high on mean.
 
@@ -189,13 +161,13 @@ Hidden categories should be interpreted as behavior-family aggregates rather tha
 
 | Category | low | medium | high | xhigh |
 | --- | ---: | ---: | ---: | ---: |
-| evolution | 0.314348 | 0.295435 | 0.562391 | 0.604783 |
-| fail_to_pass | 0.420000 | 0.431429 | 0.645000 | 0.706071 |
-| localization | 0.133889 | 0.324444 | 0.773333 | 0.874722 |
-| metamorphic | 0.384615 | 0.369231 | 0.552308 | 0.600000 |
-| parity | 0.531111 | 0.505556 | 0.734445 | 0.791111 |
-| pass_to_pass | 0.779524 | 0.800000 | 0.864762 | 0.932857 |
-| performance | 0.556000 | 0.515334 | 0.738000 | 0.800000 |
+| evolution | 0.314 | 0.295 | 0.562 | 0.605 |
+| fail_to_pass | 0.420 | 0.431 | 0.645 | 0.706 |
+| localization | 0.134 | 0.324 | 0.773 | 0.875 |
+| metamorphic | 0.385 | 0.369 | 0.552 | 0.600 |
+| parity | 0.531 | 0.506 | 0.734 | 0.791 |
+| pass_to_pass | 0.780 | 0.800 | 0.865 | 0.933 |
+| performance | 0.556 | 0.515 | 0.738 | 0.800 |
 
 The largest visible differences are in localization, staged evolution, parity, and performance. That pattern matches the benchmark design: lower-reasoning runs can often make local fixes, but higher-reasoning runs are better at maintaining one implementation model across interacting requirements and language surfaces.
 
@@ -216,10 +188,10 @@ Quality per GPT token in this table uses ratio-of-means: mean quality divided by
 
 | Reasoning | Mean implementation tokens | Mean implementation seconds | Quality mean | Quality per GPT token |
 | --- | ---: | ---: | ---: | ---: |
-| low | 815,190 | 199 | 0.433800 | 5.32146e-7 |
-| medium | 1,389,968 | 318 | 0.461959 | 3.32352e-7 |
-| high | 2,612,154 | 686 | 0.696050 | 2.66466e-7 |
-| xhigh | 3,333,886 | 1,019 | 0.755057 | 2.26480e-7 |
+| low | 815,190 | 199 | 0.434 | 5.32e-7 |
+| medium | 1,389,968 | 318 | 0.462 | 3.32e-7 |
+| high | 2,612,154 | 686 | 0.696 | 2.66e-7 |
+| xhigh | 3,333,886 | 1,019 | 0.755 | 2.26e-7 |
 
 Raw quality per token falls as reasoning increases because low-reasoning runs are cheaper. That metric alone is not the right operational target when the implementation has to clear a quality threshold. The practical tradeoff is between quality level, weak-run risk, and cost. High is the quality/cost knee because it delivers the main quality jump. Xhigh costs more and has lower raw quality per token, but it gives the best observed mean and the strongest tail behavior.
 
@@ -239,7 +211,7 @@ The xhigh result is still practically valuable. It reduced weak-run risk and led
 
 Use RuleLedger v3 when the evaluation goal is to measure whether a coding model can maintain a coherent implementation across interacting software constraints. It is especially useful for reasoning-effort studies because the task punishes narrow local fixes.
 
-Use GPT-5.5 high as the practical solo setting for RuleLedger v3-like work. It captures the main quality jump while costing materially less than xhigh.
+Use GPT-5.5 high as the practical setting for RuleLedger v3-like work. It captures the main quality jump while costing materially less than xhigh.
 
 Use GPT-5.5 xhigh when maximum expected quality and weak-run reduction matter more than token and wall-clock cost. Xhigh had the best mean and no runs below `0.4` quality.
 
@@ -258,7 +230,7 @@ For future benchmark work, add preregistered statistical tests, distribution plo
 - Token and elapsed-time metrics are implementation-cost signals, not prices or universal latency measurements.
 - The current analysis uses approximate confidence intervals and descriptive effect sizes, not a preregistered inferential analysis plan.
 
-These limitations define the claim boundary. They do not erase the main result: RuleLedger v3 exposes a large quality transition between medium and high reasoning in solo GPT-5.5 software-engineering work.
+These limitations define the claim boundary. They do not erase the main result: RuleLedger v3 exposes a large quality transition between medium and high reasoning in GPT-5.5 software-engineering work.
 
 ## Appendix A: Batched Execution
 
@@ -279,30 +251,30 @@ The first three batches were launched from a clean repository. Batches 4-6 recor
 
 | Batch | Reasoning | Runs | Quality | Hidden correctness | Judge |
 | --- | --- | ---: | ---: | ---: | ---: |
-| batch 001 | low | 5 | 0.475156 | 0.401389 | 0.450583 |
-| batch 001 | medium | 5 | 0.589751 | 0.547222 | 0.582500 |
-| batch 001 | high | 5 | 0.527437 | 0.490278 | 0.429000 |
-| batch 001 | xhigh | 5 | 0.673830 | 0.629861 | 0.702512 |
-| batch 002 | low | 5 | 0.377782 | 0.294444 | 0.348000 |
-| batch 002 | medium | 5 | 0.496087 | 0.497917 | 0.534968 |
-| batch 002 | high | 5 | 0.864543 | 0.863194 | 0.831550 |
-| batch 002 | xhigh | 5 | 0.797686 | 0.793750 | 0.779700 |
-| batch 003 | low | 10 | 0.463410 | 0.409028 | 0.432339 |
-| batch 003 | medium | 10 | 0.483799 | 0.428125 | 0.423988 |
-| batch 003 | high | 10 | 0.801662 | 0.787153 | 0.779062 |
-| batch 003 | xhigh | 10 | 0.852129 | 0.850347 | 0.838000 |
-| batch 004 | low | 10 | 0.360163 | 0.273264 | 0.365750 |
-| batch 004 | medium | 10 | 0.363847 | 0.297570 | 0.377338 |
-| batch 004 | high | 10 | 0.636425 | 0.621528 | 0.655125 |
-| batch 004 | xhigh | 10 | 0.782214 | 0.776389 | 0.778056 |
-| batch 005 | low | 10 | 0.508938 | 0.436111 | 0.449464 |
-| batch 005 | medium | 10 | 0.350944 | 0.274306 | 0.368750 |
-| batch 005 | high | 10 | 0.676574 | 0.650347 | 0.667833 |
-| batch 005 | xhigh | 10 | 0.655113 | 0.609375 | 0.702200 |
-| batch 006 | low | 10 | 0.410020 | 0.353472 | 0.322500 |
-| batch 006 | medium | 10 | 0.568285 | 0.524305 | 0.566250 |
-| batch 006 | high | 10 | 0.669598 | 0.636111 | 0.684500 |
-| batch 006 | xhigh | 10 | 0.750073 | 0.748958 | 0.701000 |
+| batch 001 | low | 5 | 0.475 | 0.401 | 0.451 |
+| batch 001 | medium | 5 | 0.590 | 0.547 | 0.583 |
+| batch 001 | high | 5 | 0.527 | 0.490 | 0.429 |
+| batch 001 | xhigh | 5 | 0.674 | 0.630 | 0.703 |
+| batch 002 | low | 5 | 0.378 | 0.294 | 0.348 |
+| batch 002 | medium | 5 | 0.496 | 0.498 | 0.535 |
+| batch 002 | high | 5 | 0.865 | 0.863 | 0.832 |
+| batch 002 | xhigh | 5 | 0.798 | 0.794 | 0.780 |
+| batch 003 | low | 10 | 0.463 | 0.409 | 0.432 |
+| batch 003 | medium | 10 | 0.484 | 0.428 | 0.424 |
+| batch 003 | high | 10 | 0.802 | 0.787 | 0.779 |
+| batch 003 | xhigh | 10 | 0.852 | 0.850 | 0.838 |
+| batch 004 | low | 10 | 0.360 | 0.273 | 0.366 |
+| batch 004 | medium | 10 | 0.364 | 0.298 | 0.377 |
+| batch 004 | high | 10 | 0.636 | 0.622 | 0.655 |
+| batch 004 | xhigh | 10 | 0.782 | 0.776 | 0.778 |
+| batch 005 | low | 10 | 0.509 | 0.436 | 0.449 |
+| batch 005 | medium | 10 | 0.351 | 0.274 | 0.369 |
+| batch 005 | high | 10 | 0.677 | 0.650 | 0.668 |
+| batch 005 | xhigh | 10 | 0.655 | 0.609 | 0.702 |
+| batch 006 | low | 10 | 0.410 | 0.353 | 0.323 |
+| batch 006 | medium | 10 | 0.568 | 0.524 | 0.566 |
+| batch 006 | high | 10 | 0.670 | 0.636 | 0.684 |
+| batch 006 | xhigh | 10 | 0.750 | 0.749 | 0.701 |
 
 The per-batch table explains why small pilots were informative but insufficient. Batch 001 made high look weaker than medium. Batch 002 made high look stronger than xhigh. Batch 005 again had xhigh below high on aggregate quality. The completed pooled sample is what stabilizes the broader result.
 

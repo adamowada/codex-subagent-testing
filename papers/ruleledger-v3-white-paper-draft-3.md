@@ -3,8 +3,7 @@
 A controlled benchmark for solo GPT-5.5 coding runs
 
 By Adam Owada, with Codex<br>
-Benchmark completed June 17, 2026<br>
-Draft revised June 25, 2026
+June 17, 2026
 
 ## Abstract
 
@@ -112,10 +111,10 @@ The paper reports observed sample means, standard deviations, approximate confid
 
 | Reasoning | Runs | Quality mean | Quality sd | Hidden correctness | Judge | Impl tokens | Impl seconds | Primary read |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| low | 50 | 0.433800 | 0.181064 | 0.363958 | 0.393869 | 815,190 | 199 | Useful local progress, weak global consistency |
-| medium | 50 | 0.461959 | 0.175457 | 0.409375 | 0.459012 | 1,389,968 | 318 | Modest gain over low |
-| high | 50 | 0.696050 | 0.194662 | 0.674375 | 0.683359 | 2,612,154 | 686 | Main quality jump |
-| xhigh | 50 | 0.755057 | 0.171127 | 0.739375 | 0.752072 | 3,333,886 | 1,019 | Best mean and tail behavior |
+| low | 50 | 0.434 | 0.181 | 0.364 | 0.394 | 815,190 | 199 | Useful local progress, weak global consistency |
+| medium | 50 | 0.462 | 0.175 | 0.409 | 0.459 | 1,389,968 | 318 | Modest gain over low |
+| high | 50 | 0.696 | 0.195 | 0.674 | 0.683 | 2,612,154 | 686 | Main quality jump |
+| xhigh | 50 | 0.755 | 0.171 | 0.739 | 0.752 | 3,333,886 | 1,019 | Best mean and tail behavior |
 
 ## Detailed Findings
 
@@ -147,12 +146,12 @@ The adjacent xhigh-over-high gap was `+0.059`, with an approximate 95% interval 
 
 | Comparison | Mean difference | Approx. 95% interval | Cohen's d | Interpretation |
 | --- | ---: | ---: | ---: | --- |
-| medium - low | +0.028159 | [-0.042583, +0.098901] | 0.158 | Small, not robustly separated |
-| high - medium | +0.234091 | [+0.160561, +0.307621] | 1.263 | Large, robust adjacent separation |
-| xhigh - high | +0.059007 | [-0.013715, +0.131729] | 0.322 | Positive mean, interval crosses zero |
-| high - low | +0.262250 | [+0.187657, +0.336843] | 1.395 | Large separation |
-| xhigh - low | +0.321257 | [+0.251355, +0.391159] | 1.824 | Very large separation |
-| xhigh - medium | +0.293099 | [+0.224331, +0.361867] | 1.691 | Very large separation |
+| medium - low | +0.028 | [-0.043, +0.099] | 0.158 | Small, not robustly separated |
+| high - medium | +0.234 | [+0.161, +0.308] | 1.263 | Large, robust adjacent separation |
+| xhigh - high | +0.059 | [-0.014, +0.132] | 0.322 | Positive mean, interval crosses zero |
+| high - low | +0.262 | [+0.188, +0.337] | 1.395 | Large separation |
+| xhigh - low | +0.321 | [+0.251, +0.391] | 1.824 | Very large separation |
+| xhigh - medium | +0.293 | [+0.224, +0.362] | 1.691 | Very large separation |
 
 This is the paper's main claim boundary. RuleLedger v3 strongly separates high/xhigh from low/medium. It strongly separates high from medium. The medium-over-low and xhigh-over-high observed means point in the expected direction, but they do not carry the same evidentiary weight.
 
@@ -160,10 +159,10 @@ This is the paper's main claim boundary. RuleLedger v3 strongly separates high/x
 
 | Reasoning | Hidden tests | Hidden correctness | Hidden parity | Performance | Judge |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| low | 0.378911 | 0.363958 | 0.531111 | 0.556000 | 0.393869 |
-| medium | 0.420218 | 0.409375 | 0.505556 | 0.515334 | 0.459012 |
-| high | 0.687041 | 0.674375 | 0.734445 | 0.738000 | 0.683359 |
-| xhigh | 0.753693 | 0.739375 | 0.791111 | 0.800000 | 0.752072 |
+| low | 0.379 | 0.364 | 0.531 | 0.556 | 0.394 |
+| medium | 0.420 | 0.409 | 0.506 | 0.515 | 0.459 |
+| high | 0.687 | 0.674 | 0.734 | 0.738 | 0.683 |
+| xhigh | 0.754 | 0.739 | 0.791 | 0.800 | 0.752 |
 
 Hidden-test and judge signals show the same broad ladder: low and medium are clustered together, high improves sharply, and xhigh leads high on mean.
 
@@ -173,13 +172,13 @@ Hidden categories should be interpreted as behavior-family aggregates rather tha
 
 | Category | low | medium | high | xhigh |
 | --- | ---: | ---: | ---: | ---: |
-| evolution | 0.314348 | 0.295435 | 0.562391 | 0.604783 |
-| fail_to_pass | 0.420000 | 0.431429 | 0.645000 | 0.706071 |
-| localization | 0.133889 | 0.324444 | 0.773333 | 0.874722 |
-| metamorphic | 0.384615 | 0.369231 | 0.552308 | 0.600000 |
-| parity | 0.531111 | 0.505556 | 0.734445 | 0.791111 |
-| pass_to_pass | 0.779524 | 0.800000 | 0.864762 | 0.932857 |
-| performance | 0.556000 | 0.515334 | 0.738000 | 0.800000 |
+| evolution | 0.314 | 0.295 | 0.562 | 0.605 |
+| fail_to_pass | 0.420 | 0.431 | 0.645 | 0.706 |
+| localization | 0.134 | 0.324 | 0.773 | 0.875 |
+| metamorphic | 0.385 | 0.369 | 0.552 | 0.600 |
+| parity | 0.531 | 0.506 | 0.734 | 0.791 |
+| pass_to_pass | 0.780 | 0.800 | 0.865 | 0.933 |
+| performance | 0.556 | 0.515 | 0.738 | 0.800 |
 
 The largest visible differences are in localization, staged evolution, parity, and performance. That pattern matches the benchmark design: lower-reasoning runs can often make local fixes, but higher-reasoning runs are better at maintaining one implementation model across interacting requirements and language surfaces.
 
@@ -198,10 +197,10 @@ The xhigh condition did not merely win on mean. It also removed the low-quality 
 
 | Reasoning | Mean implementation tokens | Mean implementation seconds | Quality mean | Quality per GPT token |
 | --- | ---: | ---: | ---: | ---: |
-| low | 815,190 | 199 | 0.433800 | 5.32146e-7 |
-| medium | 1,389,968 | 318 | 0.461959 | 3.32352e-7 |
-| high | 2,612,154 | 686 | 0.696050 | 2.66466e-7 |
-| xhigh | 3,333,886 | 1,019 | 0.755057 | 2.26480e-7 |
+| low | 815,190 | 199 | 0.434 | 5.32e-7 |
+| medium | 1,389,968 | 318 | 0.462 | 3.32e-7 |
+| high | 2,612,154 | 686 | 0.696 | 2.66e-7 |
+| xhigh | 3,333,886 | 1,019 | 0.755 | 2.26e-7 |
 
 Raw quality per token falls as reasoning increases because low-reasoning runs are cheaper. That metric alone is not the right operational target when the implementation has to clear a quality threshold. The practical tradeoff is between quality level, weak-run risk, and cost. High is the quality/cost knee because it delivers the main quality jump. Xhigh costs more and has lower raw quality per token, but it gives the best observed mean and the strongest tail behavior.
 
@@ -261,30 +260,30 @@ The first three batches were launched from a clean repository. Batches 4-6 recor
 
 | Batch | Reasoning | Runs | Quality | Hidden correctness | Judge |
 | --- | --- | ---: | ---: | ---: | ---: |
-| batch 001 | low | 5 | 0.475156 | 0.401389 | 0.450583 |
-| batch 001 | medium | 5 | 0.589751 | 0.547222 | 0.582500 |
-| batch 001 | high | 5 | 0.527437 | 0.490278 | 0.429000 |
-| batch 001 | xhigh | 5 | 0.673830 | 0.629861 | 0.702512 |
-| batch 002 | low | 5 | 0.377782 | 0.294444 | 0.348000 |
-| batch 002 | medium | 5 | 0.496087 | 0.497917 | 0.534968 |
-| batch 002 | high | 5 | 0.864543 | 0.863194 | 0.831550 |
-| batch 002 | xhigh | 5 | 0.797686 | 0.793750 | 0.779700 |
-| batch 003 | low | 10 | 0.463410 | 0.409028 | 0.432339 |
-| batch 003 | medium | 10 | 0.483799 | 0.428125 | 0.423988 |
-| batch 003 | high | 10 | 0.801662 | 0.787153 | 0.779062 |
-| batch 003 | xhigh | 10 | 0.852129 | 0.850347 | 0.838000 |
-| batch 004 | low | 10 | 0.360163 | 0.273264 | 0.365750 |
-| batch 004 | medium | 10 | 0.363847 | 0.297570 | 0.377338 |
-| batch 004 | high | 10 | 0.636425 | 0.621528 | 0.655125 |
-| batch 004 | xhigh | 10 | 0.782214 | 0.776389 | 0.778056 |
-| batch 005 | low | 10 | 0.508938 | 0.436111 | 0.449464 |
-| batch 005 | medium | 10 | 0.350944 | 0.274306 | 0.368750 |
-| batch 005 | high | 10 | 0.676574 | 0.650347 | 0.667833 |
-| batch 005 | xhigh | 10 | 0.655113 | 0.609375 | 0.702200 |
-| batch 006 | low | 10 | 0.410020 | 0.353472 | 0.322500 |
-| batch 006 | medium | 10 | 0.568285 | 0.524305 | 0.566250 |
-| batch 006 | high | 10 | 0.669598 | 0.636111 | 0.684500 |
-| batch 006 | xhigh | 10 | 0.750073 | 0.748958 | 0.701000 |
+| batch 001 | low | 5 | 0.475 | 0.401 | 0.451 |
+| batch 001 | medium | 5 | 0.590 | 0.547 | 0.583 |
+| batch 001 | high | 5 | 0.527 | 0.490 | 0.429 |
+| batch 001 | xhigh | 5 | 0.674 | 0.630 | 0.703 |
+| batch 002 | low | 5 | 0.378 | 0.294 | 0.348 |
+| batch 002 | medium | 5 | 0.496 | 0.498 | 0.535 |
+| batch 002 | high | 5 | 0.865 | 0.863 | 0.832 |
+| batch 002 | xhigh | 5 | 0.798 | 0.794 | 0.780 |
+| batch 003 | low | 10 | 0.463 | 0.409 | 0.432 |
+| batch 003 | medium | 10 | 0.484 | 0.428 | 0.424 |
+| batch 003 | high | 10 | 0.802 | 0.787 | 0.779 |
+| batch 003 | xhigh | 10 | 0.852 | 0.850 | 0.838 |
+| batch 004 | low | 10 | 0.360 | 0.273 | 0.366 |
+| batch 004 | medium | 10 | 0.364 | 0.298 | 0.377 |
+| batch 004 | high | 10 | 0.636 | 0.622 | 0.655 |
+| batch 004 | xhigh | 10 | 0.782 | 0.776 | 0.778 |
+| batch 005 | low | 10 | 0.509 | 0.436 | 0.449 |
+| batch 005 | medium | 10 | 0.351 | 0.274 | 0.369 |
+| batch 005 | high | 10 | 0.677 | 0.650 | 0.668 |
+| batch 005 | xhigh | 10 | 0.655 | 0.609 | 0.702 |
+| batch 006 | low | 10 | 0.410 | 0.353 | 0.323 |
+| batch 006 | medium | 10 | 0.568 | 0.524 | 0.566 |
+| batch 006 | high | 10 | 0.670 | 0.636 | 0.684 |
+| batch 006 | xhigh | 10 | 0.750 | 0.749 | 0.701 |
 
 The per-batch table explains why small pilots were informative but insufficient. Batch 001 made high look weaker than medium. Batch 002 made high look stronger than xhigh. Batch 005 again had xhigh below high on aggregate quality. The completed pooled sample is what stabilizes the broader result.
 
