@@ -253,6 +253,8 @@ def _selected_agent_snippets(run: Mapping[str, Any]) -> list[str]:
 
     if topology == "solo":
         return []
+    if topology == "staged_spark":
+        return []
     if mode == "direct":
         spark = ["spark_direct_implementer", "spark_direct_tester", "spark_adversary"]
     elif mode == "proposal":

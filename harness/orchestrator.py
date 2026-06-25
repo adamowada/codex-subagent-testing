@@ -30,6 +30,7 @@ from harness.codex_runner import (
     ProcessResult,
     build_implementation_command,
     build_judge_command,
+    build_single_model_command,
     codex_events_have_failure,
     command_for_display,
     extract_final_response,
@@ -242,6 +243,7 @@ def run(args: argparse.Namespace) -> int:
             repo_root=repo_root,
             experiment_dir=experiment_dir,
             run=run_record,
+            workspace_root=workspace_root,
             codex_bin=codex_bin,
             rerun_failed=args.rerun_failed,
             status=status,
@@ -691,6 +693,7 @@ def run_implementation_and_tests(
     repo_root: Path,
     experiment_dir: Path,
     run: Mapping[str, Any],
+    workspace_root: Path,
     codex_bin: str,
     rerun_failed: bool,
     status: StatusWriter,
@@ -704,6 +707,14 @@ def run_implementation_and_tests(
     implementation_reran = False
     if should_run_phase(state, "implemented", run_dir / "events.jsonl", rerun_failed):
         if rerun_failed and _phase_failed(state, "implemented"):
+            refresh_worktree = worktree_directory(experiment_dir, run, workspace_root)
+            if refresh_worktree != worktree and worktree.exists():
+                archived_original = _archive_path(worktree)
+                _append_log(
+                    log_path,
+                    f"{run['run_id']} archived previous worktree to {archived_original} before workspace-root refresh",
+                )
+            worktree = refresh_worktree
             archived_worktree = refresh_run_worktree(
                 repo_root=repo_root,
                 run_dir=run_dir,
@@ -721,42 +732,55 @@ def run_implementation_and_tests(
             state,
             rerun_failed,
         )
-        prompt = (run_dir / "rendered_prompt.md").read_text(encoding="utf-8")
-        command = materialize_worktree_command(
-            build_implementation_command(codex_bin, run, prompt, config_dir=run_dir / "codex_config"),
-            worktree,
-        )
-        display_command = command_for_display(command)
-        _append_log(log_path, f"{run['run_id']} implementation command={json.dumps(display_command)}")
-        result = run_process_to_files(
-            command,
-            cwd=worktree,
-            stdout_path=run_dir / "events.jsonl",
-            stderr_path=run_dir / "stderr.log",
-            timeout_seconds=int(run["timeouts"]["implementation_seconds"]),
-            command_display=display_command,
-        )
-        write_process_result(run_dir / "wall_time.json", result)
-        events_path = run_dir / "events.jsonl"
-        final_response = extract_final_response(events_path)
-        event_summary = summarize_codex_events(events_path)
-        final_response_errors = implementation_final_response_errors(final_response)
-        _write_json(run_dir / "final_response.json", final_response)
-        implementation_failed = (
-            result.returncode != 0
-            or result.timed_out
-            or codex_events_have_failure(event_summary)
-        )
-        phase_data = {
-            "returncode": result.returncode,
-            "timed_out": result.timed_out,
-            "elapsed_seconds": result.elapsed_seconds,
-            "stdout_path": result.stdout_path,
-            "stderr_path": result.stderr_path,
-            "final_response_parsed": final_response.get("parsed"),
-            "codex_event_summary": event_summary,
-            "final_response_errors": final_response_errors,
-        }
+        if run.get("topology") == "staged_spark":
+            result, final_response, event_summary, phase_data = run_staged_spark_implementation(
+                repo_root=repo_root,
+                run_dir=run_dir,
+                worktree=worktree,
+                run=run,
+                codex_bin=codex_bin,
+                log_path=log_path,
+            )
+            final_response_errors = implementation_final_response_errors(final_response)
+            phase_data["final_response_errors"] = final_response_errors
+            implementation_failed = result.returncode != 0 or result.timed_out
+        else:
+            prompt = (run_dir / "rendered_prompt.md").read_text(encoding="utf-8")
+            command = materialize_worktree_command(
+                build_implementation_command(codex_bin, run, prompt, config_dir=run_dir / "codex_config"),
+                worktree,
+            )
+            display_command = command_for_display(command)
+            _append_log(log_path, f"{run['run_id']} implementation command={json.dumps(display_command)}")
+            result = run_process_to_files(
+                command,
+                cwd=worktree,
+                stdout_path=run_dir / "events.jsonl",
+                stderr_path=run_dir / "stderr.log",
+                timeout_seconds=int(run["timeouts"]["implementation_seconds"]),
+                command_display=display_command,
+            )
+            write_process_result(run_dir / "wall_time.json", result)
+            events_path = run_dir / "events.jsonl"
+            final_response = extract_final_response(events_path)
+            event_summary = summarize_codex_events(events_path)
+            final_response_errors = implementation_final_response_errors(final_response)
+            _write_json(run_dir / "final_response.json", final_response)
+            implementation_failed = (
+                result.returncode != 0
+                or result.timed_out
+                or codex_events_have_failure(event_summary)
+            )
+            phase_data = {
+                "returncode": result.returncode,
+                "timed_out": result.timed_out,
+                "elapsed_seconds": result.elapsed_seconds,
+                "stdout_path": result.stdout_path,
+                "stderr_path": result.stderr_path,
+                "final_response_parsed": final_response.get("parsed"),
+                "codex_event_summary": event_summary,
+                "final_response_errors": final_response_errors,
+            }
         if archived_to is not None:
             phase_data["previous_artifacts_archived_to"] = archived_to
         mark_phase(
@@ -843,6 +867,560 @@ def run_implementation_and_tests(
             phase_data,
         )
     status.update_run(str(run["run_id"]), phase="implementation_complete")
+
+
+STAGED_SPARK_LEAF_ASSIGNMENTS: tuple[dict[str, str], ...] = (
+    {
+        "id": "leaf_01",
+        "title": "TypeScript parsing, normalization, views, and migration compatibility",
+        "focus": "TypeScript parse/normalize/view compatibility, v2 migration behavior, and public API stability.",
+    },
+    {
+        "id": "leaf_02",
+        "title": "TypeScript replay, billing, reporting, performance, and API integration",
+        "focus": "TypeScript replay model, billing/proration, reporting, performance shape, and exports.",
+    },
+    {
+        "id": "leaf_03",
+        "title": "Python parsing, normalization, views, and migration compatibility",
+        "focus": "Python parse/normalize/view compatibility, v2 migration behavior, and public API stability.",
+    },
+    {
+        "id": "leaf_04",
+        "title": "Python replay, billing, reporting, performance, and API integration",
+        "focus": "Python replay model, billing/proration, reporting, performance shape, and exports.",
+    },
+    {
+        "id": "leaf_05",
+        "title": "Cross-language parity, fixtures, public tests, and regression review",
+        "focus": "TypeScript/Python parity risks, visible regression tests, deterministic CSV output, and fixture review.",
+    },
+    {
+        "id": "leaf_06",
+        "title": "Adversarial localization, maintainability, performance, and hidden-test risk review",
+        "focus": "Architectural localization, maintainability hazards, performance traps, and hidden-test risk analysis.",
+    },
+)
+
+
+def run_staged_spark_implementation(
+    *,
+    repo_root: Path,
+    run_dir: Path,
+    worktree: Path,
+    run: Mapping[str, Any],
+    codex_bin: str,
+    log_path: Path,
+) -> tuple[ProcessResult, dict[str, Any], dict[str, Any], dict[str, Any]]:
+    started_at = iso_now()
+    started = time.monotonic()
+    stage_root = run_dir / "staged"
+    if stage_root.exists():
+        archived = _archive_path(stage_root)
+        _append_log(log_path, f"{run['run_id']} archived previous staged artifacts to {archived}")
+    stage_root.mkdir(parents=True, exist_ok=True)
+
+    rendered_prompt = (run_dir / "rendered_prompt.md").read_text(encoding="utf-8")
+    mode = str(run.get("spark_mode") or "")
+    root = run["root"] if isinstance(run.get("root"), Mapping) else {}
+    leaf = run["leaf"] if isinstance(run.get("leaf"), Mapping) else {}
+    spark_config = run.get("spark_mode_config") if isinstance(run.get("spark_mode_config"), Mapping) else {}
+    leaf_model = str(leaf.get("model") or "gpt-5.3-codex-spark")
+    leaf_reasoning = _staged_leaf_reasoning(leaf)
+    leaf_sandbox = str(spark_config.get("leaf_write_mode") or ("read-only" if mode == "proposal" else "workspace-write"))
+    root_model = str(root.get("model") or "gpt-5.5")
+    root_reasoning = str(root.get("reasoning") or "medium")
+    root_sandbox = str(root.get("sandbox") or "workspace-write")
+
+    stage_records: list[dict[str, Any]] = []
+
+    plan_dir = stage_root / "root_plan"
+    plan_prompt = _staged_planning_prompt(rendered_prompt, run)
+    plan_record = _run_staged_codex_stage(
+        codex_bin=codex_bin,
+        stage_dir=plan_dir,
+        worktree=worktree,
+        prompt=plan_prompt,
+        model=root_model,
+        reasoning=root_reasoning,
+        sandbox="read-only",
+        timeout_seconds=_staged_timeout(run, "planning"),
+        stage_id="root_plan",
+        role="gpt_root_planning",
+        log_path=log_path,
+    )
+    stage_records.append(plan_record)
+
+    plan_value = _final_response_value(plan_record.get("final_response"))
+    for assignment in STAGED_SPARK_LEAF_ASSIGNMENTS:
+        leaf_dir = stage_root / assignment["id"]
+        leaf_worktree = _staged_leaf_worktree(worktree.parent / "leaf_worktrees", assignment["id"])
+        copy_benchmark_template(_run_benchmark_path(repo_root, run, "template_path"), leaf_worktree)
+        baseline_sha = initialize_git_baseline(leaf_worktree)
+        _write_json(
+            leaf_dir / "metadata.json",
+            {
+                "schema_version": 1,
+                "leaf_id": assignment["id"],
+                "assignment": assignment,
+                "worktree": str(leaf_worktree),
+                "baseline_commit": baseline_sha,
+            },
+        )
+        leaf_prompt = _staged_leaf_prompt(
+            rendered_prompt=rendered_prompt,
+            run=run,
+            assignment=assignment,
+            plan_value=plan_value,
+            mode=mode,
+        )
+        leaf_record = _run_staged_codex_stage(
+            codex_bin=codex_bin,
+            stage_dir=leaf_dir,
+            worktree=leaf_worktree,
+            prompt=leaf_prompt,
+            model=leaf_model,
+            reasoning=leaf_reasoning,
+            sandbox=leaf_sandbox,
+            timeout_seconds=_staged_timeout(run, "leaf"),
+            stage_id=assignment["id"],
+            role="spark_leaf",
+            log_path=log_path,
+        )
+        capture_diff(leaf_dir, leaf_worktree)
+        leaf_record["diff_path"] = str(leaf_dir / "diff.patch")
+        leaf_record["diff_numstat_path"] = str(leaf_dir / "diff-numstat.txt")
+        stage_records.append(leaf_record)
+
+    manifest_path = stage_root / "stage-manifest.json"
+    _write_json(
+        manifest_path,
+        {
+            "schema_version": 1,
+            "run_id": run["run_id"],
+            "topology": "staged_spark",
+            "spark_mode": mode,
+            "records": stage_records,
+        },
+    )
+
+    integration_dir = stage_root / "root_integration"
+    integration_prompt = _staged_integration_prompt(
+        rendered_prompt=rendered_prompt,
+        run=run,
+        stage_manifest_path=manifest_path,
+        stage_records=stage_records,
+    )
+    integration_record = _run_staged_codex_stage(
+        codex_bin=codex_bin,
+        stage_dir=integration_dir,
+        worktree=worktree,
+        prompt=integration_prompt,
+        model=root_model,
+        reasoning=root_reasoning,
+        sandbox=root_sandbox,
+        timeout_seconds=_staged_timeout(run, "integration"),
+        stage_id="root_integration",
+        role="gpt_root_integration",
+        log_path=log_path,
+    )
+    stage_records.append(integration_record)
+    _write_json(
+        manifest_path,
+        {
+            "schema_version": 1,
+            "run_id": run["run_id"],
+            "topology": "staged_spark",
+            "spark_mode": mode,
+            "records": stage_records,
+        },
+    )
+
+    _combine_staged_events(stage_records, run_dir / "events.jsonl")
+    _combine_staged_stderr(stage_records, run_dir / "stderr.log")
+    final_response = integration_record["final_response"]
+    _write_json(run_dir / "final_response.json", final_response)
+    event_summary = summarize_codex_events(run_dir / "events.jsonl")
+    integration_summary = integration_record.get("event_summary", {})
+    integration_failed = (
+        integration_record.get("returncode") != 0
+        or bool(integration_record.get("timed_out"))
+        or codex_events_have_failure(integration_summary if isinstance(integration_summary, Mapping) else {})
+    )
+    finished_at = iso_now()
+    result = ProcessResult(
+        command=["staged_spark_implementation"],
+        command_display=["staged_spark_implementation"],
+        cwd=str(worktree),
+        started_at=started_at,
+        finished_at=finished_at,
+        elapsed_seconds=round(time.monotonic() - started, 6),
+        returncode=1 if integration_failed else 0,
+        timed_out=bool(integration_record.get("timed_out")),
+        stdout_path=str(run_dir / "events.jsonl"),
+        stderr_path=str(run_dir / "stderr.log"),
+    )
+    write_process_result(run_dir / "wall_time.json", result)
+
+    stage_failures = [
+        {
+            "stage_id": record.get("stage_id"),
+            "role": record.get("role"),
+            "returncode": record.get("returncode"),
+            "timed_out": record.get("timed_out"),
+            "event_summary": record.get("event_summary"),
+        }
+        for record in stage_records
+        if record.get("returncode") != 0
+        or record.get("timed_out")
+        or codex_events_have_failure(record.get("event_summary", {}))
+    ]
+    phase_data = {
+        "returncode": result.returncode,
+        "timed_out": result.timed_out,
+        "elapsed_seconds": result.elapsed_seconds,
+        "stdout_path": result.stdout_path,
+        "stderr_path": result.stderr_path,
+        "final_response_parsed": final_response.get("parsed"),
+        "codex_event_summary": event_summary,
+        "stage_manifest": str(manifest_path),
+        "stage_failures": stage_failures,
+        "stage_count": len(stage_records),
+    }
+    return result, final_response, event_summary, phase_data
+
+
+def _run_staged_codex_stage(
+    *,
+    codex_bin: str,
+    stage_dir: Path,
+    worktree: Path,
+    prompt: str,
+    model: str,
+    reasoning: str,
+    sandbox: str,
+    timeout_seconds: int,
+    stage_id: str,
+    role: str,
+    log_path: Path,
+) -> dict[str, Any]:
+    stage_dir.mkdir(parents=True, exist_ok=True)
+    prompt_path = stage_dir / "prompt.md"
+    prompt_path.write_text(prompt, encoding="utf-8")
+    workspace_prompt_path = worktree / f".codex_staged_{stage_id}_prompt.md"
+    workspace_prompt_path.write_text(prompt, encoding="utf-8")
+    command_prompt = (
+        f"Read the complete staged instructions from `{workspace_prompt_path.name}` in the current workspace, "
+        "then follow them exactly. Do not invoke nested Codex or external AI."
+    )
+    command = materialize_worktree_command(
+        build_single_model_command(
+            codex_bin,
+            model=model,
+            reasoning=reasoning,
+            sandbox=sandbox,
+            prompt=command_prompt,
+        ),
+        worktree,
+    )
+    display_command = command_for_display(command)
+    _append_log(log_path, f"{stage_id} staged command={json.dumps(display_command)}")
+    result = run_process_to_files(
+        command,
+        cwd=worktree,
+        stdout_path=stage_dir / "events.jsonl",
+        stderr_path=stage_dir / "stderr.log",
+        timeout_seconds=timeout_seconds,
+        command_display=display_command,
+    )
+    try:
+        workspace_prompt_path.unlink()
+    except OSError:
+        pass
+    write_process_result(stage_dir / "wall_time.json", result)
+    final_response = extract_final_response(stage_dir / "events.jsonl")
+    event_summary = summarize_codex_events(stage_dir / "events.jsonl")
+    _write_json(stage_dir / "final_response.json", final_response)
+    record = {
+        "schema_version": 1,
+        "stage_id": stage_id,
+        "role": role,
+        "model": model,
+        "reasoning": reasoning,
+        "sandbox": sandbox,
+        "worktree": str(worktree),
+        "prompt_path": str(prompt_path),
+        "events_path": str(stage_dir / "events.jsonl"),
+        "stderr_path": str(stage_dir / "stderr.log"),
+        "wall_time_path": str(stage_dir / "wall_time.json"),
+        "final_response_path": str(stage_dir / "final_response.json"),
+        "returncode": result.returncode,
+        "timed_out": result.timed_out,
+        "elapsed_seconds": result.elapsed_seconds,
+        "event_summary": event_summary,
+        "final_response": final_response,
+    }
+    _write_json(stage_dir / "stage-record.json", record)
+    return record
+
+
+def _staged_leaf_worktree(parent: Path, leaf_id: str) -> Path:
+    parent.mkdir(parents=True, exist_ok=True)
+    candidate = parent / leaf_id
+    if not candidate.exists():
+        return candidate
+    timestamp = iso_now().replace(":", "").replace("-", "")
+    suffix = 1
+    while True:
+        candidate = parent / f"{leaf_id}-{timestamp}-{suffix:02d}"
+        if not candidate.exists():
+            return candidate
+        suffix += 1
+
+
+def _staged_planning_prompt(rendered_prompt: str, run: Mapping[str, Any]) -> str:
+    assignments = "\n".join(
+        f"- {item['id']}: {item['title']} ({item['focus']})"
+        for item in STAGED_SPARK_LEAF_ASSIGNMENTS
+    )
+    return _final_prompt(
+        f"""# GPT Root Planning Stage
+
+You are the GPT-5.5 root planner for a staged Spark experiment. Do not edit
+files. Read the visible task context and produce six concise task briefs for
+the Spark leaves listed below.
+
+Spark mode: `{run.get('spark_mode')}`
+Root reasoning: `{run.get('root', {}).get('reasoning') if isinstance(run.get('root'), Mapping) else ''}`
+
+## Leaf Assignments
+
+{assignments}
+
+## Visible Task Context
+
+{rendered_prompt}
+
+## Output
+
+Return strict JSON only:
+
+```json
+{{
+  "briefs": [
+    {{
+      "id": "leaf_01",
+      "task": "Concrete task brief.",
+      "files_to_inspect": ["README.md"],
+      "deliverable": "What this leaf should return."
+    }}
+  ],
+  "integration_strategy": "How the root should combine leaf outputs.",
+  "nested_codex_invoked": false
+}}
+```
+"""
+    )
+
+
+def _staged_leaf_prompt(
+    *,
+    rendered_prompt: str,
+    run: Mapping[str, Any],
+    assignment: Mapping[str, str],
+    plan_value: Mapping[str, Any],
+    mode: str,
+) -> str:
+    planned_brief = _planned_leaf_brief(plan_value, assignment["id"])
+    if mode == "proposal":
+        mode_rules = (
+            "You are in proposal mode. Do not edit files. Inspect the visible "
+            "workspace and return concrete findings, proposed patches, tests, "
+            "and integration notes."
+        )
+    else:
+        mode_rules = (
+            "You are in direct edit mode inside an isolated leaf workspace. You "
+            "may edit files in this copy. The root integration run will inspect "
+            "your diff and decide what to land in the final measured workspace."
+        )
+
+    return _final_prompt(
+        f"""# Spark Leaf Stage: {assignment['id']}
+
+{mode_rules}
+
+## Assignment
+
+Title: {assignment['title']}
+
+Focus: {assignment['focus']}
+
+Planner brief:
+
+```json
+{json.dumps(planned_brief, indent=2, sort_keys=True)}
+```
+
+## Visible Task Context
+
+{rendered_prompt}
+
+## Output
+
+Return strict JSON only:
+
+```json
+{{
+  "status": "success",
+  "summary": "What you found or changed.",
+  "changed_files": [],
+  "tests_run": [],
+  "proposals": [],
+  "risks": [],
+  "nested_codex_invoked": false
+}}
+```
+
+Allowed status values are `success`, `partial`, and `failed`. Set
+`nested_codex_invoked` to `false`; nested Codex and external AI are prohibited.
+"""
+    )
+
+
+def _staged_integration_prompt(
+    *,
+    rendered_prompt: str,
+    run: Mapping[str, Any],
+    stage_manifest_path: Path,
+    stage_records: list[Mapping[str, Any]],
+) -> str:
+    mode = str(run.get("spark_mode") or "")
+    leaf_lines = []
+    for record in stage_records:
+        if record.get("role") != "spark_leaf":
+            continue
+        details = [
+            f"stage_id={record.get('stage_id')}",
+            f"final_response={record.get('final_response_path')}",
+            f"events={record.get('events_path')}",
+        ]
+        if record.get("diff_path"):
+            details.append(f"diff={record.get('diff_path')}")
+        leaf_lines.append("- " + "; ".join(str(item) for item in details))
+    leaves = "\n".join(leaf_lines)
+    mode_guidance = (
+        "Inspect the leaf diffs and manually integrate only changes you judge correct."
+        if mode == "direct"
+        else "Inspect the leaf proposals and implement only changes you judge correct."
+    )
+    return _final_prompt(
+        f"""# GPT Root Integration Stage
+
+You are the GPT-5.5 root integrator for the final measured workspace.
+
+{mode_guidance}
+
+The outer harness has preserved staged evidence at:
+
+`{stage_manifest_path}`
+
+Leaf artifacts:
+
+{leaves}
+
+Read the relevant leaf final responses, diffs, and proposals from those paths.
+Do not read hidden tests or private case files. Do not invoke `codex`, nested
+Codex, external AI, or additional agent processes.
+
+## Visible Task Context
+
+{rendered_prompt}
+"""
+    )
+
+
+def _planned_leaf_brief(plan_value: Mapping[str, Any], leaf_id: str) -> dict[str, Any]:
+    briefs = plan_value.get("briefs")
+    if isinstance(briefs, list):
+        for brief in briefs:
+            if isinstance(brief, Mapping) and brief.get("id") == leaf_id:
+                return dict(brief)
+    assignment = next((item for item in STAGED_SPARK_LEAF_ASSIGNMENTS if item["id"] == leaf_id), None)
+    return dict(assignment or {"id": leaf_id, "task": "Inspect the visible task and report useful findings."})
+
+
+def _final_response_value(final_response: Any) -> Mapping[str, Any]:
+    if not isinstance(final_response, Mapping):
+        return {}
+    value = final_response.get("value")
+    return value if isinstance(value, Mapping) else {}
+
+
+def _staged_leaf_reasoning(leaf: Mapping[str, Any]) -> str:
+    reasoning_by_role = leaf.get("reasoning_by_role")
+    if isinstance(reasoning_by_role, Mapping):
+        values = {str(value) for value in reasoning_by_role.values() if value}
+        if len(values) == 1:
+            return next(iter(values))
+        if "implementer" in reasoning_by_role:
+            return str(reasoning_by_role["implementer"])
+    return "xhigh"
+
+
+def _staged_timeout(run: Mapping[str, Any], stage: str) -> int:
+    timeouts = run.get("timeouts") if isinstance(run.get("timeouts"), Mapping) else {}
+    default = int(timeouts.get("implementation_seconds", 7200))
+    staged = run.get("staged_spark") if isinstance(run.get("staged_spark"), Mapping) else {}
+    key = {
+        "planning": "planning_timeout_seconds",
+        "leaf": "leaf_timeout_seconds",
+        "integration": "integration_timeout_seconds",
+    }.get(stage)
+    if key and isinstance(staged.get(key), int) and int(staged[key]) > 0:
+        return int(staged[key])
+    return default
+
+
+def _combine_staged_events(stage_records: Iterable[Mapping[str, Any]], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8", errors="replace") as handle:
+        for record in stage_records:
+            events_path = Path(str(record.get("events_path", "")))
+            if not events_path.exists():
+                continue
+            for line in events_path.read_text(encoding="utf-8", errors="replace").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    handle.write(line + "\n")
+                    continue
+                if isinstance(event, dict):
+                    event.setdefault("model", record.get("model"))
+                    event["staged_spark"] = {
+                        "stage_id": record.get("stage_id"),
+                        "role": record.get("role"),
+                    }
+                handle.write(json.dumps(event, sort_keys=True) + "\n")
+
+
+def _combine_staged_stderr(stage_records: Iterable[Mapping[str, Any]], output_path: Path) -> None:
+    chunks: list[str] = []
+    for record in stage_records:
+        stderr_path = Path(str(record.get("stderr_path", "")))
+        if not stderr_path.exists():
+            continue
+        chunks.append(f"===== {record.get('stage_id')} ({record.get('role')}) =====\n")
+        chunks.append(stderr_path.read_text(encoding="utf-8", errors="replace"))
+        if chunks and not chunks[-1].endswith("\n"):
+            chunks.append("\n")
+    output_path.write_text("".join(chunks), encoding="utf-8", errors="replace")
+
+
+def _final_prompt(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n").strip() + "\n"
 
 
 def run_judge(

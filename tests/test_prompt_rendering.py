@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
 RULELEDGER_V3_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_sanity.yaml"
+SPARK_MODE_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_efficiency_pilot.yaml"
 
 
 @pytest.fixture
@@ -148,6 +149,20 @@ def test_v3_prompt_uses_issue_brief_and_reasoning_ladder_docs() -> None:
     assert "reconcile the implementation as one replay model" in prompt
     assert "Avoid a single-surface fix" in prompt
     assert "root_sandbox: danger-full-access" in prompt
+
+
+def test_staged_spark_prompt_disables_codex_managed_subagents() -> None:
+    runs = expand_experiment_matrix(load_experiment_config(SPARK_MODE_CONFIG_PATH))
+    run = next(candidate for candidate in runs if candidate["topology"] == "staged_spark")
+    prompt = render_implementation_prompt(run, REPO_ROOT)
+    config = tomllib.loads(render_codex_config(run, REPO_ROOT)["config.toml"])
+
+    assert "outer-harness staged Spark experiment" in prompt
+    assert "The harness, not this Codex process" in prompt
+    assert "Direct edit mode gives each Spark leaf an isolated writable copy" in prompt
+    assert config["agents"]["max_depth"] == 0
+    assert config["agents"]["max_threads"] == 1
+    assert set(config["agents"]) == {"max_depth", "max_threads"}
 
 
 def test_every_implementation_prompt_has_safety_and_json_contract(runs: list[dict]) -> None:

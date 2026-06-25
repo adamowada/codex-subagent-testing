@@ -181,7 +181,7 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             repeats = repeat_count
 
         topology = cell.get("topology")
-        if topology not in {"solo", "flat_spark", "depth2_subleads"}:
+        if topology not in {"solo", "flat_spark", "depth2_subleads", "staged_spark"}:
             errors.append(f"{path}.topology: unknown topology {topology!r}")
 
         _validate_prompt_template_reference(
@@ -194,6 +194,7 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             "solo": "solo",
             "flat_spark": "flat_spark",
             "depth2_subleads": "depth2_subleads",
+            "staged_spark": "staged_spark",
         }.get(str(topology))
         if expected_prompt is not None and cell.get("prompt_template") != expected_prompt:
             errors.append(f"{path}.prompt_template: {topology} requires {expected_prompt}")
@@ -260,11 +261,25 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
                 breadth += sublead_count + leaf_total
                 if strict_initial_contract and cell_id == "C4" and leaf_total != 18:
                     errors.append(f"{path}.leaf.count: C4 requires exactly 18 Spark leaves")
+        elif topology == "staged_spark":
+            if max_depth != 0:
+                errors.append(f"{path}.agents.max_depth: staged_spark requires max_depth=0")
+            leaf = _mapping(cell, "leaf", errors, prefix=path)
+            leaf_count = _positive_int(leaf, "count", f"{path}.leaf.count", errors)
+            _validate_leaf(leaf, path, errors, strict_initial_contract=strict_initial_contract)
+            if leaf_count is not None:
+                breadth += leaf_count
 
         if max_threads is not None and max_threads < breadth:
-            errors.append(
-                f"{path}.agents.max_threads: expected at least {breadth} for configured breadth"
-            )
+            if topology == "staged_spark":
+                # Staged Spark leaves are invoked by the outer harness, not by
+                # one Codex root process, so agents.max_threads describes only
+                # the per-invocation Codex agent budget.
+                pass
+            else:
+                errors.append(
+                    f"{path}.agents.max_threads: expected at least {breadth} for configured breadth"
+                )
         if strict_initial_contract and cell_id == "C4" and max_threads is not None and max_threads < 24:
             errors.append(f"{path}.agents.max_threads: C4 requires at least 24")
 
