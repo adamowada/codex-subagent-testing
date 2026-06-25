@@ -177,3 +177,67 @@ def test_summary_combines_main_and_extension_for_xhigh_comparison() -> None:
     assert proposal["runs"] == 1
     assert summary["xhigh_combined_direct_vs_proposal"][0]["quality_mean_delta_proposal_minus_direct"] == 0.1
     assert len(summary["xhigh_combined_spark_vs_historical"]) == 2
+
+
+def test_summary_combines_main_and_extension_for_high_comparison() -> None:
+    summary = build_summary(
+        [
+            _row(
+                cell_id="V3P2_r01",
+                source="historical",
+                cohort="historical_solo",
+                reasoning="high",
+                mode="solo",
+                quality=0.7,
+                gpt_tokens=100.0,
+                spark_tokens=None,
+            ),
+            _row(
+                cell_id="SME4_direct_r01",
+                source="main",
+                cohort="spark_assisted",
+                reasoning="high",
+                mode="direct",
+                quality=0.9,
+                gpt_tokens=100.0,
+                spark_tokens=10.0,
+            ),
+            _row(
+                cell_id="SMEH4_direct_r01",
+                source="high_extension",
+                cohort="spark_assisted",
+                reasoning="high",
+                mode="direct",
+                quality=0.8,
+                gpt_tokens=120.0,
+                spark_tokens=20.0,
+            ),
+            _row(
+                cell_id="SMEH5_proposal_r01",
+                source="high_extension",
+                cohort="spark_assisted",
+                reasoning="high",
+                mode="proposal",
+                quality=0.65,
+                gpt_tokens=80.0,
+                spark_tokens=30.0,
+            ),
+        ]
+    )
+
+    direct = next(
+        group
+        for group in summary["high_combined_groups"]
+        if group["cohort"] == "high_combined_spark_assisted" and group["mode"] == "direct"
+    )
+    proposal = next(
+        group
+        for group in summary["high_combined_groups"]
+        if group["cohort"] == "high_combined_spark_assisted" and group["mode"] == "proposal"
+    )
+
+    assert direct["runs"] == 2
+    assert direct["quality"]["mean"] == 0.85
+    assert proposal["runs"] == 1
+    assert summary["high_combined_direct_vs_proposal"][0]["quality_mean_delta_proposal_minus_direct"] == -0.2
+    assert len(summary["high_combined_spark_vs_historical"]) == 2

@@ -26,6 +26,7 @@ RULELEDGER_V3_EXPERIMENT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_ex
 RULELEDGER_V3_PAPER_50_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_paper_50.yaml"
 SPARK_MODE_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_efficiency_pilot.yaml"
 SPARK_MODE_MAIN_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_efficiency_main.yaml"
+SPARK_MODE_HIGH_EXTENSION_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_efficiency_high_extension.yaml"
 SPARK_MODE_XHIGH_EXTENSION_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_efficiency_xhigh_extension.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
@@ -304,6 +305,24 @@ def test_spark_mode_efficiency_xhigh_extension_expands_to_thirty_runs() -> None:
     assert summary["by_root_reasoning"] == {"xhigh": 30}
     assert runs[0]["run_id"] == "SMEX6_direct_r01"
     assert runs[-1]["run_id"] == "SMEX7_proposal_r15"
+    assert {run["leaf"]["count"] for run in runs} == {6}
+    assert {tuple(run["leaf"]["reasoning_by_role"].values()) for run in runs} == {
+        ("xhigh", "xhigh", "xhigh")
+    }
+
+
+def test_spark_mode_efficiency_high_extension_expands_to_thirty_runs() -> None:
+    config = load_experiment_config(SPARK_MODE_HIGH_EXTENSION_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert len(runs) == 30
+    assert config["parallelism"] == {"implementation_jobs": 7, "judge_jobs": 6}
+    assert summary["by_topology"] == {"staged_spark": 30}
+    assert summary["by_spark_mode"] == {"direct": 15, "proposal": 15}
+    assert summary["by_root_reasoning"] == {"high": 30}
+    assert runs[0]["run_id"] == "SMEH4_direct_r01"
+    assert runs[-1]["run_id"] == "SMEH5_proposal_r15"
     assert {run["leaf"]["count"] for run in runs} == {6}
     assert {tuple(run["leaf"]["reasoning_by_role"].values()) for run in runs} == {
         ("xhigh", "xhigh", "xhigh")

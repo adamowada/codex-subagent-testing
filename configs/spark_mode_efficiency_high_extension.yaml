@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "benchmark": {
+    "version": "ruleledger_v3"
+  },
+  "experiment": {
+    "id": "spark_mode_efficiency_high_extension",
+    "repeat_count": 15,
+    "seed": 20260624
+  },
+  "parallelism": {
+    "implementation_jobs": 7,
+    "judge_jobs": 6
+  },
+  "timeouts": {
+    "implementation_seconds": 7200,
+    "judge_seconds": 1800
+  },
+  "paths": {
+    "benchmark_template": "benchmark_template_v3",
+    "hidden_cases": "hidden_tests/cases_v3",
+    "prompt_templates": {
+      "common": "prompts/task_common_v3.md",
+      "solo": "prompts/task_solo.md",
+      "flat_spark": "prompts/task_flat_spark_v3.md",
+      "depth2_subleads": "prompts/task_depth2_subleads.md",
+      "staged_spark": "prompts/task_staged_spark_v3.md",
+      "judge": "prompts/judge.md"
+    },
+    "codex_config_template": "codex_templates/config.toml.j2"
+  },
+  "models": {
+    "gpt55": "gpt-5.5",
+    "spark": "gpt-5.3-codex-spark"
+  },
+  "spark_modes": {
+    "direct": {
+      "leaf_write_mode": "workspace-write",
+      "proposal_only": false
+    },
+    "proposal": {
+      "leaf_write_mode": "read-only",
+      "proposal_only": true
+    }
+  },
+  "scoring": {
+    "path": "configs/scoring_v3.yaml"
+  },
+  "judge": {
+    "model": "gpt-5.5",
+    "reasoning": "xhigh",
+    "prompt_template": "judge",
+    "sandbox": "danger-full-access"
+  },
+  "cells": [
+    {
+      "id": "SMEH4",
+      "name": "spark_mode_gpt55_high_direct_extension",
+      "repeats": 15,
+      "spark_modes": ["direct"],
+      "topology": "staged_spark",
+      "prompt_template": "staged_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "high",
+        "sandbox": "danger-full-access"
+      },
+      "leaf": {
+        "model": "gpt-5.3-codex-spark",
+        "count": 6,
+        "reasoning_by_role": {
+          "implementer": "xhigh",
+          "tester": "xhigh",
+          "adversary": "xhigh"
+        }
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "SMEH5",
+      "name": "spark_mode_gpt55_high_proposal_extension",
+      "repeats": 15,
+      "spark_modes": ["proposal"],
+      "topology": "staged_spark",
+      "prompt_template": "staged_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "high",
+        "sandbox": "danger-full-access"
+      },
+      "leaf": {
+        "model": "gpt-5.3-codex-spark",
+        "count": 6,
+        "reasoning_by_role": {
+          "implementer": "xhigh",
+          "tester": "xhigh",
+          "adversary": "xhigh"
+        }
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    }
+  ]
+}

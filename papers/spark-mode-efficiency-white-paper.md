@@ -18,14 +18,19 @@ for the 20 proposal-mode runs. Direct edit also used fewer average
 implementation tokens: about `2.76M` total tokens per run versus `3.02M` for
 proposal mode. Direct edit won clearly for `low`, `medium`, and `high` roots.
 
-A follow-up xhigh extension added 15 more xhigh direct runs and 15 more xhigh
-proposal runs. Combined with the original main matrix, the xhigh comparison is
-now 20 direct runs versus 20 proposal runs. In that larger xhigh sample, direct
-edit is slightly higher quality (`0.733897` vs `0.714206`), while proposal mode
-uses fewer GPT tokens (`3.64M` vs `3.88M`) and fewer total implementation
-tokens (`4.43M` vs `4.49M`) but more Spark tokens (`0.79M` vs `0.61M`). Both
-combined xhigh Spark-assisted modes underperform the historical 50-run xhigh
-GPT-only quality mean (`0.755057`).
+Two follow-up extensions added 15 direct runs and 15 proposal runs at `high`
+and `xhigh` root reasoning. Combined with the original main matrix, both
+focused comparisons now have 20 direct runs versus 20 proposal runs. In the
+larger high sample, direct edit remains higher quality (`0.711964` vs
+`0.652004`) and much more token efficient than proposal mode, but the direct
+mean is only slightly above the historical 50-run high GPT-only quality mean
+(`0.696050`) while using more implementation tokens.
+
+In the larger xhigh sample, direct edit is also slightly higher quality
+(`0.733897` vs `0.714206`), while proposal mode uses fewer GPT tokens (`3.64M`
+vs `3.88M`) and fewer total implementation tokens (`4.43M` vs `4.49M`) but more
+Spark tokens (`0.79M` vs `0.61M`). Both combined xhigh Spark-assisted modes
+underperform the historical 50-run xhigh GPT-only quality mean (`0.755057`).
 
 ## Research Question
 
@@ -64,10 +69,25 @@ The xhigh extension config,
 - 15 additional xhigh proposal runs.
 - 30 total extension runs.
 
-Pilot, main, and extension used:
+The high extension config,
+`configs/spark_mode_efficiency_high_extension.yaml`, ran:
+
+- 15 additional high direct runs.
+- 15 additional high proposal runs.
+- 30 total extension runs.
+
+Pilot, main, and the xhigh extension used:
 
 - Implementation jobs: `5`
 - Judge jobs: `4`
+
+The high extension used the requested higher concurrency:
+
+- Implementation jobs: `7`
+- Judge jobs: `6`
+
+All measured runs used:
+
 - Benchmark: RuleLedger v3
 - Judge: `gpt-5.5` xhigh
 - Spark leaves: six `gpt-5.3-codex-spark` xhigh leaves
@@ -76,7 +96,9 @@ The main experiment was repaired with `-Resume` and `-RerunFailed` after an
 initial set of judge JSON parse failures. The xhigh extension also required a
 resume after a usage-limit interruption; the repair used a short workspace root
 to avoid Windows path length failures during failed implementation refresh.
-Final validation status is `passed` for pilot, main, and the xhigh extension.
+The high extension also required a usage-limit wait and resume. Final
+validation status is `passed` for pilot, main, xhigh extension, and high
+extension.
 
 ## Measurement
 
@@ -139,6 +161,68 @@ result looked different: proposal mode was essentially tied on quality but
 slightly ahead, and it saved enough GPT tokens to reduce total implementation
 tokens despite spending more Spark tokens. Because that difference was tiny, the
 xhigh extension was run to test whether the apparent proposal advantage held.
+The original five-run `high` result also deserved a closer look because high
+direct was one of the strongest main-matrix cells while high proposal was much
+weaker. The high extension tested whether that large high direct advantage held
+at 20 runs per Spark mode.
+
+## High Extension Deep Dive
+
+The high extension keeps the high direct-vs-proposal result directionally
+intact, but it makes the comparison to historical GPT-only high more cautious.
+Combining the original five main high runs per mode with the 15 extension runs
+per mode gives:
+
+| Cohort | Mode | Runs | Quality mean | Quality median | Quality sd | GPT tokens mean | Spark tokens mean | Total tokens mean |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| high Spark | direct | 20 | 0.711964 | 0.691288 | 0.157685 | 2,801,135 | 632,108 | 3,433,243 |
+| high Spark | proposal | 20 | 0.652004 | 0.592725 | 0.161956 | 2,933,084 | 1,563,753 | 4,496,837 |
+| high GPT-only historical | solo | 50 | 0.696050 | 0.684818 | 0.194662 | 2,612,154 | n/a | 2,612,154 |
+
+Proposal-minus-direct deltas for the combined high sample:
+
+| Metric | Delta |
+| --- | ---: |
+| Quality mean | -0.059960 |
+| Hidden correctness mean | -0.044444 |
+| Performance mean | -0.056667 |
+| Judge mean | -0.123451 |
+| GPT implementation tokens mean | +131,950 |
+| Spark implementation tokens mean | +931,645 |
+| Total implementation tokens mean | +1,063,595 |
+| Quality per GPT token mean | -1.91e-8 |
+| Quality per total token mean | -5.77e-8 |
+
+The observed high-mode result favors direct edit: it is higher quality, spends
+less GPT, spends far less Spark, and uses about `1.06M` fewer total
+implementation tokens per run. The quality uncertainty is still meaningful,
+though. A bootstrap interval for proposal-minus-direct quality was
+approximately `[-0.155647, 0.035416]`, so the 20-run sample supports direct as
+the practical high-mode default but not a strong claim about a guaranteed
+quality gap.
+
+The extension-only high runs explain why the original five-run gap narrowed.
+The 15 added high direct runs averaged `0.673590`, while the 15 added high
+proposal runs averaged `0.669870`; in the extension batch alone, quality was
+nearly tied, but proposal remained much more expensive (`4.88M` total
+implementation tokens versus `3.51M` for direct).
+
+Against the historical high GPT-only baseline:
+
+| Comparison | Quality delta | GPT token delta | Total token delta | Quality/total-token delta |
+| --- | ---: | ---: | ---: | ---: |
+| high direct minus historical solo | +0.015914 | +188,981 | +821,089 | -7.43e-8 |
+| high proposal minus historical solo | -0.044046 | +320,931 | +1,884,684 | -1.32e-7 |
+
+The high Spark-vs-historical result is therefore mixed. Combined high direct is
+slightly above the historical high solo quality mean, but the bootstrap interval
+for high direct minus historical high quality was approximately `[-0.069460,
+0.101787]`. Combined high proposal is below historical high solo, with a
+bootstrap interval of approximately `[-0.130477, 0.043197]`. Both Spark-assisted
+high modes use more total implementation tokens than historical GPT-only high,
+so GPT-only high remains the cleaner token-efficiency baseline. If Spark is a
+separate and cheaper budget, high direct is still the better Spark-assisted high
+configuration.
 
 ## Xhigh Extension Deep Dive
 
@@ -209,11 +293,13 @@ against that baseline as follows:
 In the original main matrix, direct edit Spark assistance improved mean quality
 over the historical GPT-only baseline at every root reasoning level. Proposal
 mode was more mixed: it improved low and xhigh, was essentially flat at medium,
-and underperformed the historical high baseline. After the xhigh extension,
-that statement should no longer be read as evidence that xhigh Spark assistance
-beats xhigh GPT-only. The better-supported xhigh result is the 20-run direct
-and 20-run proposal comparison above, where both Spark-assisted xhigh modes are
-below the historical xhigh solo mean.
+and underperformed the historical high baseline. After the high and xhigh
+extensions, that original five-run statement should be read as hypothesis
+generation, not as settled evidence. The better-supported high result is that
+combined high direct is only slightly above historical high solo quality while
+using more total implementation tokens, and combined high proposal is below
+historical high solo. The better-supported xhigh result is that both
+Spark-assisted xhigh modes are below the historical xhigh solo mean.
 
 Token efficiency is less favorable when Spark tokens are counted as part of
 total implementation cost. Spark assistance generally raises quality, but it
@@ -246,9 +332,11 @@ keep the historical baseline visible and note this bridge uncertainty.
 The core pattern is consistent with a practical division of labor:
 
 - In direct edit mode, Spark leaves do concrete implementation work before the
-  GPT root integrates the result. This appears to help low, medium, and high
-  roots by giving the root more finished material and fewer speculative
-  recommendations to translate.
+  GPT root integrates the result. This appears most useful as a Spark-mode
+  choice: direct edit beats proposal mode at low, medium, high, and expanded
+  xhigh in observed quality. The high extension makes the GPT-only comparison
+  more cautious, because high direct no longer shows a large quality margin over
+  historical high solo.
 - In proposal mode, the GPT root keeps more control. At xhigh, proposal mode is
   no longer the quality leader after the extension, but it remains the
   GPT-saving option.
@@ -260,10 +348,13 @@ The strongest original main-matrix quality results were xhigh proposal
 (`0.835775`), xhigh direct (`0.832860`), and high direct (`0.827086`). The
 xhigh extension shows why those five-run xhigh cells should be treated
 cautiously: the added xhigh runs were lower on average, pulling the combined
-xhigh means to `0.733897` direct and `0.714206` proposal.
+xhigh means to `0.733897` direct and `0.714206` proposal. The high extension
+does the same for high direct: the combined high direct mean is `0.711964`, not
+the original main-cell `0.827086`, while combined high proposal is `0.652004`.
 
 - If Spark and GPT tokens both matter, high direct edit is the best quality/cost
-  compromise among the high-quality cells.
+  compromise among the expanded Spark-assisted high cells, but GPT-only high is
+  the better total-token baseline.
 - If GPT tokens are the scarce budget and Spark tokens are cheaper, xhigh
   proposal remains attractive relative to xhigh direct because it saves about
   `242k` GPT implementation tokens per run in the combined xhigh sample.
@@ -273,8 +364,16 @@ xhigh means to `0.733897` direct and `0.714206` proposal.
 
 Use direct edit mode as the default for xhigh Spark leaves under GPT-5.5 roots,
 especially for `low`, `medium`, and `high` root reasoning. It produced higher
-quality and better implementation-token efficiency in three of four reasoning
-levels and won the aggregate comparison.
+observed quality than proposal mode in the main matrix and in both expanded
+high and xhigh comparisons.
+
+For `high` roots, prefer direct edit over proposal mode when using this staged
+six-Spark-leaf topology. In the combined high sample, proposal mode scored about
+`0.0600` lower on quality and used about `1.06M` more total implementation
+tokens per run. However, compare high direct against GPT-only high before
+adopting Spark assistance solely for quality: the expanded high direct quality
+mean is only `0.0159` above the historical high solo mean and is worse on total
+token efficiency.
 
 Use proposal mode selectively with an `xhigh` GPT-5.5 root when GPT budget is
 the limiting resource and extra Spark usage is acceptable. In the combined
@@ -290,20 +389,24 @@ in this experiment.
 
 Do not use proposal mode as the general Spark leaf default for this benchmark.
 At low, medium, and high root reasoning, proposal mode was lower quality and
-more expensive in total implementation tokens.
+more expensive in total implementation tokens. The expanded high sample makes
+that especially clear on cost.
 
 ## Limitations
 
 The main Spark-assisted matrix has five runs per cell. That is enough to reveal
-a strong directional pattern for low, medium, and high roots, but the xhigh
-extension showed that five xhigh runs were not enough to settle the xhigh
+a strong directional pattern for the original matrix, but the high and xhigh
+extensions showed that five runs were not enough to settle every root-reasoning
 interaction.
 
-The combined xhigh comparison has 20 runs per Spark mode. That is stronger than
-the original five-run xhigh cells, but the quality intervals still overlap. The
-best-supported xhigh claim is modest: direct edit is slightly higher quality in
-the observed sample, proposal mode spends fewer GPT and total tokens, and both
-Spark-assisted modes trail the historical xhigh solo mean.
+The combined high and xhigh comparisons each have 20 runs per Spark mode. That
+is stronger than the original five-run cells, but quality intervals still
+overlap. The best-supported high claim is practical rather than absolute:
+direct edit is the better high Spark mode, but GPT-only high remains the
+cleaner total-token baseline. The best-supported xhigh claim is similarly
+modest: direct edit is slightly higher quality in the observed sample, proposal
+mode spends fewer GPT and total tokens, and both Spark-assisted modes trail the
+historical xhigh solo mean.
 
 The contemporaneous GPT-only bridge sample has only two runs per reasoning
 level. It is useful as a drift signal but not as a replacement for the 50-run
@@ -325,12 +428,16 @@ Key artifact locations:
 - Main run: `runs/20260624T053702-spark_mode_efficiency_main-main`
 - Xhigh extension run:
   `runs/20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension`
+- High extension run:
+  `runs/20260624T220413-spark_mode_efficiency_high_extension-high_extension_j7_j6`
 - Main HTML report:
   `runs/20260624T053702-spark_mode_efficiency_main-main/report/report.html`
 - Main PDF report:
   `runs/20260624T053702-spark_mode_efficiency_main-main/report/report.pdf`
 - Xhigh extension PDF report:
   `runs/20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension/report/report.pdf`
+- High extension PDF report:
+  `runs/20260624T220413-spark_mode_efficiency_high_extension-high_extension_j7_j6/report/report.pdf`
 - Final analysis:
   `runs/analysis/spark_mode_efficiency_final`
 
@@ -347,7 +454,11 @@ Key commands:
 
 .\scripts\run_experiment.ps1 -Config configs/spark_mode_efficiency_xhigh_extension.yaml -Jobs 5 -JudgeJobs 4 -WorkspaceRoot C:\cstws -Resume 20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension -RerunFailed
 
-python scripts\analyze_spark_mode_efficiency.py --experiment-dir runs\20260624T023048-spark_mode_efficiency_pilot-pilot --experiment-dir runs\20260624T053702-spark_mode_efficiency_main-main --experiment-dir runs\20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension --output-dir runs\analysis\spark_mode_efficiency_final
+.\scripts\run_experiment.ps1 -Config configs/spark_mode_efficiency_high_extension.yaml -Jobs 7 -JudgeJobs 6 -WorkspaceRoot C:\cstws -ExperimentName high_extension_j7_j6 -StudyId spark-mode-efficiency -BatchId high-extension-j7-j6 -BatchSequence 4
+
+.\scripts\run_experiment.ps1 -Config configs/spark_mode_efficiency_high_extension.yaml -Jobs 7 -JudgeJobs 6 -WorkspaceRoot C:\cstws -Resume 20260624T220413-spark_mode_efficiency_high_extension-high_extension_j7_j6 -RerunFailed
+
+python scripts\analyze_spark_mode_efficiency.py --experiment-dir runs\20260624T023048-spark_mode_efficiency_pilot-pilot --experiment-dir runs\20260624T053702-spark_mode_efficiency_main-main --experiment-dir runs\20260624T105944-spark_mode_efficiency_xhigh_extension-xhigh_extension --experiment-dir runs\20260624T220413-spark_mode_efficiency_high_extension-high_extension_j7_j6 --output-dir runs\analysis\spark_mode_efficiency_final
 ```
 
 Validation evidence:
@@ -355,6 +466,7 @@ Validation evidence:
 - Pilot `validation.json`: `passed`
 - Main `validation.json`: `passed`
 - Xhigh extension `validation.json`: `passed`
-- Analysis rows: `294`
+- High extension `validation.json`: `passed`
+- Analysis rows: `324`
 - Focused analysis test: `python -m pytest tests\test_spark_mode_analysis.py -q`
-- Full suite: `python -m pytest -q` (`189 passed`)
+- Full suite: `python -m pytest -q` (`191 passed`)

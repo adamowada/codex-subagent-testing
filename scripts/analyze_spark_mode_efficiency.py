@@ -101,30 +101,32 @@ def read_results(experiment_dir: Path, *, source: str) -> list[dict[str, Any]]:
 def build_summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
     group_summaries = summarize_groups(rows, cohort_key=lambda row: str(row.get("cohort") or "unknown"))
     phase_group_summaries = summarize_groups(rows, cohort_key=_phase_cohort)
-    xhigh_combined_rows = [
-        row
-        for row in rows
-        if (
-            str(row.get("root_reasoning")) == "xhigh"
-            and str(row.get("source")) in {"historical", "main", "xhigh_extension"}
-        )
-    ]
-    xhigh_combined_groups = summarize_groups(xhigh_combined_rows, cohort_key=_xhigh_combined_cohort)
+    high_combined_groups = _focused_combined_groups(rows, reasoning="high")
+    xhigh_combined_groups = _focused_combined_groups(rows, reasoning="xhigh")
     return {
         "schema_version": 1,
         "row_count": len(rows),
         "groups": group_summaries,
         "phase_groups": phase_group_summaries,
+        "high_combined_groups": high_combined_groups,
         "xhigh_combined_groups": xhigh_combined_groups,
         "direct_vs_proposal": direct_proposal_deltas(group_summaries, cohort="spark_assisted"),
         "main_direct_vs_proposal": direct_proposal_deltas(phase_group_summaries, cohort="main_spark_assisted"),
         "pilot_direct_vs_proposal": direct_proposal_deltas(phase_group_summaries, cohort="pilot_spark_assisted"),
+        "high_combined_direct_vs_proposal": direct_proposal_deltas(
+            high_combined_groups,
+            cohort="high_combined_spark_assisted",
+        ),
         "xhigh_combined_direct_vs_proposal": direct_proposal_deltas(
             xhigh_combined_groups,
             cohort="xhigh_combined_spark_assisted",
         ),
         "bridge_vs_historical": bridge_deltas(group_summaries),
         "main_spark_vs_historical": spark_historical_deltas(phase_group_summaries),
+        "high_combined_spark_vs_historical": spark_historical_deltas(
+            high_combined_groups,
+            spark_cohort="high_combined_spark_assisted",
+        ),
         "xhigh_combined_spark_vs_historical": spark_historical_deltas(
             xhigh_combined_groups,
             spark_cohort="xhigh_combined_spark_assisted",
@@ -328,6 +330,12 @@ def render_markdown(summary: dict[str, Any]) -> str:
     main_groups = [group for group in summary["phase_groups"] if group["cohort"] == "main_spark_assisted"]
     lines.extend(["", "## Official Main Spark-Assisted Summary", ""])
     _append_group_table(lines, main_groups)
+    high_groups = [
+        group for group in summary["high_combined_groups"] if group["cohort"] == "high_combined_spark_assisted"
+    ]
+    if high_groups:
+        lines.extend(["", "## Combined High Main Plus Extension Summary", ""])
+        _append_group_table(lines, high_groups)
     xhigh_groups = [
         group for group in summary["xhigh_combined_groups"] if group["cohort"] == "xhigh_combined_spark_assisted"
     ]
@@ -344,6 +352,9 @@ def render_markdown(summary: dict[str, Any]) -> str:
         _append_direct_delta_table(lines, summary["main_direct_vs_proposal"])
     else:
         lines.append("No complete direct/proposal pairs available.")
+    if summary["high_combined_direct_vs_proposal"]:
+        lines.extend(["", "## Combined High Proposal Minus Direct", ""])
+        _append_direct_delta_table(lines, summary["high_combined_direct_vs_proposal"])
     if summary["xhigh_combined_direct_vs_proposal"]:
         lines.extend(["", "## Combined Xhigh Proposal Minus Direct", ""])
         _append_direct_delta_table(lines, summary["xhigh_combined_direct_vs_proposal"])
@@ -382,6 +393,9 @@ def render_markdown(summary: dict[str, Any]) -> str:
             )
     else:
         lines.append("No main Spark/historical pairs available.")
+    if summary["high_combined_spark_vs_historical"]:
+        lines.extend(["", "## Combined High Spark Minus Historical", ""])
+        _append_spark_historical_delta_table(lines, summary["high_combined_spark_vs_historical"])
     if summary["xhigh_combined_spark_vs_historical"]:
         lines.extend(["", "## Combined Xhigh Spark Minus Historical", ""])
         _append_spark_historical_delta_table(lines, summary["xhigh_combined_spark_vs_historical"])
@@ -457,15 +471,26 @@ def _cohort(row: dict[str, Any]) -> str:
 def _phase_cohort(row: dict[str, Any]) -> str:
     cohort = str(row.get("cohort") or _cohort(row))
     source = str(row.get("source") or "")
-    if cohort == "spark_assisted" and source in {"main", "pilot", "xhigh_extension"}:
+    if cohort == "spark_assisted" and source in {"main", "pilot", "high_extension", "xhigh_extension"}:
         return f"{source}_spark_assisted"
     return cohort
 
 
-def _xhigh_combined_cohort(row: dict[str, Any]) -> str:
+def _focused_combined_groups(rows: list[dict[str, Any]], *, reasoning: str) -> list[dict[str, Any]]:
+    source = f"{reasoning}_extension"
+    combined_rows = [
+        row
+        for row in rows
+        if str(row.get("root_reasoning")) == reasoning and str(row.get("source")) in {"historical", "main", source}
+    ]
+    return summarize_groups(combined_rows, cohort_key=lambda row: _focused_combined_cohort(row, reasoning=reasoning))
+
+
+def _focused_combined_cohort(row: dict[str, Any], *, reasoning: str) -> str:
     cohort = str(row.get("cohort") or _cohort(row))
-    if cohort == "spark_assisted" and str(row.get("source")) in {"main", "xhigh_extension"}:
-        return "xhigh_combined_spark_assisted"
+    source = str(row.get("source"))
+    if cohort == "spark_assisted" and source in {"main", f"{reasoning}_extension"}:
+        return f"{reasoning}_combined_spark_assisted"
     return cohort
 
 
@@ -480,6 +505,8 @@ def _experiment_source(path: Path) -> str:
     name = path.name.lower()
     if "xhigh_extension" in name:
         return "xhigh_extension"
+    if "high_extension" in name:
+        return "high_extension"
     if "pilot" in name:
         return "pilot"
     if "main" in name:
