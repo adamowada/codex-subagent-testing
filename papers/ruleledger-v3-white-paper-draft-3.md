@@ -3,7 +3,8 @@
 A controlled benchmark for solo GPT-5.5 coding runs
 
 By Adam Owada, with Codex<br>
-June 25, 2026
+Benchmark completed June 17, 2026<br>
+Draft revised June 25, 2026
 
 ## Abstract
 
