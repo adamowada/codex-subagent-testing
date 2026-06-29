@@ -333,7 +333,13 @@ def _validate_usage_artifact(path: Path, value: Any) -> list[str]:
         for key in ("implementation_tokens", "judge_tokens", "judge_inclusive_tokens"):
             if not _is_nonnegative_number(totals.get(key)):
                 errors.append(f"usage artifact totals.{key} is not a non-negative number: {path}")
-        for key in ("gpt55_implementation_tokens", "gpt55_judge_inclusive_tokens", "spark_implementation_tokens"):
+        for key in (
+            "gpt55_implementation_tokens",
+            "gpt55_judge_inclusive_tokens",
+            "spark_implementation_tokens",
+            "root_implementation_tokens",
+            "leaf_implementation_tokens",
+        ):
             if totals.get(key) is not None and not _is_nonnegative_number(totals.get(key)):
                 errors.append(f"usage artifact totals.{key} is not null or a non-negative number: {path}")
     elif "totals" in value:

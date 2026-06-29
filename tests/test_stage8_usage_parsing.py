@@ -37,6 +37,7 @@ def test_parser_reads_supported_usage_shapes_and_aliases(tmp_path: Path) -> None
             },
             {
                 "type": "turn.completed",
+                "staged_spark": {"stage_id": "leaf_01", "role": "spark_leaf"},
                 "turn": {
                     "completed": {
                         "usage": {
@@ -60,6 +61,7 @@ def test_parser_reads_supported_usage_shapes_and_aliases(tmp_path: Path) -> None
     assert events[1]["model"] == "gpt-5.5"
     assert events[2]["reasoning_output_tokens"] == 2
     assert events[2]["model"] == "gpt-5.3-codex-spark"
+    assert events[2]["stage_role"] == "spark_leaf"
 
 
 def test_parse_result_warns_for_malformed_and_non_object_lines(tmp_path: Path) -> None:
@@ -159,6 +161,42 @@ def test_summary_marks_partial_model_attribution_as_best_effort(runs: list[dict]
     assert summary["totals"]["spark_implementation_tokens"] == 10
     assert summary["unattributed"]["implementation_tokens"] == 30
     assert any("some usage events only" in warning for warning in summary["warnings"])
+
+
+def test_summary_tracks_staged_root_and_leaf_tokens(runs: list[dict], tmp_path: Path) -> None:
+    run = next(candidate for candidate in runs if candidate["run_id"] == "C1_direct_r01")
+    impl = tmp_path / "events.jsonl"
+    judge = tmp_path / "judge.events.jsonl"
+    _write_jsonl(
+        impl,
+        [
+            {
+                "model": "gpt-5.5",
+                "staged": {"stage_id": "root_plan", "role": "gpt_root_planning"},
+                "usage": {"input_tokens": 10, "output_tokens": 5},
+            },
+            {
+                "model": "gpt-5.5",
+                "staged": {"stage_id": "leaf_01", "role": "leaf"},
+                "usage": {"input_tokens": 20, "output_tokens": 10},
+            },
+            {
+                "model": "gpt-5.5",
+                "staged": {"stage_id": "root_integration", "role": "gpt_root_integration"},
+                "usage": {"input_tokens": 3, "output_tokens": 2},
+            },
+        ],
+    )
+    _write_jsonl(judge, [{"usage": {"input_tokens": 1, "output_tokens": 1}}])
+
+    summary = summarize_usage(implementation_events_path=impl, judge_events_path=judge, run=run)
+
+    assert summary["totals"]["implementation_tokens"] == 50
+    assert summary["totals"]["gpt55_implementation_tokens"] == 50
+    assert summary["totals"]["spark_implementation_tokens"] == 0
+    assert summary["totals"]["root_implementation_tokens"] == 20
+    assert summary["totals"]["leaf_implementation_tokens"] == 30
+    assert summary["implementation_role_totals"]["leaf"]["total_tokens"] == 30
 
 
 def test_usage_artifact_validation_rejects_incomplete_summary(tmp_path: Path) -> None:

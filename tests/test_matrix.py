@@ -31,6 +31,8 @@ SPARK_MODE_LOW_MEDIUM_EXTENSION_CONFIG_PATH = (
     REPO_ROOT / "configs" / "spark_mode_efficiency_low_medium_extension.yaml"
 )
 SPARK_MODE_XHIGH_EXTENSION_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_efficiency_xhigh_extension.yaml"
+GPT55_FRONTIER_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_pilot.yaml"
+GPT55_FRONTIER_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -348,6 +350,52 @@ def test_spark_mode_efficiency_low_medium_extension_expands_to_sixty_runs() -> N
     assert {run["leaf"]["count"] for run in runs} == {6}
     assert {tuple(run["leaf"]["reasoning_by_role"].values()) for run in runs} == {
         ("xhigh", "xhigh", "xhigh")
+    }
+
+
+def test_gpt55_direct_quality_frontier_pilot_expands_to_four_staged_runs() -> None:
+    config = load_experiment_config(GPT55_FRONTIER_PILOT_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert len(runs) == 4
+    assert config["parallelism"] == {"implementation_jobs": 2, "judge_jobs": 2}
+    assert summary["by_cell"] == {"GQF0": 1, "GQF1": 1, "GQF2": 1, "GQF3": 1}
+    assert summary["by_topology"] == {"staged_spark": 4}
+    assert summary["by_spark_mode"] == {"direct": 4}
+    assert summary["by_root_reasoning"] == {"high": 2, "xhigh": 2}
+    assert [run["run_id"] for run in runs] == [
+        "GQF0_direct_r01",
+        "GQF1_direct_r01",
+        "GQF2_direct_r01",
+        "GQF3_direct_r01",
+    ]
+    assert {run["leaf"]["model"] for run in runs} == {"gpt-5.5"}
+    assert {run["leaf"]["count"] for run in runs} == {6}
+
+
+def test_gpt55_direct_quality_frontier_expands_to_eighty_runs() -> None:
+    config = load_experiment_config(GPT55_FRONTIER_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert len(runs) == 80
+    assert config["parallelism"] == {"implementation_jobs": 3, "judge_jobs": 3}
+    assert summary["by_cell"] == {"GQF0": 20, "GQF1": 20, "GQF2": 20, "GQF3": 20}
+    assert summary["by_topology"] == {"staged_spark": 80}
+    assert summary["by_spark_mode"] == {"direct": 80}
+    assert summary["by_root_reasoning"] == {"high": 40, "xhigh": 40}
+    assert runs[0]["run_id"] == "GQF0_direct_r01"
+    assert runs[-1]["run_id"] == "GQF3_direct_r20"
+    assert {
+        (run["root"]["reasoning"], tuple(run["leaf"]["reasoning_by_role"].values()))
+        for run in runs
+        if run["repeat_index"] == 1
+    } == {
+        ("high", ("high", "high", "high")),
+        ("xhigh", ("high", "high", "high")),
+        ("high", ("xhigh", "xhigh", "xhigh")),
+        ("xhigh", ("xhigh", "xhigh", "xhigh")),
     }
 
 

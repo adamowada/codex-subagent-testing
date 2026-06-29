@@ -267,6 +267,8 @@ def test_v2_report_includes_category_performance_and_root_spread(
     assert "hidden_correctness" in csv_columns
     assert "performance_pass_rate" in csv_columns
     assert "gpt55_judge_inclusive_tokens" in csv_columns
+    assert "root_implementation_tokens" in csv_columns
+    assert "leaf_implementation_tokens" in csv_columns
     assert "spark_implementation_tokens" in csv_columns
 
     with sqlite3.connect(outputs["results_sqlite"]) as connection:
@@ -276,6 +278,8 @@ def test_v2_report_includes_category_performance_and_root_spread(
         "performance_pass_rate",
         "hidden_category_scores",
         "gpt55_judge_inclusive_tokens",
+        "root_implementation_tokens",
+        "leaf_implementation_tokens",
         "spark_implementation_tokens",
     } <= sqlite_columns
 

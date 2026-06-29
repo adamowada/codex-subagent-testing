@@ -155,6 +155,13 @@ def build_template_context(run: Mapping[str, Any]) -> dict[str, str]:
     proposal_only = bool(spark_config.get("proposal_only")) if spark_config else False
     leaf_write_mode = str(spark_config.get("leaf_write_mode")) if spark_config else "none"
     topology = _required_str(run, "topology")
+    leaf_model = str(leaf.get("model", "none")) if leaf else "none"
+    leaf_family = _leaf_family(leaf_model) if leaf else "none"
+    display_topology = (
+        "staged_leaf"
+        if topology == "staged_spark" and leaf_family not in {"spark", "none"}
+        else topology
+    )
 
     context = {
         "run_id": _required_str(run, "run_id"),
@@ -162,8 +169,10 @@ def build_template_context(run: Mapping[str, Any]) -> dict[str, str]:
         "cell_name": _required_str(run, "cell_name"),
         "repeat_index": str(_required_int(run, "repeat_index")),
         "topology": topology,
+        "display_topology": display_topology,
         "spark_mode": spark_mode_name,
         "spark_mode_name": spark_mode_name,
+        "write_mode": spark_mode_name,
         "proposal_only": _bool_text(proposal_only),
         "leaf_write_mode": leaf_write_mode,
         "root_model": _required_str(root, "model"),
@@ -173,7 +182,8 @@ def build_template_context(run: Mapping[str, Any]) -> dict[str, str]:
         "sublead_reasoning": str(subleads.get("reasoning", "none")) if subleads else "none",
         "sublead_count": str(subleads.get("count", 0)) if subleads else "0",
         "leaves_per_sublead": str(subleads.get("leaves_per_sublead", 0)) if subleads else "0",
-        "leaf_model": str(leaf.get("model", "none")) if leaf else "none",
+        "leaf_model": leaf_model,
+        "leaf_family": leaf_family,
         "leaf_count": str(leaf.get("count", 0)) if leaf else "0",
         "spark_reasoning_implementer": str(reasoning_by_role.get("implementer", "none")),
         "spark_reasoning_tester": str(reasoning_by_role.get("tester", "none")),
@@ -347,6 +357,7 @@ def _repo_file(repo_root: Path, relative_path: str) -> Path:
 
 
 def _run_metadata_block(context: Mapping[str, str]) -> str:
+    mode_label = "spark_mode" if context["leaf_family"] in {"spark", "none"} else "write_mode"
     lines = [
         "## Run Metadata",
         "",
@@ -355,8 +366,8 @@ def _run_metadata_block(context: Mapping[str, str]) -> str:
         f"cell_id: {context['cell_id']}",
         f"cell_name: {context['cell_name']}",
         f"repeat_index: {context['repeat_index']}",
-        f"topology: {context['topology']}",
-        f"spark_mode: {context['spark_mode']}",
+        f"topology: {context['display_topology']}",
+        f"{mode_label}: {context['write_mode']}",
         f"proposal_only: {context['proposal_only']}",
         f"leaf_write_mode: {context['leaf_write_mode']}",
         f"root_model: {context['root_model']}",
@@ -431,6 +442,10 @@ def _required_int(parent: Mapping[str, Any], key: str) -> int:
 
 def _bool_text(value: bool) -> str:
     return "true" if value else "false"
+
+
+def _leaf_family(model: str) -> str:
+    return "spark" if "spark" in model.lower() else "generic"
 
 
 def _final_text(text: str) -> str:

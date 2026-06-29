@@ -20,6 +20,7 @@ CONFIG_PATH = REPO_ROOT / "configs" / "initial_experiment.yaml"
 RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
 RULELEDGER_V3_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_sanity.yaml"
 SPARK_MODE_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_efficiency_pilot.yaml"
+GPT55_FRONTIER_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_pilot.yaml"
 
 
 @pytest.fixture
@@ -162,6 +163,23 @@ def test_staged_spark_prompt_disables_codex_managed_subagents() -> None:
     assert "Direct edit mode gives each Spark leaf an isolated writable copy" in prompt
     assert config["agents"]["max_depth"] == 0
     assert config["agents"]["max_threads"] == 1
+    assert set(config["agents"]) == {"max_depth", "max_threads"}
+
+
+def test_gpt55_frontier_prompt_uses_generic_leaf_language() -> None:
+    runs = expand_experiment_matrix(load_experiment_config(GPT55_FRONTIER_PILOT_CONFIG_PATH))
+    run = runs[0]
+    prompt = render_implementation_prompt(run, REPO_ROOT)
+    config = tomllib.loads(render_codex_config(run, REPO_ROOT)["config.toml"])
+
+    assert "staged GPT-5.5 leaf experiment" in prompt
+    assert "Required GPT-5.5 Leaves" in prompt
+    assert "Current write mode: `direct`" in prompt
+    assert "topology: staged_leaf" in prompt
+    assert "write_mode: direct" in prompt
+    assert "Spark" not in prompt
+    assert config["model"] == "gpt-5.5"
+    assert config["agents"]["max_depth"] == 0
     assert set(config["agents"]) == {"max_depth", "max_threads"}
 
 

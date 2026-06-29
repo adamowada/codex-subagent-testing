@@ -984,7 +984,7 @@ def run_staged_spark_implementation(
             sandbox=leaf_sandbox,
             timeout_seconds=_staged_timeout(run, "leaf"),
             stage_id=assignment["id"],
-            role="spark_leaf",
+            role=_staged_leaf_role(run),
             log_path=log_path,
         )
         capture_diff(leaf_dir, leaf_worktree)
@@ -1000,6 +1000,9 @@ def run_staged_spark_implementation(
             "run_id": run["run_id"],
             "topology": "staged_spark",
             "spark_mode": mode,
+            "write_mode": mode,
+            "leaf_model": leaf_model,
+            "leaf_role": _staged_leaf_role(run),
             "records": stage_records,
         },
     )
@@ -1032,6 +1035,9 @@ def run_staged_spark_implementation(
             "run_id": run["run_id"],
             "topology": "staged_spark",
             "spark_mode": mode,
+            "write_mode": mode,
+            "leaf_model": leaf_model,
+            "leaf_role": _staged_leaf_role(run),
             "records": stage_records,
         },
     )
@@ -1183,15 +1189,23 @@ def _staged_planning_prompt(rendered_prompt: str, run: Mapping[str, Any]) -> str
         f"- {item['id']}: {item['title']} ({item['focus']})"
         for item in STAGED_SPARK_LEAF_ASSIGNMENTS
     )
+    root = run.get("root") if isinstance(run.get("root"), Mapping) else {}
+    root_model = str(root.get("model") or "GPT-5.5")
+    root_reasoning = str(root.get("reasoning") or "")
+    leaf_model = _staged_leaf_model(run)
+    leaf_reasoning = _staged_leaf_reasoning(run.get("leaf") if isinstance(run.get("leaf"), Mapping) else {})
+    leaf_collective = _staged_leaf_collective(run)
     return _final_prompt(
         f"""# GPT Root Planning Stage
 
-You are the GPT-5.5 root planner for a staged Spark experiment. Do not edit
-files. Read the visible task context and produce six concise task briefs for
-the Spark leaves listed below.
+You are the {root_model} root planner for this {_staged_experiment_label(run)}.
+Do not edit files. Read the visible task context and produce six concise task
+briefs for the {leaf_collective} listed below.
 
-Spark mode: `{run.get('spark_mode')}`
-Root reasoning: `{run.get('root', {}).get('reasoning') if isinstance(run.get('root'), Mapping) else ''}`
+Write mode: `{run.get('spark_mode')}`
+Root reasoning: `{root_reasoning}`
+Leaf model: `{leaf_model}`
+Leaf reasoning: `{leaf_reasoning}`
 
 ## Leaf Assignments
 
@@ -1232,6 +1246,7 @@ def _staged_leaf_prompt(
     mode: str,
 ) -> str:
     planned_brief = _planned_leaf_brief(plan_value, assignment["id"])
+    leaf_label = _staged_leaf_label(run)
     if mode == "proposal":
         mode_rules = (
             "You are in proposal mode. Do not edit files. Inspect the visible "
@@ -1246,7 +1261,7 @@ def _staged_leaf_prompt(
         )
 
     return _final_prompt(
-        f"""# Spark Leaf Stage: {assignment['id']}
+        f"""# {leaf_label} Leaf Stage: {assignment['id']}
 
 {mode_rules}
 
@@ -1296,9 +1311,11 @@ def _staged_integration_prompt(
     stage_records: list[Mapping[str, Any]],
 ) -> str:
     mode = str(run.get("spark_mode") or "")
+    root = run.get("root") if isinstance(run.get("root"), Mapping) else {}
+    root_model = str(root.get("model") or "GPT-5.5")
     leaf_lines = []
     for record in stage_records:
-        if record.get("role") != "spark_leaf":
+        if not _is_staged_leaf_record(record):
             continue
         details = [
             f"stage_id={record.get('stage_id')}",
@@ -1317,7 +1334,7 @@ def _staged_integration_prompt(
     return _final_prompt(
         f"""# GPT Root Integration Stage
 
-You are the GPT-5.5 root integrator for the final measured workspace.
+You are the {root_model} root integrator for the final measured workspace.
 
 {mode_guidance}
 
@@ -1348,6 +1365,41 @@ def _planned_leaf_brief(plan_value: Mapping[str, Any], leaf_id: str) -> dict[str
                 return dict(brief)
     assignment = next((item for item in STAGED_SPARK_LEAF_ASSIGNMENTS if item["id"] == leaf_id), None)
     return dict(assignment or {"id": leaf_id, "task": "Inspect the visible task and report useful findings."})
+
+
+def _staged_leaf_model(run: Mapping[str, Any]) -> str:
+    leaf = run.get("leaf") if isinstance(run.get("leaf"), Mapping) else {}
+    return str(leaf.get("model") or "gpt-5.3-codex-spark")
+
+
+def _staged_uses_spark(run: Mapping[str, Any]) -> bool:
+    return "spark" in _staged_leaf_model(run).lower()
+
+
+def _staged_leaf_role(run: Mapping[str, Any]) -> str:
+    return "spark_leaf" if _staged_uses_spark(run) else "leaf"
+
+
+def _staged_leaf_label(run: Mapping[str, Any]) -> str:
+    model = _staged_leaf_model(run)
+    if "spark" in model.lower():
+        return "Spark"
+    if model.lower() == "gpt-5.5":
+        return "GPT-5.5"
+    return model
+
+
+def _staged_leaf_collective(run: Mapping[str, Any]) -> str:
+    label = _staged_leaf_label(run)
+    return "Spark leaves" if label == "Spark" else f"{label} worker leaves"
+
+
+def _staged_experiment_label(run: Mapping[str, Any]) -> str:
+    return "staged Spark experiment" if _staged_uses_spark(run) else "staged leaf experiment"
+
+
+def _is_staged_leaf_record(record: Mapping[str, Any]) -> bool:
+    return record.get("role") in {"spark_leaf", "leaf"}
 
 
 def _final_response_value(final_response: Any) -> Mapping[str, Any]:

@@ -69,6 +69,9 @@ def parse_usage_file(path: str | Path, *, label: str) -> UsageParseResult:
         model = _find_model(event, usage)
         if isinstance(model, str):
             normalized["model"] = model
+        stage_role = _find_stage_role(event)
+        if isinstance(stage_role, str):
+            normalized["stage_role"] = stage_role
         usage_events.append(normalized)
 
     if malformed_lines:
@@ -126,6 +129,7 @@ def summarize_usage(
     model_totals = _model_totals(implementation_events + judge_events)
     implementation_model_totals = _model_totals(implementation_events)
     judge_model_totals = _model_totals(judge_events)
+    implementation_role_totals = _role_totals(implementation_events)
     root_model = str(run.get("root", {}).get("model", "unknown")) if isinstance(run.get("root"), Mapping) else "unknown"
     judge_model = (
         str(run.get("judge", {}).get("model", "unknown")) if isinstance(run.get("judge"), Mapping) else "unknown"
@@ -157,6 +161,14 @@ def summarize_usage(
             "judge_tokens": judge["total_tokens"],
             "judge_inclusive_tokens": implementation["total_tokens"] + judge["total_tokens"],
             "gpt55_implementation_tokens": attribution["gpt55_implementation_tokens"],
+            "root_implementation_tokens": _tokens_for_roles(
+                implementation_role_totals,
+                {"gpt_root_planning", "gpt_root_integration"},
+            ),
+            "leaf_implementation_tokens": _tokens_for_roles(
+                implementation_role_totals,
+                {"spark_leaf", "leaf"},
+            ),
             "gpt55_judge_tokens": judge_gpt55_tokens,
             "gpt55_judge_inclusive_tokens": gpt55_judge_inclusive_tokens,
             "spark_implementation_tokens": attribution["spark_implementation_tokens"],
@@ -168,6 +180,7 @@ def summarize_usage(
         "model_totals": model_totals,
         "implementation_model_totals": implementation_model_totals,
         "judge_model_totals": judge_model_totals,
+        "implementation_role_totals": implementation_role_totals,
         "unattributed": {
             "implementation_tokens": _unattributed_tokens(implementation_events),
             "judge_tokens": _unattributed_tokens(judge_events),
@@ -218,6 +231,16 @@ def _find_model(event: Mapping[str, Any], usage: Mapping[str, Any]) -> str | Non
     return None
 
 
+def _find_stage_role(event: Mapping[str, Any]) -> str | None:
+    for key in ("staged", "staged_spark"):
+        value = event.get(key)
+        if isinstance(value, Mapping):
+            role = value.get("role")
+            if isinstance(role, str) and role:
+                return role
+    return None
+
+
 def _nested_value(value: Mapping[str, Any], path: tuple[str, ...]) -> Any:
     current: Any = value
     for key in path:
@@ -255,6 +278,21 @@ def _model_totals(events: list[dict[str, Any]]) -> dict[str, Any]:
             continue
         bucket = totals.setdefault(
             model,
+            {key: 0 for key in USAGE_TOTAL_KEYS},
+        )
+        for key in bucket:
+            bucket[key] += int(event.get(key, 0))
+    return totals
+
+
+def _role_totals(events: list[dict[str, Any]]) -> dict[str, Any]:
+    totals: dict[str, Any] = {}
+    for event in events:
+        role = event.get("stage_role")
+        if not isinstance(role, str):
+            continue
+        bucket = totals.setdefault(
+            role,
             {key: 0 for key in USAGE_TOTAL_KEYS},
         )
         for key in bucket:
@@ -354,6 +392,17 @@ def _tokens_for_model(model_totals: Mapping[str, Any], model: str) -> int:
     if not isinstance(bucket, Mapping):
         return 0
     return int(bucket.get("total_tokens", 0))
+
+
+def _tokens_for_roles(role_totals: Mapping[str, Any], roles: set[str]) -> int | None:
+    if not role_totals:
+        return None
+    total = 0
+    for role in roles:
+        bucket = role_totals.get(role)
+        if isinstance(bucket, Mapping):
+            total += int(bucket.get("total_tokens", 0))
+    return total
 
 
 def _nullable_sum(*values: int | None) -> int | None:
