@@ -33,6 +33,7 @@ SPARK_MODE_LOW_MEDIUM_EXTENSION_CONFIG_PATH = (
 SPARK_MODE_XHIGH_EXTENSION_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_efficiency_xhigh_extension.yaml"
 GPT55_FRONTIER_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_pilot.yaml"
 GPT55_FRONTIER_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier.yaml"
+GPT55_FRONTIER_50_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_50.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -397,6 +398,20 @@ def test_gpt55_direct_quality_frontier_expands_to_eighty_runs() -> None:
         ("high", ("xhigh", "xhigh", "xhigh")),
         ("xhigh", ("xhigh", "xhigh", "xhigh")),
     }
+
+
+def test_gpt55_direct_quality_frontier_50_expands_to_fifty_repeats_per_cell() -> None:
+    config = load_experiment_config(GPT55_FRONTIER_50_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert len(runs) == 200
+    assert summary["by_cell"] == {"GQF0": 50, "GQF1": 50, "GQF2": 50, "GQF3": 50}
+    assert summary["by_topology"] == {"staged_spark": 200}
+    assert summary["by_spark_mode"] == {"direct": 200}
+    assert summary["by_root_reasoning"] == {"high": 100, "xhigh": 100}
+    assert runs[0]["run_id"] == "GQF0_direct_r01"
+    assert runs[-1]["run_id"] == "GQF3_direct_r50"
 
 
 def test_c4_topology_resolves_to_eighteen_spark_leaves(config: dict) -> None:

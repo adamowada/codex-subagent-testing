@@ -33,6 +33,7 @@ SOLO_REASONING_CONFIG_PATH = REPO_ROOT / "configs" / "c5_c7_solo_reasoning.yaml"
 RULELEDGER_V2_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
 RULELEDGER_V3_SANITY_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_sanity.yaml"
 RULELEDGER_V3_PAPER_50_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_paper_50.yaml"
+GPT55_FRONTIER_50_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_50.yaml"
 
 
 @pytest.fixture
@@ -88,6 +89,21 @@ def test_repeat_range_selection_preserves_cell_order_for_batched_studies() -> No
         run["cell_id"]: sum(1 for candidate in selected if candidate["cell_id"] == run["cell_id"])
         for run in selected
     } == {"V3P0": 30, "V3P1": 30, "V3P2": 30, "V3P3": 30}
+
+
+def test_gpt55_frontier_repeat_extension_selects_missing_thirty_repeats_per_cell() -> None:
+    runs = expand_experiment_matrix(load_experiment_config(GPT55_FRONTIER_50_CONFIG_PATH))
+
+    selected = select_runs(runs, repeat_from=21, repeat_to=50)
+
+    assert len(selected) == 120
+    assert selected[0]["run_id"] == "GQF0_direct_r21"
+    assert selected[-1]["run_id"] == "GQF3_direct_r50"
+    assert {run["repeat_index"] for run in selected} == set(range(21, 51))
+    assert {
+        run["cell_id"]: sum(1 for candidate in selected if candidate["cell_id"] == run["cell_id"])
+        for run in selected
+    } == {"GQF0": 30, "GQF1": 30, "GQF2": 30, "GQF3": 30}
 
 
 def test_run_parallel_prints_incremental_progress(capsys: pytest.CaptureFixture[str]) -> None:
