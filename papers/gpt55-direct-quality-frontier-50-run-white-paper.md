@@ -1,308 +1,289 @@
-# GPT-5.5 Direct-Edit Quality Frontier, 50 Runs Per Cell
+# GPT-5.5 Direct-Edit Quality Frontier: Six Leaves vs Three Leaves
 
-What changed when the preliminary 20-run result was extended to 50 valid runs per topology
+50 valid runs per cell on RuleLedger v3
 
 By Adam Owada, with Codex<br>
 July 1, 2026
 
 ## Abstract
 
-This paper reports the 50-run-per-cell extension of the GPT-5.5 direct-edit
-quality frontier experiment on RuleLedger v3. The experiment compares four
-staged GPT-5.5 subagent topologies: high root with high leaves, xhigh root with
-high leaves, high root with xhigh leaves, and xhigh root with xhigh leaves.
-Each cell now contains 50 valid scored runs, for 200 total measured
-implementations.
+This paper extends the GPT-5.5 direct-edit quality-frontier study from a
+four-cell, six-leaf matrix to an eight-cell leaf-count comparison. The original
+frontier used 50 valid runs per cell for six GPT-5.5 direct-edit leaves. The
+new expansion adds 50 valid runs per cell for the same root and leaf reasoning
+pairs, but with three GPT-5.5 direct-edit leaves. In total, the analysis covers
+400 valid scored RuleLedger v3 implementations.
 
-The preliminary 20-run result made high root plus high GPT-5.5 leaves look like
-a clear winner. The 50-run result keeps that cell in first place on observed
-mean quality and token efficiency, but the evidence is more nuanced. High root
-plus high leaves scored the best mean quality, `0.7495`, with a 95% bootstrap
-confidence interval of `[0.7021, 0.7962]`. Xhigh root plus xhigh leaves was
-second at `0.7308`, xhigh root plus high leaves was third at `0.7190`, and high
-root plus xhigh leaves was fourth at `0.6885`.
+The motivating hypothesis was that fewer leaves might help xhigh roots by
+reducing integration burden. The result does not support that hypothesis as a
+mean-quality claim. With xhigh roots, three leaves scored `0.7219` mean quality
+and six leaves scored `0.7249`; the three-minus-six delta was `-0.0030` with a
+95% bootstrap interval of `[-0.0488, +0.0421]`. Matched xhigh-root comparisons
+were also unresolved: three leaves were `+0.0018` ahead with high leaves and
+`-0.0079` behind with xhigh leaves.
 
-The larger sample therefore changes the conclusion from "high/high is clearly
-best" to "high/high is the best observed default, but not decisively separated
-from the other top cells." The high/high advantage over xhigh/xhigh is only
-`+0.0187` mean quality with a bootstrap interval crossing zero. Its advantage
-over xhigh/high is `+0.0305`, also unresolved. Its advantage over high/xhigh is
-larger at `+0.0610` and is close to resolving, but still has a lower confidence
-bound just below zero.
+The useful result is different. Three leaves preserved nearly the same
+xhigh-root quality while spending much less. Across xhigh-root cells, the
+three-leaf topology used `81.6%` as many GPT-5.5 implementation tokens as the
+six-leaf topology. Across all cells, three leaves used `79.5%` as many
+implementation tokens and improved mean quality-per-token from `1.266e-07` to
+`1.576e-07`.
 
-The more durable result is about cost and reasoning interactions. Xhigh root
-reasoning did not provide a reliable average-quality lift. Xhigh leaves were
-not a general improvement and were actively unattractive when paired with a
-high root. Xhigh/xhigh remained the best upper-tail configuration, with the
-best top-quartile mean, but it spent about `35%` more implementation tokens
-than high/high. In practice, high/high is still the recommended default if the
-goal is mean quality per token, while xhigh/xhigh is the configuration to study
-when the goal is peak-run hunting.
+The highest observed mean-quality cell remains six leaves with a high root and
+high leaves: `0.7495`. The best three-leaf mean was xhigh root with xhigh
+leaves at `0.7229`, closely followed by xhigh root with high leaves at
+`0.7209`. The practical conclusion is therefore: use six-leaf high/high when
+single-run mean quality is the main goal; use three leaves when token
+efficiency or lower orchestration load matters; and continue treating xhigh
+reasoning as an interaction-sensitive knob, not a monotonic quality dial.
 
 ## Decision Summary
 
 | Developer goal | Recommended configuration | Evidence |
 | --- | --- | --- |
-| Best observed mean quality | High root + high GPT-5.5 leaves | Mean quality `0.7495`, highest among the four cells |
-| Best token efficiency | High root + high GPT-5.5 leaves | `1.538e-07` quality per GPT-5.5 implementation token, best in the matrix |
-| Best upper-tail behavior | Xhigh root + xhigh GPT-5.5 leaves | Best top-quartile mean, `0.9756`, and 5 of the top 10 runs |
-| Avoided default | High root + xhigh GPT-5.5 leaves | Lowest mean quality, `0.6885`, despite higher leaf token spend |
-| Main statistical caution | Do not over-rank the top three cells | Pairwise intervals among GQF0, GQF1, and GQF3 overlap zero |
-| Practical next experiment | Reduce coordination load or make integration stricter | Six GPT-5.5 leaves add expensive search; the root still has to compress it into one coherent semantics model |
+| Best observed mean quality | Six leaves, high root + high leaves | GQF0 mean quality `0.7495`, highest of all eight cells |
+| Best three-leaf quality | Three leaves, xhigh root + xhigh leaves | GQ3L2 mean quality `0.7229` |
+| Best token efficiency | Three leaves, high root + high leaves | GQ3L1 quality/token `1.810e-07` |
+| Best xhigh-root cost reduction | Three leaves with either leaf reasoning | Xhigh-root quality delta `-0.0030`, token ratio `0.816` |
+| Hypothesis outcome | Not supported as a quality uplift | Three leaves did not improve xhigh-root mean quality |
+| Most important caveat | Three-leaf high/high loses quality | GQ3L1 trailed GQF0 by `-0.0559` mean quality |
 
 ## Experiment Matrix
 
 All runs used the same frozen RuleLedger v3 starter project, hidden test suite,
 scoring profile, prompt templates, and staged direct-edit workflow. The judge
-was GPT-5.5 xhigh for every run.
+was GPT-5.5 xhigh for every run. The only experimental changes in the expansion
+were leaf count and the three-role assignment set.
 
-| Cell | Root reasoning | Leaf reasoning | Leaf count | Leaf model | Write mode | Valid runs |
-| --- | --- | --- | ---: | --- | --- | ---: |
-| GQF0 | high | high | 6 | GPT-5.5 | direct edit | 50 |
-| GQF1 | xhigh | high | 6 | GPT-5.5 | direct edit | 50 |
-| GQF2 | high | xhigh | 6 | GPT-5.5 | direct edit | 50 |
-| GQF3 | xhigh | xhigh | 6 | GPT-5.5 | direct edit | 50 |
+| Cell | Leaf count | Root reasoning | Leaf reasoning | Leaf model | Write mode | Valid runs |
+| --- | ---: | --- | --- | --- | --- | ---: |
+| GQF0 | 6 | high | high | GPT-5.5 | direct edit | 50 |
+| GQF1 | 6 | xhigh | high | GPT-5.5 | direct edit | 50 |
+| GQF2 | 6 | high | xhigh | GPT-5.5 | direct edit | 50 |
+| GQF3 | 6 | xhigh | xhigh | GPT-5.5 | direct edit | 50 |
+| GQ3L0 | 3 | high | xhigh | GPT-5.5 | direct edit | 50 |
+| GQ3L1 | 3 | high | high | GPT-5.5 | direct edit | 50 |
+| GQ3L2 | 3 | xhigh | xhigh | GPT-5.5 | direct edit | 50 |
+| GQ3L3 | 3 | xhigh | high | GPT-5.5 | direct edit | 50 |
 
-The staged topology was:
-
-```text
-Frozen RuleLedger v3 starter
-  -> GPT-5.5 root planning stage
-  -> six GPT-5.5 direct-edit leaf stages
-  -> GPT-5.5 root integration stage
-  -> public tests, hidden tests, scoring, judge review, usage parsing
-```
-
-The six leaves retained the prior role split: TypeScript parsing and
+The six-leaf topology used the earlier role split: TypeScript parsing and
 compatibility; TypeScript replay, reporting, and performance; Python parsing
 and compatibility; Python replay, reporting, and performance; cross-language
 parity and regression review; and adversarial review.
 
+The three-leaf topology used broader leaves:
+
+1. TypeScript parsing, normalization, replay, billing, reporting, public API
+   compatibility, and performance.
+2. Python parsing, normalization, replay, billing, reporting, public API
+   compatibility, and performance.
+3. Cross-language parity, regression coverage, hidden-risk review, and
+   integration simplification.
+
 ## Execution Audit
 
-The 50-run result pools two validated batches:
+The 400-run analysis pools three validated experiment directories:
 
 | Batch | Directory | Runs per cell | Notes |
 | --- | --- | ---: | --- |
-| Original frontier | `runs/20260629T224027-gpt55_direct_quality_frontier-gpt55_frontier_j7_j6` | 20 | Initial 80-run experiment |
-| Extension | `runs/20260630T061938-gpt55_direct_quality_frontier_50-gpt55_frontier_50_r21_r50_j7_j6` | 30 | Rerun-repaired 120-run extension |
+| Six-leaf original | `runs/20260629T224027-gpt55_direct_quality_frontier-gpt55_frontier_j7_j6` | 20 | Initial 80-run experiment |
+| Six-leaf extension | `runs/20260630T061938-gpt55_direct_quality_frontier_50-gpt55_frontier_50_r21_r50_j7_j6` | 30 | Rerun-repaired 120-run extension |
+| Three-leaf expansion | `runs/20260701T051040-gpt55_direct_quality_frontier_3leaf_50-gpt55_frontier_3leaf_50_j7_j6` | 50 | Rerun-repaired 200-run expansion |
 
-The extension initially produced usage-limit artifacts: GQF2 r35-r50 and all
-GQF3 r21-r50 had invalid implementation failures, and every extension judge
-phase failed from the same usage ceiling. Those zero scores were not treated as
-signal. The invalid phases were rerun with a shorter workspace path and lower
-concurrency. All 120 extension implementations completed, all 120 judges
-completed, and the final validation pass succeeded.
+The three-leaf expansion initially encountered usage-limit contamination. In
+the first pass, all judges failed, much of GQ3L1 failed, and the GQ3L2/GQ3L3
+implementation cells produced usage-limit artifacts. Those zero scores were
+not treated as signal. Invalid phases were rerun after usage resets until all
+200 implementations completed, all 200 judges parsed strict JSON, and Stage 11
+validation passed.
 
-The final Stage 11 validation status for the extension is `passed`. The pooled
-analysis script also passed its own checks: exactly 50 rows per cell, exactly
-20 original and 30 extension rows per cell, no duplicate run IDs, complete
-artifacts, no preserved failure phases, no usage warnings, and no non-positive
-quality scores.
+The final validation status for the three-leaf experiment is `passed`. The
+combined analysis script also passed: exactly 50 rows per cell, no duplicate
+run IDs, complete artifacts, no preserved failure phases, no usage warnings,
+no score warnings, and no non-positive quality scores.
 
-The reproducible analysis command is:
+The reproducible analysis commands are:
 
 ```powershell
 python scripts\analyze_gpt55_frontier_50.py
+python scripts\analyze_gpt55_leaf_count_frontier_50.py
 ```
 
-It writes derived analysis outputs under
-`runs/analysis/gpt55_direct_quality_frontier_50`.
+The second command writes derived comparison outputs under
+`runs/analysis/gpt55_direct_quality_frontier_leaf_count_50`.
 
 ## Primary Results
 
-| Cell | Configuration | Runs | Mean quality | 95% bootstrap CI | Median | Top quartile | Hidden correctness | Judge | GPT-5.5 impl tokens | Quality/token |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| GQF0 | High root + high leaves | 50 | `0.7495` | `[0.7021, 0.7962]` | `0.7808` | `0.9607` | `0.7227` | `0.7350` | `5.029M` | `1.538e-07` |
-| GQF1 | Xhigh root + high leaves | 50 | `0.7190` | `[0.6775, 0.7636]` | `0.6892` | `0.9669` | `0.6974` | `0.7252` | `6.213M` | `1.200e-07` |
-| GQF2 | High root + xhigh leaves | 50 | `0.6885` | `[0.6450, 0.7335]` | `0.6457` | `0.9142` | `0.6660` | `0.6516` | `5.735M` | `1.222e-07` |
-| GQF3 | Xhigh root + xhigh leaves | 50 | `0.7308` | `[0.6847, 0.7791]` | `0.6873` | `0.9756` | `0.7188` | `0.7188` | `6.791M` | `1.105e-07` |
+| Cell | Configuration | Runs | Mean quality | 95% bootstrap CI | Hidden correctness | Judge | GPT-5.5 impl tokens | Quality/token |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| GQF0 | 6 leaves, high root + high leaves | 50 | `0.7495` | `[0.7022, 0.7955]` | `0.7227` | `0.7350` | `5.029M` | `1.538e-07` |
+| GQF1 | 6 leaves, xhigh root + high leaves | 50 | `0.7190` | `[0.6770, 0.7629]` | `0.6974` | `0.7252` | `6.213M` | `1.200e-07` |
+| GQF2 | 6 leaves, high root + xhigh leaves | 50 | `0.6885` | `[0.6455, 0.7338]` | `0.6660` | `0.6516` | `5.735M` | `1.222e-07` |
+| GQF3 | 6 leaves, xhigh root + xhigh leaves | 50 | `0.7308` | `[0.6846, 0.7789]` | `0.7188` | `0.7188` | `6.791M` | `1.105e-07` |
+| GQ3L0 | 3 leaves, high root + xhigh leaves | 50 | `0.6970` | `[0.6496, 0.7448]` | `0.6667` | `0.6748` | `4.287M` | `1.689e-07` |
+| GQ3L1 | 3 leaves, high root + high leaves | 50 | `0.6936` | `[0.6435, 0.7450]` | `0.6697` | `0.6615` | `3.984M` | `1.810e-07` |
+| GQ3L2 | 3 leaves, xhigh root + xhigh leaves | 50 | `0.7229` | `[0.6773, 0.7700]` | `0.7111` | `0.7085` | `5.535M` | `1.336e-07` |
+| GQ3L3 | 3 leaves, xhigh root + high leaves | 50 | `0.7209` | `[0.6775, 0.7652]` | `0.7122` | `0.7099` | `5.082M` | `1.471e-07` |
 
-High/high remains the best observed mean performer. It also has the best
-median, the best mean hidden-test score, the best performance score, the lowest
-mean implementation token count, and the best quality-per-token score.
+The old six-leaf conclusion still matters: GQF0 remains the best observed
+single-run default. The expansion adds a second lesson: three-leaf xhigh-root
+cells retain the same mean-quality band as six-leaf xhigh-root cells, but with
+substantially lower token spend.
 
-The story is not a clean monotonic reasoning ladder. Raising only the leaves
-from high to xhigh hurt the high-root cell. Raising only the root from high to
-xhigh also did not help the high-leaf cell. The all-xhigh cell recovered enough
-to place second by mean and first by upper tail, but at the highest token cost.
+## Matched Leaf-Count Comparisons
 
-## Original 20 vs Extension 30
+| Reasoning pair | 3-leaf cell | 6-leaf cell | Quality delta | 95% bootstrap CI | P(delta > 0) | Token ratio |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| High root + high leaves | GQ3L1 | GQF0 | `-0.0559` | `[-0.1257, +0.0130]` | `0.0542` | `0.792` |
+| High root + xhigh leaves | GQ3L0 | GQF2 | `+0.0085` | `[-0.0565, +0.0730]` | `0.6045` | `0.748` |
+| Xhigh root + high leaves | GQ3L3 | GQF1 | `+0.0018` | `[-0.0594, +0.0621]` | `0.5277` | `0.818` |
+| Xhigh root + xhigh leaves | GQ3L2 | GQF3 | `-0.0079` | `[-0.0730, +0.0574]` | `0.4052` | `0.815` |
 
-| Cell | Original 20 quality | Extension 30 quality | Pooled 50 quality | Interpretation |
-| --- | ---: | ---: | ---: | --- |
-| GQF0 | `0.7693` | `0.7363` | `0.7495` | Original lead shrank |
-| GQF1 | `0.7047` | `0.7286` | `0.7190` | Original underperformance moderated |
-| GQF2 | `0.6845` | `0.6912` | `0.6885` | Stable low-ranking cell |
-| GQF3 | `0.7321` | `0.7299` | `0.7308` | Very stable mean |
+The matched comparisons show where fewer leaves helped and where they did not.
+The high/high six-leaf cell lost the most when collapsed to three broad leaves:
+`-0.0559` mean quality. That is not fully resolved by the bootstrap interval,
+but the probability of a positive three-leaf effect is only `0.0542`.
 
-This split explains why the result felt counter-intuitive. The first 20 runs
-were directionally useful, but the extension changed the spacing. GQF0 stayed
-on top, yet its lead over GQF1 and GQF3 became much smaller. GQF3's mean was
-almost unchanged; GQF1 improved; GQF2 stayed weak.
+For xhigh roots, the picture is almost flat. Three leaves were barely ahead
+with high leaves and barely behind with xhigh leaves. Both intervals are wide
+and centered near zero. This is why the original hypothesis is not supported:
+the reduced leaf count did not create an xhigh-root quality uplift.
 
-## Pairwise Quality Comparisons
+The token result is much less ambiguous. Every three-leaf matched cell used
+fewer implementation tokens. The three-leaf token ratio ranged from `0.748` to
+`0.818`, meaning roughly `18%` to `25%` lower GPT-5.5 implementation spend.
 
-| Comparison | Mean delta | 95% bootstrap CI | Probability left > right |
-| --- | ---: | ---: | ---: |
-| GQF0 minus GQF1 | `+0.0305` | `[-0.0338, +0.0928]` | `0.8230` |
-| GQF0 minus GQF2 | `+0.0610` | `[-0.0038, +0.1247]` | `0.9677` |
-| GQF0 minus GQF3 | `+0.0187` | `[-0.0478, +0.0846]` | `0.7152` |
-| GQF1 minus GQF2 | `+0.0305` | `[-0.0316, +0.0940]` | `0.8353` |
-| GQF1 minus GQF3 | `-0.0118` | `[-0.0747, +0.0532]` | `0.3623` |
-| GQF2 minus GQF3 | `-0.0423` | `[-0.1071, +0.0211]` | `0.0974` |
+## Hypothesis Tests
 
-At 50 runs per cell, the pairwise result supports three tiers rather than a
-single decisive ranking:
+| Effect | Quality delta | 95% bootstrap CI | P(delta > 0) | Token ratio |
+| --- | ---: | ---: | ---: | ---: |
+| 3 leaves minus 6 leaves, all cells | `-0.0134` | `[-0.0462, +0.0199]` | `0.2118` | `0.795` |
+| 3 leaves minus 6 leaves, high roots | `-0.0237` | `[-0.0719, +0.0234]` | `0.1648` | `0.768` |
+| 3 leaves minus 6 leaves, xhigh roots | `-0.0030` | `[-0.0488, +0.0421]` | `0.4485` | `0.816` |
+| 3-leaf xhigh roots minus 3-leaf high roots | `+0.0266` | `[-0.0209, +0.0738]` | `0.8645` | `1.284` |
 
-1. GQF0 is the best observed mean and the best practical default.
-2. GQF1 and GQF3 are close enough to GQF0 that their exact order remains
-   uncertain.
-3. GQF2 is the weakest observed cell, especially relative to GQF0 and GQF3.
+The xhigh-root hypothesis was directionally plausible: fewer leaves should
+give the root fewer candidate patches to reconcile, less conflicting code to
+discard, and a simpler final integration decision. But the observed quality
+lift did not appear. Three-leaf xhigh roots were statistically indistinguishable
+from six-leaf xhigh roots and slightly lower on observed mean.
 
-The GQF0-over-GQF2 comparison is close to resolving; its lower bootstrap bound
-is only `-0.0038`. The GQF0-over-GQF1 and GQF0-over-GQF3 comparisons are not
-close to decisive.
+The last row is interesting for a different reason. Within the three-leaf
+matrix, xhigh roots beat high roots by `+0.0266` observed mean quality, with
+probability positive `0.8645`. This is not decisive, but it is a cleaner sign
+that xhigh root effort may become more useful once the leaf set is smaller.
+The cost remains real: three-leaf xhigh-root cells spent `1.284x` as many
+implementation tokens as three-leaf high-root cells.
 
-## Reasoning Effects
+## Upper Tail
 
-| Effect | Mean quality delta | 95% bootstrap CI | Probability positive |
-| --- | ---: | ---: | ---: |
-| Xhigh root minus high root, pooled | `+0.0059` | `[-0.0396, +0.0510]` | `0.6007` |
-| Xhigh leaves minus high leaves, pooled | `-0.0246` | `[-0.0695, +0.0210]` | `0.1459` |
-| Xhigh root minus high root with high leaves | `-0.0305` | `[-0.0934, +0.0338]` | `0.1714` |
-| Xhigh root minus high root with xhigh leaves | `+0.0423` | `[-0.0218, +0.1068]` | `0.8986` |
-| Xhigh leaves minus high leaves with high root | `-0.0610` | `[-0.1252, +0.0028]` | `0.0316` |
-| Xhigh leaves minus high leaves with xhigh root | `+0.0118` | `[-0.0515, +0.0753]` | `0.6425` |
+| Cell | Top-quartile mean |
+| --- | ---: |
+| GQF0 | `0.9607` |
+| GQF1 | `0.9669` |
+| GQF2 | `0.9142` |
+| GQF3 | `0.9756` |
+| GQ3L0 | `0.9439` |
+| GQ3L1 | `0.9537` |
+| GQ3L2 | `0.9700` |
+| GQ3L3 | `0.9508` |
 
-The clearest interaction is that xhigh leaves are not a free upgrade. With a
-high root, xhigh leaves reduced mean quality by `0.0610` and added about
-`0.706M` implementation tokens. With an xhigh root, xhigh leaves had a small
-positive observed effect, but the interval remains wide.
+The upper-tail result remains friendly to xhigh/xhigh. The best top-quartile
+mean overall is still six-leaf xhigh/xhigh, GQF3, at `0.9756`. The best
+three-leaf upper tail is GQ3L2 at `0.9700`, close enough to matter
+operationally.
 
-One plausible interpretation is coordination load. Xhigh leaves may produce
-more ambitious and internally reasoned local edits, but the root still has to
-integrate six branches into one coherent TypeScript/Python semantics model. If
-the root is not also spending enough reasoning effort, xhigh leaf output can
-increase integration burden more than it increases usable solution quality.
-Even with an xhigh root, the quality lift is uncertain and token cost is high.
+The top individual runs also show that the three-leaf xhigh cells can reach
+the ceiling. Among the top 15 runs in the 400-run pool, GQ3L2 appears three
+times and GQ3L3 appears four times. The best single run remains GQF0 r32 at
+`0.9904`, but the three-leaf xhigh cells are not low-ceiling configurations.
 
-## Upper Tail and Peak Runs
+## Interpretation
 
-The best single run in the 50-run pool was `GQF0_direct_r32`, with quality
-`0.9904`. That is a change from the original 20-run paper, where the best
-single run came from GQF3. However, the upper tail still favors GQF3:
+This experiment splits "quality" and "coordination cost" more cleanly than the
+first six-leaf study. More leaves give the root a broader search portfolio.
+That helps the high/high six-leaf default and probably explains why GQF0 still
+has the best mean quality. Fewer leaves reduce spend and integration surface,
+but the broader three-role leaves appear to lose some of the benefit of
+specialized search.
 
-| Cell | Top-quartile mean | Best run | Top-10 runs represented |
-| --- | ---: | ---: | ---: |
-| GQF0 | `0.9607` | `0.9904` | 3 |
-| GQF1 | `0.9669` | `0.9861` | 1 |
-| GQF2 | `0.9142` | `0.9788` | 1 |
-| GQF3 | `0.9756` | `0.9893` | 5 |
+For xhigh roots, the tradeoff is more attractive. The three-leaf xhigh cells
+are effectively tied with their six-leaf counterparts on mean quality, while
+using about one-fifth fewer implementation tokens. That does not prove that
+fewer leaves "help" xhigh roots in absolute quality, but it does show that six
+leaves may be unnecessary for xhigh-root quality on this benchmark.
 
-This split matters operationally. If a workflow can afford many expensive
-attempts and select the best result after hidden or high-fidelity evaluation,
-xhigh/xhigh may be worth testing further. If the workflow wants the best
-expected result from a single run, high/high remains the better default.
+The xhigh-root result also changes how to read the earlier six-leaf paper. The
+six-leaf GQF1/GQF3 cells were expensive and not clearly better than GQF0. In
+the three-leaf matrix, xhigh roots look more competitive: GQ3L2 and GQ3L3 are
+the top two three-leaf means, and the xhigh-root average is `0.0266` above the
+three-leaf high-root average. This is not enough to dethrone GQF0, but it is
+enough to justify a follow-up study focused on smaller xhigh-root teams.
 
 ## Is 50 Runs Per Cell Enough?
 
-Fifty runs per cell is enough to reject the most naive version of the original
-story: the top cells are not separated by large margins. It is also enough to
-show that high root plus xhigh leaves is not an attractive default in this
-task. It is not enough to prove the exact order of GQF0, GQF1, and GQF3.
+Fifty runs per cell is enough to rule out large effects in several places. If
+three leaves had meaningfully improved xhigh-root mean quality, the matched
+comparisons should not have landed within one point of zero. It is also enough
+to show that the token reduction is large and consistent.
 
-The reason is simple variance. The pooled quality standard deviations are
-between about `0.157` and `0.171`. With `n=50`, the standard error of a cell
-mean is still roughly `0.022` to `0.024`. The observed top-cell gaps are
-`0.0187` to `0.0305`, which are the same size as one standard error. A
-`0.06` gap is borderline at this sample size; a `0.10` gap would be much more
-convincing.
+It is not enough to settle small quality differences. The xhigh-root
+three-minus-six interval is `[-0.0488, +0.0421]`, so modest gains or losses
+remain plausible. Likewise, the three-leaf xhigh-root advantage over
+three-leaf high roots is suggestive but not conclusive.
 
-A rough two-sample power calculation with quality standard deviation near
-`0.165` implies:
+The practical reading is:
 
-| True mean gap | Approximate runs per cell for 80% power |
-| ---: | ---: |
-| `0.10` | about `43` |
-| `0.06` | about `119` |
-| `0.05` | about `171` |
-| `0.03` | about `475` |
-
-That does not mean every future experiment needs hundreds of runs. It means
-that 50 runs per cell can support practical ranking decisions when gaps are
-large, but cannot make tiny differences look decisive. For this experiment,
-the right confidence statement is:
-
-> High/high is the best observed and most token-efficient default. GQF3 is the
-> best upper-tail configuration. The exact mean-quality ranking among GQF0,
-> GQF1, and GQF3 remains uncertain at 50 runs per cell.
-
-## Practical Interpretation
-
-The 50-run extension strengthens the case for conservative reasoning budgets in
-multi-agent coding topologies. More reasoning did not monotonically increase
-mean quality. Instead, the topology behaved like a coordination system:
-
-- High leaves gave the root smaller, cheaper material to integrate.
-- Xhigh leaves increased leaf-side token spend and did not reliably improve
-  final integrated quality.
-- Xhigh root effort was not enough by itself to raise the high-leaf cell.
-- Xhigh root plus xhigh leaves created the strongest upper tail, but not the
-  strongest average or efficiency.
-
-The result is especially relevant because all cells used GPT-5.5 leaves in
-direct-edit mode. This was already the higher-quality branch suggested by the
-Spark experiments. The remaining question was not "proposal or direct edit?"
-but "how much reasoning effort should the root and leaves spend once direct
-editing is chosen?" On RuleLedger v3, the answer is not simply "as much as
-possible."
+1. Six-leaf high/high remains the best observed highest-quality default.
+2. Three-leaf xhigh-root cells are quality-competitive with six-leaf xhigh-root
+   cells and cheaper.
+3. The exact quality ranking of the xhigh-root cells is still too tight for a
+   definitive claim.
 
 ## Recommendations
 
-For future RuleLedger-style subagent work:
+For RuleLedger-style direct-edit subagent work:
 
-1. Use high root plus high GPT-5.5 direct-edit leaves as the default
-   quality-per-token setting.
-2. Keep xhigh/xhigh as a peak-run or best-of-N candidate, not as the default
-   single-run setting.
-3. Do not run high root plus xhigh leaves unless testing a specific hypothesis
-   about integration support.
-4. Test whether fewer GPT-5.5 leaves improve mean quality by reducing root
-   integration burden.
-5. Add stricter root integration constraints or a post-integration consistency
-   pass before spending more reasoning on leaves.
-6. Treat 20-run cells as exploratory and 50-run cells as directional unless
-   observed gaps are around `0.10` or larger.
+1. Keep six-leaf high root plus high leaves as the default when the objective is
+   highest expected single-run quality.
+2. Use three-leaf xhigh-root cells when token budget or orchestration latency
+   matters and a small possible quality tradeoff is acceptable.
+3. Do not interpret "fewer leaves help xhigh roots" as a proven quality law.
+   The evidence supports "fewer leaves preserve xhigh-root quality more cheaply."
+4. Avoid three-leaf high/high as a replacement for six-leaf high/high if the
+   goal is maximum quality; that matched comparison had the largest observed
+   loss.
+5. Continue studying three-leaf xhigh/xhigh as a peak-run candidate, because
+   its upper tail was close to six-leaf xhigh/xhigh at lower token cost.
 
 ## Limitations
 
-This experiment is a controlled benchmark result, not a universal law about
-GPT-5.5. RuleLedger v3 rewards global semantic consistency across TypeScript
-and Python implementations; other tasks may reward broader search more. All
-leaves used the same six-role structure, so the result does not isolate whether
-different role designs would benefit more from xhigh reasoning. The judge was
-held constant at GPT-5.5 xhigh, so judge behavior is not part of the matrix.
+This is one benchmark and one model family. RuleLedger v3 rewards coherent
+cross-language semantics, replay correctness, deterministic reporting, and
+hidden-case robustness. Other tasks may benefit more from broader leaf search
+or more specialized leaves.
 
-The confidence intervals are bootstrap intervals over observed runs, not a
-guarantee that future harness versions, model snapshots, or prompt changes will
-preserve the same ordering. The extension also required a usage-limit repair
-workflow. The final data are valid after rerunning invalid phases, but the
-incident is a reminder that zero scores from infrastructure failures must be
-excluded or repaired rather than interpreted as model behavior.
+The three-leaf experiment required several usage-limit repair passes. The
+final data are valid after rerunning invalid phases, and validation confirms no
+preserved failure phases or unparsed judges. Still, the repair history matters:
+usage-limit zeros are infrastructure artifacts and must be repaired rather
+than interpreted.
+
+The bootstrap intervals are empirical intervals over observed runs. They do
+not guarantee stability across future model snapshots, prompt changes, or
+harness changes. The judge was held constant at GPT-5.5 xhigh, so judge
+behavior is not part of the experimental matrix.
 
 ## Conclusion
 
-The 50-run extension preserves the practical recommendation but softens the
-strength of the claim. High root plus high GPT-5.5 direct-edit leaves remains
-the best observed mean-quality and quality-per-token configuration. Xhigh root
-plus xhigh leaves remains the most interesting ceiling configuration. But the
-experiment no longer supports a confident statement that high/high is
-statistically superior to every other top cell.
+The three-leaf expansion answers the original question with a useful "no, but."
+No, fewer leaves did not improve xhigh-root mean quality. But fewer leaves did
+preserve xhigh-root quality while cutting implementation token spend by about
+`18%`.
 
-The counter-intuitive lesson is that reasoning effort is not a scalar quality
-knob in staged coding systems. Once multiple direct-edit leaves are involved,
-more reasoning can create more search, more code, and more integration burden.
-The root's job is not just to collect clever patches; it has to compress them
-into one consistent implementation. On this benchmark, the cheaper high/high
-configuration found the best average balance.
+The highest-quality default remains six leaves with a high root and high
+leaves. The most efficient frontier now includes three-leaf teams, especially
+when the root is xhigh. In other words, the next optimization target is not
+simply "more reasoning" or "fewer agents." It is finding the smallest team that
+gives the root enough diverse, correct material without making integration the
+dominant source of waste.
