@@ -60,6 +60,7 @@ from harness.preflight import run_preflight, write_preflight
 from harness.prompt_rendering import render_codex_config, render_implementation_prompt, render_judge_prompt
 from harness.report_data import write_results_outputs
 from harness.scoring import compute_run_score, write_run_score
+from harness.staged_assignments import staged_assignment_set_name, staged_leaf_assignments
 from harness.validation import validate_stage11, write_validation_report
 
 
@@ -869,40 +870,6 @@ def run_implementation_and_tests(
     status.update_run(str(run["run_id"]), phase="implementation_complete")
 
 
-STAGED_SPARK_LEAF_ASSIGNMENTS: tuple[dict[str, str], ...] = (
-    {
-        "id": "leaf_01",
-        "title": "TypeScript parsing, normalization, views, and migration compatibility",
-        "focus": "TypeScript parse/normalize/view compatibility, v2 migration behavior, and public API stability.",
-    },
-    {
-        "id": "leaf_02",
-        "title": "TypeScript replay, billing, reporting, performance, and API integration",
-        "focus": "TypeScript replay model, billing/proration, reporting, performance shape, and exports.",
-    },
-    {
-        "id": "leaf_03",
-        "title": "Python parsing, normalization, views, and migration compatibility",
-        "focus": "Python parse/normalize/view compatibility, v2 migration behavior, and public API stability.",
-    },
-    {
-        "id": "leaf_04",
-        "title": "Python replay, billing, reporting, performance, and API integration",
-        "focus": "Python replay model, billing/proration, reporting, performance shape, and exports.",
-    },
-    {
-        "id": "leaf_05",
-        "title": "Cross-language parity, fixtures, public tests, and regression review",
-        "focus": "TypeScript/Python parity risks, visible regression tests, deterministic CSV output, and fixture review.",
-    },
-    {
-        "id": "leaf_06",
-        "title": "Adversarial localization, maintainability, performance, and hidden-test risk review",
-        "focus": "Architectural localization, maintainability hazards, performance traps, and hidden-test risk analysis.",
-    },
-)
-
-
 def run_staged_spark_implementation(
     *,
     repo_root: Path,
@@ -927,6 +894,8 @@ def run_staged_spark_implementation(
     spark_config = run.get("spark_mode_config") if isinstance(run.get("spark_mode_config"), Mapping) else {}
     leaf_model = str(leaf.get("model") or "gpt-5.3-codex-spark")
     leaf_reasoning = _staged_leaf_reasoning(leaf)
+    assignment_set = staged_assignment_set_name(leaf)
+    assignments = staged_leaf_assignments(leaf)
     leaf_sandbox = str(spark_config.get("leaf_write_mode") or ("read-only" if mode == "proposal" else "workspace-write"))
     root_model = str(root.get("model") or "gpt-5.5")
     root_reasoning = str(root.get("reasoning") or "medium")
@@ -952,7 +921,7 @@ def run_staged_spark_implementation(
     stage_records.append(plan_record)
 
     plan_value = _final_response_value(plan_record.get("final_response"))
-    for assignment in STAGED_SPARK_LEAF_ASSIGNMENTS:
+    for assignment in assignments:
         leaf_dir = stage_root / assignment["id"]
         leaf_worktree = _staged_leaf_worktree(worktree.parent / "leaf_worktrees", assignment["id"])
         copy_benchmark_template(_run_benchmark_path(repo_root, run, "template_path"), leaf_worktree)
@@ -1002,6 +971,7 @@ def run_staged_spark_implementation(
             "spark_mode": mode,
             "write_mode": mode,
             "leaf_model": leaf_model,
+            "leaf_assignment_set": assignment_set,
             "leaf_role": _staged_leaf_role(run),
             "records": stage_records,
         },
@@ -1037,6 +1007,7 @@ def run_staged_spark_implementation(
             "spark_mode": mode,
             "write_mode": mode,
             "leaf_model": leaf_model,
+            "leaf_assignment_set": assignment_set,
             "leaf_role": _staged_leaf_role(run),
             "records": stage_records,
         },
@@ -1185,21 +1156,24 @@ def _staged_leaf_worktree(parent: Path, leaf_id: str) -> Path:
 
 
 def _staged_planning_prompt(rendered_prompt: str, run: Mapping[str, Any]) -> str:
+    leaf = run.get("leaf") if isinstance(run.get("leaf"), Mapping) else {}
+    selected_assignments = staged_leaf_assignments(leaf)
     assignments = "\n".join(
         f"- {item['id']}: {item['title']} ({item['focus']})"
-        for item in STAGED_SPARK_LEAF_ASSIGNMENTS
+        for item in selected_assignments
     )
     root = run.get("root") if isinstance(run.get("root"), Mapping) else {}
     root_model = str(root.get("model") or "GPT-5.5")
     root_reasoning = str(root.get("reasoning") or "")
     leaf_model = _staged_leaf_model(run)
-    leaf_reasoning = _staged_leaf_reasoning(run.get("leaf") if isinstance(run.get("leaf"), Mapping) else {})
+    leaf_reasoning = _staged_leaf_reasoning(leaf)
     leaf_collective = _staged_leaf_collective(run)
+    leaf_count = len(selected_assignments)
     return _final_prompt(
         f"""# GPT Root Planning Stage
 
 You are the {root_model} root planner for this {_staged_experiment_label(run)}.
-Do not edit files. Read the visible task context and produce six concise task
+Do not edit files. Read the visible task context and produce {leaf_count} concise task
 briefs for the {leaf_collective} listed below.
 
 Write mode: `{run.get('spark_mode')}`
@@ -1245,7 +1219,7 @@ def _staged_leaf_prompt(
     plan_value: Mapping[str, Any],
     mode: str,
 ) -> str:
-    planned_brief = _planned_leaf_brief(plan_value, assignment["id"])
+    planned_brief = _planned_leaf_brief(plan_value, assignment)
     leaf_label = _staged_leaf_label(run)
     if mode == "proposal":
         mode_rules = (
@@ -1357,13 +1331,13 @@ Codex, external AI, or additional agent processes.
     )
 
 
-def _planned_leaf_brief(plan_value: Mapping[str, Any], leaf_id: str) -> dict[str, Any]:
+def _planned_leaf_brief(plan_value: Mapping[str, Any], assignment: Mapping[str, str]) -> dict[str, Any]:
+    leaf_id = assignment["id"]
     briefs = plan_value.get("briefs")
     if isinstance(briefs, list):
         for brief in briefs:
             if isinstance(brief, Mapping) and brief.get("id") == leaf_id:
                 return dict(brief)
-    assignment = next((item for item in STAGED_SPARK_LEAF_ASSIGNMENTS if item["id"] == leaf_id), None)
     return dict(assignment or {"id": leaf_id, "task": "Inspect the visible task and report useful findings."})
 
 

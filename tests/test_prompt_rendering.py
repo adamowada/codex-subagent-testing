@@ -21,6 +21,7 @@ RULELEDGER_V2_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v2_pilot.yaml"
 RULELEDGER_V3_CONFIG_PATH = REPO_ROOT / "configs" / "ruleledger_v3_sanity.yaml"
 SPARK_MODE_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_efficiency_pilot.yaml"
 GPT55_FRONTIER_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_pilot.yaml"
+GPT55_FRONTIER_3LEAF_50_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_3leaf_50.yaml"
 
 
 @pytest.fixture
@@ -181,6 +182,22 @@ def test_gpt55_frontier_prompt_uses_generic_leaf_language() -> None:
     assert config["model"] == "gpt-5.5"
     assert config["agents"]["max_depth"] == 0
     assert set(config["agents"]) == {"max_depth", "max_threads"}
+
+
+def test_gpt55_frontier_3leaf_prompt_renders_three_role_assignments() -> None:
+    runs = expand_experiment_matrix(load_experiment_config(GPT55_FRONTIER_3LEAF_50_CONFIG_PATH))
+    run = runs[0]
+    prompt = render_implementation_prompt(run, REPO_ROOT)
+    context = build_template_context(run)
+
+    assert "3 GPT-5.5 leaf runs" in prompt
+    assert "exactly 3 GPT-5.5 worker leaves" in prompt
+    assert "`three_role` assignment set" in prompt
+    assert "TypeScript implementation surface" in prompt
+    assert "Python implementation surface" in prompt
+    assert "Cross-language parity, regression, performance, and adversarial review" in prompt
+    assert "leaf_count: 3" in prompt
+    assert context["leaf_assignment_set"] == "three_role"
 
 
 def test_every_implementation_prompt_has_safety_and_json_contract(runs: list[dict]) -> None:

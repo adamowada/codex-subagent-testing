@@ -5,23 +5,17 @@ RuleLedger v3.
 
 Current write mode: `{{ spark_mode }}`
 
-The harness, not this Codex process, invokes the GPT-5.5 root planning run, six
-GPT-5.5 leaf runs, and the GPT-5.5 root integration run as separate measured
-processes. Do not spawn subagents, invoke `codex`, call external AI, or start
-other agent processes from inside any measured process.
+The harness, not this Codex process, invokes the GPT-5.5 root planning run,
+{{ leaf_count }} GPT-5.5 leaf runs, and the GPT-5.5 root integration run as
+separate measured processes. Do not spawn subagents, invoke `codex`, call
+external AI, or start other agent processes from inside any measured process.
 
 ## Required GPT-5.5 Leaves
 
-The outer harness assigns exactly six GPT-5.5 worker leaves:
+The outer harness assigns exactly {{ leaf_count }} GPT-5.5 worker leaves using
+the `{{ leaf_assignment_set }}` assignment set:
 
-1. TypeScript parsing, normalization, views, and migration compatibility.
-2. TypeScript replay, billing, reporting, performance, and public API
-   integration.
-3. Python parsing, normalization, views, and migration compatibility.
-4. Python replay, billing, reporting, performance, and public API integration.
-5. Cross-language parity, fixture, public-test, and regression review.
-6. Adversarial review for localization, maintainability, performance, and
-   hidden-test risk.
+{{ staged_leaf_assignments }}
 
 ## Mode Rules
 

@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "benchmark": {
+    "version": "ruleledger_v3"
+  },
+  "experiment": {
+    "id": "gpt55_direct_quality_frontier_3leaf_50",
+    "repeat_count": 50,
+    "seed": 20260701
+  },
+  "parallelism": {
+    "implementation_jobs": 7,
+    "judge_jobs": 6
+  },
+  "timeouts": {
+    "implementation_seconds": 7200,
+    "judge_seconds": 1800
+  },
+  "paths": {
+    "benchmark_template": "benchmark_template_v3",
+    "hidden_cases": "hidden_tests/cases_v3",
+    "prompt_templates": {
+      "common": "prompts/task_common_staged_leaf_v3.md",
+      "solo": "prompts/task_solo.md",
+      "flat_spark": "prompts/task_flat_spark_v3.md",
+      "depth2_subleads": "prompts/task_depth2_subleads.md",
+      "staged_spark": "prompts/task_staged_gpt55_leaf_v3.md",
+      "judge": "prompts/judge.md"
+    },
+    "codex_config_template": "codex_templates/config.toml.j2"
+  },
+  "models": {
+    "gpt55": "gpt-5.5",
+    "spark": "gpt-5.3-codex-spark"
+  },
+  "spark_modes": {
+    "direct": {
+      "leaf_write_mode": "workspace-write",
+      "proposal_only": false
+    }
+  },
+  "scoring": {
+    "path": "configs/scoring_v3.yaml"
+  },
+  "judge": {
+    "model": "gpt-5.5",
+    "reasoning": "xhigh",
+    "prompt_template": "judge",
+    "sandbox": "danger-full-access"
+  },
+  "cells": [
+    {
+      "id": "GQ3L0",
+      "name": "gpt55_frontier_3leaf_root_high_leaf_xhigh_direct",
+      "repeats": 50,
+      "spark_modes": ["direct"],
+      "topology": "staged_spark",
+      "prompt_template": "staged_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "high",
+        "sandbox": "danger-full-access"
+      },
+      "leaf": {
+        "model": "gpt-5.5",
+        "count": 3,
+        "assignment_set": "three_role",
+        "reasoning_by_role": {
+          "implementer": "xhigh",
+          "tester": "xhigh",
+          "adversary": "xhigh"
+        }
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "GQ3L1",
+      "name": "gpt55_frontier_3leaf_root_high_leaf_high_direct",
+      "repeats": 50,
+      "spark_modes": ["direct"],
+      "topology": "staged_spark",
+      "prompt_template": "staged_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "high",
+        "sandbox": "danger-full-access"
+      },
+      "leaf": {
+        "model": "gpt-5.5",
+        "count": 3,
+        "assignment_set": "three_role",
+        "reasoning_by_role": {
+          "implementer": "high",
+          "tester": "high",
+          "adversary": "high"
+        }
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "GQ3L2",
+      "name": "gpt55_frontier_3leaf_root_xhigh_leaf_xhigh_direct",
+      "repeats": 50,
+      "spark_modes": ["direct"],
+      "topology": "staged_spark",
+      "prompt_template": "staged_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "xhigh",
+        "sandbox": "danger-full-access"
+      },
+      "leaf": {
+        "model": "gpt-5.5",
+        "count": 3,
+        "assignment_set": "three_role",
+        "reasoning_by_role": {
+          "implementer": "xhigh",
+          "tester": "xhigh",
+          "adversary": "xhigh"
+        }
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    },
+    {
+      "id": "GQ3L3",
+      "name": "gpt55_frontier_3leaf_root_xhigh_leaf_high_direct",
+      "repeats": 50,
+      "spark_modes": ["direct"],
+      "topology": "staged_spark",
+      "prompt_template": "staged_spark",
+      "root": {
+        "model": "gpt-5.5",
+        "reasoning": "xhigh",
+        "sandbox": "danger-full-access"
+      },
+      "leaf": {
+        "model": "gpt-5.5",
+        "count": 3,
+        "assignment_set": "three_role",
+        "reasoning_by_role": {
+          "implementer": "high",
+          "tester": "high",
+          "adversary": "high"
+        }
+      },
+      "agents": {
+        "max_depth": 0,
+        "max_threads": 1
+      }
+    }
+  ]
+}

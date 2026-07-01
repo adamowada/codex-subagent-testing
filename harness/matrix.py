@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 VALID_REASONING = {"none", "minimal", "low", "medium", "high", "xhigh"}
 VALID_SANDBOXES = {"read-only", "workspace-write", "danger-full-access"}
+STAGED_LEAF_ASSIGNMENT_COUNTS = {"six_role": 6, "three_role": 3}
 INITIAL_SPARK_MODEL = "gpt-5.3-codex-spark"
 INITIAL_GPT55_MODEL = "gpt-5.5"
 INITIAL_SPARK_REASONING = "xhigh"
@@ -268,6 +269,12 @@ def validate_experiment_config(config: Mapping[str, Any]) -> None:
             leaf_count = _positive_int(leaf, "count", f"{path}.leaf.count", errors)
             _validate_leaf(leaf, path, errors, strict_initial_contract=strict_initial_contract)
             if leaf_count is not None:
+                assignment_set = str(leaf.get("assignment_set") or "six_role")
+                expected_leaf_count = STAGED_LEAF_ASSIGNMENT_COUNTS.get(assignment_set)
+                if expected_leaf_count is not None and leaf_count != expected_leaf_count:
+                    errors.append(
+                        f"{path}.leaf.count: assignment_set {assignment_set!r} requires {expected_leaf_count} leaves"
+                    )
                 breadth += leaf_count
 
         if max_threads is not None and max_threads < breadth:
@@ -705,6 +712,10 @@ def _validate_leaf(
         _validate_reasoning(reasoning, role_path, errors)
         if strict_initial_contract and reasoning != INITIAL_SPARK_REASONING:
             errors.append(f"{role_path}: initial Spark reasoning must be xhigh")
+
+    assignment_set = leaf.get("assignment_set")
+    if assignment_set is not None and assignment_set not in STAGED_LEAF_ASSIGNMENT_COUNTS:
+        errors.append(f"{path}.leaf.assignment_set: expected one of {sorted(STAGED_LEAF_ASSIGNMENT_COUNTS)}")
 
 
 def _cell_spark_modes(

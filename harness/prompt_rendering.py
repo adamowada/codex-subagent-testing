@@ -7,6 +7,7 @@ import re
 from typing import Any, Mapping
 
 from harness.matrix import REPO_ROOT, expand_experiment_matrix, load_experiment_config
+from harness.staged_assignments import render_staged_leaf_assignments, staged_assignment_set_name
 
 
 PLACEHOLDER_PATTERN = re.compile(r"{{\s*([A-Za-z_][A-Za-z0-9_]*)\s*}}")
@@ -185,6 +186,8 @@ def build_template_context(run: Mapping[str, Any]) -> dict[str, str]:
         "leaf_model": leaf_model,
         "leaf_family": leaf_family,
         "leaf_count": str(leaf.get("count", 0)) if leaf else "0",
+        "leaf_assignment_set": staged_assignment_set_name(leaf),
+        "staged_leaf_assignments": render_staged_leaf_assignments(leaf),
         "spark_reasoning_implementer": str(reasoning_by_role.get("implementer", "none")),
         "spark_reasoning_tester": str(reasoning_by_role.get("tester", "none")),
         "spark_reasoning_adversary": str(reasoning_by_role.get("adversary", "none")),

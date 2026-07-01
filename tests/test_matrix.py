@@ -34,6 +34,7 @@ SPARK_MODE_XHIGH_EXTENSION_CONFIG_PATH = REPO_ROOT / "configs" / "spark_mode_eff
 GPT55_FRONTIER_PILOT_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_pilot.yaml"
 GPT55_FRONTIER_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier.yaml"
 GPT55_FRONTIER_50_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_50.yaml"
+GPT55_FRONTIER_3LEAF_50_CONFIG_PATH = REPO_ROOT / "configs" / "gpt55_direct_quality_frontier_3leaf_50.yaml"
 SYNTHETIC_V2_CONFIG_PATH = REPO_ROOT / "tests" / "fixtures" / "stage14" / "ruleledger_v2_experiment.yaml"
 
 
@@ -412,6 +413,33 @@ def test_gpt55_direct_quality_frontier_50_expands_to_fifty_repeats_per_cell() ->
     assert summary["by_root_reasoning"] == {"high": 100, "xhigh": 100}
     assert runs[0]["run_id"] == "GQF0_direct_r01"
     assert runs[-1]["run_id"] == "GQF3_direct_r50"
+
+
+def test_gpt55_direct_quality_frontier_3leaf_50_expands_requested_matrix() -> None:
+    config = load_experiment_config(GPT55_FRONTIER_3LEAF_50_CONFIG_PATH)
+    runs = expand_experiment_matrix(config)
+    summary = summarize_matrix(runs)
+
+    assert len(runs) == 200
+    assert config["parallelism"] == {"implementation_jobs": 7, "judge_jobs": 6}
+    assert summary["by_cell"] == {"GQ3L0": 50, "GQ3L1": 50, "GQ3L2": 50, "GQ3L3": 50}
+    assert summary["by_topology"] == {"staged_spark": 200}
+    assert summary["by_spark_mode"] == {"direct": 200}
+    assert summary["by_root_reasoning"] == {"high": 100, "xhigh": 100}
+    assert runs[0]["run_id"] == "GQ3L0_direct_r01"
+    assert runs[-1]["run_id"] == "GQ3L3_direct_r50"
+    assert {run["leaf"]["count"] for run in runs} == {3}
+    assert {run["leaf"]["assignment_set"] for run in runs} == {"three_role"}
+    assert {
+        (run["cell_id"], run["root"]["reasoning"], tuple(run["leaf"]["reasoning_by_role"].values()))
+        for run in runs
+        if run["repeat_index"] == 1
+    } == {
+        ("GQ3L0", "high", ("xhigh", "xhigh", "xhigh")),
+        ("GQ3L1", "high", ("high", "high", "high")),
+        ("GQ3L2", "xhigh", ("xhigh", "xhigh", "xhigh")),
+        ("GQ3L3", "xhigh", ("high", "high", "high")),
+    }
 
 
 def test_c4_topology_resolves_to_eighteen_spark_leaves(config: dict) -> None:
